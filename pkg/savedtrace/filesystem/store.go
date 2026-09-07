@@ -260,13 +260,7 @@ func (s *Store) appendJournal(ctx context.Context, directory string, payload []b
 		return fmt.Errorf("close saved trace journal: %w", err)
 	}
 	if created {
-		directoryFile, err := os.Open(directory)
-		if err != nil {
-			return fmt.Errorf("open saved trace journal directory: %w", err)
-		}
-		syncErr := directoryFile.Sync()
-		closeErr := directoryFile.Close()
-		if err := errors.Join(syncErr, closeErr); err != nil {
+		if err := syncDirectory(directory); err != nil {
 			return fmt.Errorf("sync saved trace journal directory: %w", err)
 		}
 	}
@@ -402,12 +396,7 @@ func (s *Store) UpsertCaptureSession(ctx context.Context, session savedtrace.Cap
 		_ = os.Remove(temporaryName)
 		return err
 	}
-	directoryFile, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	err = errors.Join(directoryFile.Sync(), directoryFile.Close())
-	if err != nil {
+	if err := syncDirectory(directory); err != nil {
 		return fmt.Errorf("sync capture session directory: %w", err)
 	}
 	return nil

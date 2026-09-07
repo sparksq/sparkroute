@@ -29,6 +29,8 @@ jobs:
           python-version: '3.13'
       - name: Test native storage permissions, bridge, and identity contracts
         run: go test ./internal/privatepath ./pkg/sparkrun ./pkg/identity ./pkg/version
+      - name: Test native trace writes, recovery, and export
+        run: go test ./pkg/savedtrace/filesystem -run 'Test(StoreBatchUsesOneJournalAndSurvivesReopen|OpenRepairsOnlyIncompleteJournalTail|ExportJSONLScansJournalOnceAndExportsEveryRecord)$'
       - uses: actions/download-artifact@v8
         with:
           name: sparkroute-distributions

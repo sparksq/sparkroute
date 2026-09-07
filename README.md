@@ -87,6 +87,11 @@ Filesystem recording is owner-only, bounded, and intended for one gateway
 writer. It is not a multi-replica RWX-PVC backend. SQLite may share the usage
 ledger database or use a dedicated trace database.
 
+File contents are flushed on all platforms. Windows filesystem trace storage
+does not flush directory entries, so a sudden power loss can lose recently
+created or renamed journal/session files. Ordinary process restart and incomplete
+journal recovery are tested separately from power-loss durability.
+
 ```sh
 sparkroute \
   -config ./examples/config.yaml \
