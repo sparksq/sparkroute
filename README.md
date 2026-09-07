@@ -78,6 +78,11 @@ creation/retrieval through its `proxy admin-token` commands.
 
 ## Saved traces and export
 
+On Windows, SQLite databases and filesystem traces must reside in directories
+whose ACLs restrict access to the running user, SYSTEM, and local Administrators.
+Inheritable permissions are checked as well; existing ACLs are never rewritten.
+On Linux and macOS, directories use mode 0700 and files use mode 0600.
+
 Filesystem recording is owner-only, bounded, and intended for one gateway
 writer. It is not a multi-replica RWX-PVC backend. SQLite may share the usage
 ledger database or use a dedicated trace database.

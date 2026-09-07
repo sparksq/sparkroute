@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sparksq/sparkroute/internal/privatepath"
+
 	"github.com/sparksq/sparkroute/pkg/clientcredentials"
 
 	_ "modernc.org/sqlite"
@@ -460,8 +462,8 @@ func ensurePrivateFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("inspect SQLite client credential directory: %w", err)
 	}
-	if parentInfo.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf("SQLite client credential directory %q must not grant group or other permissions", parent)
+	if permissionErr := privatepath.Check(parent, parentInfo.Mode()); permissionErr != nil {
+		return fmt.Errorf("SQLite client credential directory %q: %w", parent, permissionErr)
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -474,8 +476,8 @@ func ensurePrivateFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("inspect SQLite client credential file: %w", err)
 	}
-	if info.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf("SQLite client credential file %q must not grant group or other permissions", path)
+	if permissionErr := privatepath.Check(path, info.Mode()); permissionErr != nil {
+		return fmt.Errorf("SQLite client credential file %q: %w", path, permissionErr)
 	}
 	return nil
 }

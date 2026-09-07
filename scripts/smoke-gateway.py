@@ -89,6 +89,9 @@ def smoke(archive: Path):
             process = subprocess.Popen([
                 str(binary), '-config-source=sqlite', '-config-sqlite=' + str(root / 'config.db'),
                 '-config-bootstrap=' + str(seed), '-data-address=127.0.0.1:' + str(data_port),
+                '-client-credentials-sqlite=' + str(root / 'credentials.db'),
+                '-ledger-sqlite=' + str(root / 'ledger.db'),
+                '-trace-storage=filesystem', '-trace-filesystem=' + str(root / 'traces'),
                 '-admin-address=127.0.0.1:' + str(admin_port), '-operations-address=127.0.0.1:0',
                 '-admin-auth-mode=token-file', '-admin-token-file=' + str(token), '-list-aliases',
             ], stdout=log, stderr=subprocess.STDOUT)

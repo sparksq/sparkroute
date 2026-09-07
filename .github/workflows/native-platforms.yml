@@ -27,8 +27,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Test native bridge and identity contracts
-        run: go test ./pkg/sparkrun ./pkg/identity ./pkg/version
+      - name: Test native storage permissions, bridge, and identity contracts
+        run: go test ./internal/privatepath ./pkg/sparkrun ./pkg/identity ./pkg/version
       - uses: actions/download-artifact@v8
         with:
           name: sparkroute-distributions

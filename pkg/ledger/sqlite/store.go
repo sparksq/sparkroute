@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sparksq/sparkroute/internal/privatepath"
+
 	"github.com/sparksq/sparkroute/pkg/ledger"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
 
@@ -94,11 +96,8 @@ func ensurePrivateFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("inspect SQLite ledger directory: %w", err)
 	}
-	if parentInfo.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf(
-			"SQLite ledger directory %q must not grant group or other permissions",
-			parent,
-		)
+	if permissionErr := privatepath.Check(parent, parentInfo.Mode()); permissionErr != nil {
+		return fmt.Errorf("SQLite ledger directory %q: %w", parent, permissionErr)
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -111,11 +110,8 @@ func ensurePrivateFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("inspect SQLite ledger file: %w", err)
 	}
-	if fileInfo.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf(
-			"SQLite ledger file %q must not grant group or other permissions",
-			path,
-		)
+	if permissionErr := privatepath.Check(path, fileInfo.Mode()); permissionErr != nil {
+		return fmt.Errorf("SQLite ledger file %q: %w", path, permissionErr)
 	}
 	return nil
 }

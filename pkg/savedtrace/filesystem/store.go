@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sparksq/sparkroute/internal/privatepath"
+
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
 )
 
@@ -67,7 +69,7 @@ func OpenWithOptions(root string, options Options) (*Store, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("saved trace path %q is not a directory", absolute)
 	}
-	if info.Mode().Perm()&0o077 != 0 {
+	if privatepath.Check(absolute, info.Mode()) != nil {
 		return nil, fmt.Errorf(
 			"saved trace directory %q must not grant group or other permissions",
 			absolute,
@@ -106,7 +108,7 @@ func repairJournalTail(path string) (resultErr error) {
 	if err != nil {
 		return err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || privatepath.Check(path, info.Mode()) != nil {
 		return fmt.Errorf("journal must be an owner-only regular file")
 	}
 	if info.Size() == 0 {
@@ -222,7 +224,7 @@ func (s *Store) appendJournal(ctx context.Context, directory string, payload []b
 		return file.Close()
 	}
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+	if err != nil || !info.Mode().IsRegular() || privatepath.Check(target, info.Mode()) != nil {
 		_ = cleanup()
 		if err != nil {
 			return fmt.Errorf("inspect saved trace journal: %w", err)

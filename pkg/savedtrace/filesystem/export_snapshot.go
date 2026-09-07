@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sparksq/sparkroute/internal/privatepath"
+
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
 )
 
@@ -118,7 +120,7 @@ func (s *Store) prepareExportWork() error {
 	if err != nil {
 		return fmt.Errorf("inspect saved trace export work directory: %w", err)
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || privatepath.Check(root, info.Mode()) != nil {
 		return fmt.Errorf("saved trace export work path must be an owner-only directory")
 	}
 	entries, err := os.ReadDir(root)
@@ -172,7 +174,7 @@ func (s *Store) snapshotSources(ctx context.Context) ([]snapshotSource, error) {
 		if err != nil {
 			return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || privatepath.Check(path, info.Mode()) != nil {
 			return fmt.Errorf("saved trace journal %q must be an owner-only regular file", path)
 		}
 		if info.Size() > fileReadLimit(path) {
@@ -469,7 +471,7 @@ func openRunReader(run indexRun) (*runReader, error) {
 		return nil, err
 	}
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() != run.size {
+	if err != nil || !info.Mode().IsRegular() || privatepath.Check(run.path, info.Mode()) != nil || info.Size() != run.size {
 		_ = file.Close()
 		if err != nil {
 			return nil, err
@@ -740,7 +742,7 @@ func (s *recordSnapshot) Visit(ctx context.Context, visit func(savedtrace.Record
 	}
 	defer func() { resultErr = errors.Join(resultErr, indexFile.Close()) }()
 	info, err := indexFile.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size()%indexEntrySize != 0 {
+	if err != nil || !info.Mode().IsRegular() || privatepath.Check(s.indexPath, info.Mode()) != nil || info.Size()%indexEntrySize != 0 {
 		if err != nil {
 			return err
 		}
@@ -842,7 +844,7 @@ func (c *sourceFileCache) get(pathID uint32) (*os.File, snapshotSource, error) {
 		return nil, snapshotSource{}, fmt.Errorf("open saved trace snapshot source: %w", err)
 	}
 	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < source.size {
+	if err != nil || !info.Mode().IsRegular() || privatepath.Check(source.path, info.Mode()) != nil || info.Size() < source.size {
 		_ = file.Close()
 		if err != nil {
 			return nil, snapshotSource{}, err
