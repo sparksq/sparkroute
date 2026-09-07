@@ -29,7 +29,7 @@ func (s Source) Load(ctx context.Context) (config.Document, config.Version, erro
 	if err != nil {
 		return config.Document{}, "", fmt.Errorf("open config: %w", err)
 	}
-	defer handle.Close()
+	defer func() { _ = handle.Close() }()
 
 	limited := io.LimitReader(handle, maxDocumentBytes+1)
 	raw, err := io.ReadAll(limited)

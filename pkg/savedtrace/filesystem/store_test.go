@@ -68,7 +68,7 @@ func TestExportJSONLScansJournalOnceAndExportsEveryRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	const count = 37
 	records := make([]savedtrace.Record, 0, count)
 	for index := 0; index < count; index++ {

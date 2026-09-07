@@ -114,7 +114,7 @@ func (s *Source) Resolve(
 	if err != nil {
 		return credentials.Material{}, fmt.Errorf("open credential file: %w", err)
 	}
-	defer handle.Close()
+	defer func() { _ = handle.Close() }()
 	info, err := handle.Stat()
 	if err != nil {
 		return credentials.Material{}, fmt.Errorf("inspect credential file: %w", err)

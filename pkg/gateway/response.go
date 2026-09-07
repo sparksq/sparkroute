@@ -111,7 +111,7 @@ func proxySSEEvents(
 		}
 		if err == io.EOF {
 			var processErr error
-			event, scanIndex, lineStart, processErr = writeCompleteSSEEvents(
+			event, _, _, processErr = writeCompleteSSEEvents(
 				destination,
 				event,
 				scanIndex,

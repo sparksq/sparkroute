@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -157,7 +158,7 @@ func readRequestIDs(path string) (map[string]int, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	result := make(map[string]int)
 	withoutID := 0
 	scanner := bufio.NewScanner(file)
@@ -193,7 +194,7 @@ func readIDs(
 	if err != nil {
 		return nil, 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	result := make(map[string]int)
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64<<10), 16<<20)
@@ -231,7 +232,7 @@ func bounded(values []string, maximum int) []string {
 	return values
 }
 
-func emit(path string, value any) error {
+func emit(path string, value any) (resultErr error) {
 	var writer io.Writer = os.Stdout
 	var file *os.File
 	if path != "-" {
@@ -240,7 +241,7 @@ func emit(path string, value any) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func() { resultErr = errors.Join(resultErr, file.Close()) }()
 		writer = file
 	}
 	encoder := json.NewEncoder(writer)

@@ -1002,7 +1002,7 @@ func translateAnthropicResponseToChatCompletions(
 	if err := json.Unmarshal(body, &envelope); err != nil ||
 		envelope == nil {
 		return nil, missingUsage(), fmt.Errorf(
-			"Anthropic response must be a JSON object",
+			"the Anthropic response must be a JSON object",
 		)
 	}
 	if err := rejectAnthropicResponseFields(
@@ -1016,19 +1016,19 @@ func translateAnthropicResponseToChatCompletions(
 	var source anthropicChatResponse
 	if err := json.Unmarshal(body, &source); err != nil {
 		return nil, missingUsage(), fmt.Errorf(
-			"Anthropic response must be a JSON object",
+			"the Anthropic response must be a JSON object",
 		)
 	}
 	usage, found := extractAnthropicMessagesUsage(body)
 	if !found || usage.Completeness != ledger.UsageComplete {
 		return nil, missingUsage(), fmt.Errorf(
-			"Anthropic response must contain complete usage",
+			"the Anthropic response must contain complete usage",
 		)
 	}
 	if source.ID == "" || source.Type != "message" ||
 		source.Role != "assistant" || source.Model == "" {
 		return nil, usage, fmt.Errorf(
-			"Anthropic response must be an assistant message",
+			"the Anthropic response must be an assistant message",
 		)
 	}
 	content := strings.Builder{}
@@ -1036,14 +1036,14 @@ func translateAnthropicResponseToChatCompletions(
 	for index, block := range source.Content {
 		if block == nil {
 			return nil, usage, fmt.Errorf(
-				"Anthropic output content item %d must be an object",
+				"the Anthropic output content item %d must be an object",
 				index,
 			)
 		}
 		var blockType string
 		if err := json.Unmarshal(block["type"], &blockType); err != nil {
 			return nil, usage, fmt.Errorf(
-				"Anthropic output content item %d type is invalid",
+				"the Anthropic output content item %d type is invalid",
 				index,
 			)
 		}
@@ -1057,13 +1057,13 @@ func translateAnthropicResponseToChatCompletions(
 			}
 			if rawActive(block["citations"]) {
 				return nil, usage, fmt.Errorf(
-					"Anthropic citations cannot be represented in Chat Completions",
+					"the Anthropic citations cannot be represented in Chat Completions",
 				)
 			}
 			var text string
 			if err := json.Unmarshal(block["text"], &text); err != nil {
 				return nil, usage, fmt.Errorf(
-					"Anthropic output text must be a string",
+					"the Anthropic output text must be a string",
 				)
 			}
 			content.WriteString(text)
@@ -1079,14 +1079,14 @@ func translateAnthropicResponseToChatCompletions(
 				json.Unmarshal(block["name"], &name) != nil ||
 				name == "" {
 				return nil, usage, fmt.Errorf(
-					"Anthropic output tool_use identity is invalid",
+					"the Anthropic output tool_use identity is invalid",
 				)
 			}
 			var input map[string]json.RawMessage
 			if json.Unmarshal(block["input"], &input) != nil ||
 				input == nil {
 				return nil, usage, fmt.Errorf(
-					"Anthropic output tool_use input must be an object",
+					"the Anthropic output tool_use input must be an object",
 				)
 			}
 			arguments, err := json.Marshal(input)
@@ -1101,7 +1101,7 @@ func translateAnthropicResponseToChatCompletions(
 			})
 		default:
 			return nil, usage, fmt.Errorf(
-				"Anthropic output content type %q cannot be represented in Chat Completions",
+				"the Anthropic output content type %q cannot be represented in Chat Completions",
 				blockType,
 			)
 		}
@@ -1113,7 +1113,7 @@ func translateAnthropicResponseToChatCompletions(
 	if finishReason == "tool_calls" && len(toolCalls) == 0 ||
 		finishReason != "tool_calls" && len(toolCalls) != 0 {
 		return nil, usage, fmt.Errorf(
-			"Anthropic stop reason and tool_use content are inconsistent",
+			"the Anthropic stop reason and tool_use content are inconsistent",
 		)
 	}
 	message := map[string]any{"role": "assistant"}
@@ -1186,7 +1186,7 @@ func anthropicChatFinishReason(reason string) (string, error) {
 		return "content_filter", nil
 	default:
 		return "", fmt.Errorf(
-			"Anthropic stop reason %q cannot be represented in Chat Completions",
+			"the Anthropic stop reason %q cannot be represented in Chat Completions",
 			reason,
 		)
 	}
@@ -1282,7 +1282,7 @@ func proxyAnthropicChatCompletionsStream(
 	}
 	if !state.terminal {
 		return state.result, fmt.Errorf(
-			"Anthropic Messages stream ended before a terminal event",
+			"the Anthropic Messages stream ended before a terminal event",
 		)
 	}
 	if state.failed {
@@ -1290,12 +1290,12 @@ func proxyAnthropicChatCompletionsStream(
 	}
 	if !state.started || !state.finished {
 		return state.result, fmt.Errorf(
-			"Anthropic Messages stream ended before a final message delta",
+			"the Anthropic Messages stream ended before a final message delta",
 		)
 	}
 	if state.usage.Completeness != ledger.UsageComplete {
 		return state.result, fmt.Errorf(
-			"Anthropic Messages stream ended before complete usage",
+			"the Anthropic Messages stream ended before complete usage",
 		)
 	}
 	state.result.usage = state.usage
@@ -1309,11 +1309,11 @@ func (s *anthropicChatStreamState) handle(
 	var event map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &event); err != nil ||
 		event == nil {
-		return fmt.Errorf("Anthropic stream event must be a JSON object")
+		return fmt.Errorf("the Anthropic stream event must be a JSON object")
 	}
 	var eventType string
 	if err := json.Unmarshal(event["type"], &eventType); err != nil {
-		return fmt.Errorf("Anthropic stream event type must be a string")
+		return fmt.Errorf("the Anthropic stream event type must be a string")
 	}
 	allowedFields := map[string][]string{
 		"ping":                {"type"},
@@ -1337,7 +1337,7 @@ func (s *anthropicChatStreamState) handle(
 	}
 	if s.terminal {
 		return fmt.Errorf(
-			"Anthropic stream event arrived after a terminal event",
+			"the Anthropic stream event arrived after a terminal event",
 		)
 	}
 	switch eventType {
@@ -1356,20 +1356,20 @@ func (s *anthropicChatStreamState) handle(
 	case "message_stop":
 		if !s.started || !s.finished {
 			return fmt.Errorf(
-				"Anthropic message_stop order is invalid",
+				"the Anthropic message_stop order is invalid",
 			)
 		}
 		for index := range s.blocks {
 			if !s.stopped[index] {
 				return fmt.Errorf(
-					"Anthropic content block %d did not stop",
+					"the Anthropic content block %d did not stop",
 					index,
 				)
 			}
 		}
 		if s.usage.Completeness != ledger.UsageComplete {
 			return fmt.Errorf(
-				"Anthropic message_stop is missing complete usage",
+				"the Anthropic message_stop is missing complete usage",
 			)
 		}
 		s.terminal = true
@@ -1407,7 +1407,7 @@ func (s *anthropicChatStreamState) handle(
 		return nil
 	default:
 		return fmt.Errorf(
-			"Anthropic stream event type %q cannot be represented in Chat Completions",
+			"the Anthropic stream event type %q cannot be represented in Chat Completions",
 			eventType,
 		)
 	}
@@ -1419,7 +1419,7 @@ func (s *anthropicChatStreamState) handleMessageStart(
 	payload []byte,
 ) error {
 	if s.started {
-		return fmt.Errorf("Anthropic message_start is duplicated")
+		return fmt.Errorf("the Anthropic message_start is duplicated")
 	}
 	var message struct {
 		ID         string            `json:"id"`
@@ -1432,7 +1432,7 @@ func (s *anthropicChatStreamState) handleMessageStart(
 	var rawMessage map[string]json.RawMessage
 	if json.Unmarshal(event["message"], &rawMessage) != nil ||
 		rawMessage == nil {
-		return fmt.Errorf("Anthropic message_start is invalid")
+		return fmt.Errorf("the Anthropic message_start is invalid")
 	}
 	if err := rejectAnthropicResponseFields(
 		rawMessage,
@@ -1447,11 +1447,11 @@ func (s *anthropicChatStreamState) handleMessageStart(
 		message.Role != "assistant" || message.Model == "" ||
 		len(message.Content) != 0 ||
 		rawNonNull(message.StopReason) {
-		return fmt.Errorf("Anthropic message_start is invalid")
+		return fmt.Errorf("the Anthropic message_start is invalid")
 	}
 	usage, found := extractAnthropicMessagesUsage(payload)
 	if !found {
-		return fmt.Errorf("Anthropic message_start usage is invalid")
+		return fmt.Errorf("the Anthropic message_start usage is invalid")
 	}
 	s.usage = anthropicOperationMessages.mergeUsage(s.usage, usage)
 	s.started = true
@@ -1467,23 +1467,23 @@ func (s *anthropicChatStreamState) handleBlockStart(
 	event map[string]json.RawMessage,
 ) error {
 	if !s.started || s.finished {
-		return fmt.Errorf("Anthropic content_block_start order is invalid")
+		return fmt.Errorf("the Anthropic content_block_start order is invalid")
 	}
 	var index int
 	if json.Unmarshal(event["index"], &index) != nil || index < 0 {
-		return fmt.Errorf("Anthropic content block index is invalid")
+		return fmt.Errorf("the Anthropic content block index is invalid")
 	}
 	if _, exists := s.blocks[index]; exists {
-		return fmt.Errorf("Anthropic content block index is duplicated")
+		return fmt.Errorf("the Anthropic content block index is duplicated")
 	}
 	var block map[string]json.RawMessage
 	if json.Unmarshal(event["content_block"], &block) != nil ||
 		block == nil {
-		return fmt.Errorf("Anthropic content_block_start is invalid")
+		return fmt.Errorf("the Anthropic content_block_start is invalid")
 	}
 	var blockType string
 	if json.Unmarshal(block["type"], &blockType) != nil {
-		return fmt.Errorf("Anthropic content block type is invalid")
+		return fmt.Errorf("the Anthropic content block type is invalid")
 	}
 	s.blocks[index] = blockType
 	switch blockType {
@@ -1496,13 +1496,13 @@ func (s *anthropicChatStreamState) handleBlockStart(
 		}
 		if rawActive(block["citations"]) {
 			return fmt.Errorf(
-				"Anthropic citations cannot be represented in Chat Completions",
+				"the Anthropic citations cannot be represented in Chat Completions",
 			)
 		}
 		var text string
 		if json.Unmarshal(block["text"], &text) != nil || text != "" {
 			return fmt.Errorf(
-				"Anthropic streaming text block start is invalid",
+				"the Anthropic streaming text block start is invalid",
 			)
 		}
 		return nil
@@ -1520,7 +1520,7 @@ func (s *anthropicChatStreamState) handleBlockStart(
 			json.Unmarshal(block["input"], &input) != nil ||
 			input == nil || len(input) != 0 {
 			return fmt.Errorf(
-				"Anthropic streaming tool_use block start is invalid",
+				"the Anthropic streaming tool_use block start is invalid",
 			)
 		}
 		toolIndex := s.nextTool
@@ -1537,7 +1537,7 @@ func (s *anthropicChatStreamState) handleBlockStart(
 		}, nil)
 	default:
 		return fmt.Errorf(
-			"Anthropic content block type %q cannot be represented in Chat Completions",
+			"the Anthropic content block type %q cannot be represented in Chat Completions",
 			blockType,
 		)
 	}
@@ -1548,26 +1548,26 @@ func (s *anthropicChatStreamState) handleBlockDelta(
 	event map[string]json.RawMessage,
 ) error {
 	if !s.started || s.finished {
-		return fmt.Errorf("Anthropic content_block_delta order is invalid")
+		return fmt.Errorf("the Anthropic content_block_delta order is invalid")
 	}
 	var index int
 	if json.Unmarshal(event["index"], &index) != nil || index < 0 ||
 		s.stopped[index] {
-		return fmt.Errorf("Anthropic content block delta index is invalid")
+		return fmt.Errorf("the Anthropic content block delta index is invalid")
 	}
 	blockType, exists := s.blocks[index]
 	if !exists {
 		return fmt.Errorf(
-			"Anthropic content block delta has no matching start",
+			"the Anthropic content block delta has no matching start",
 		)
 	}
 	var delta map[string]json.RawMessage
 	if json.Unmarshal(event["delta"], &delta) != nil || delta == nil {
-		return fmt.Errorf("Anthropic content block delta is invalid")
+		return fmt.Errorf("the Anthropic content block delta is invalid")
 	}
 	var deltaType string
 	if json.Unmarshal(delta["type"], &deltaType) != nil {
-		return fmt.Errorf("Anthropic content block delta type is invalid")
+		return fmt.Errorf("the Anthropic content block delta type is invalid")
 	}
 	switch {
 	case blockType == "text" && deltaType == "text_delta":
@@ -1576,7 +1576,7 @@ func (s *anthropicChatStreamState) handleBlockDelta(
 		}
 		var text string
 		if json.Unmarshal(delta["text"], &text) != nil {
-			return fmt.Errorf("Anthropic text delta is invalid")
+			return fmt.Errorf("the Anthropic text delta is invalid")
 		}
 		return s.writeChunk(
 			destination,
@@ -1592,12 +1592,12 @@ func (s *anthropicChatStreamState) handleBlockDelta(
 		}
 		var partial string
 		if json.Unmarshal(delta["partial_json"], &partial) != nil {
-			return fmt.Errorf("Anthropic input JSON delta is invalid")
+			return fmt.Errorf("the Anthropic input JSON delta is invalid")
 		}
 		toolIndex, exists := s.toolIndexes[index]
 		if !exists {
 			return fmt.Errorf(
-				"Anthropic tool delta has no matching start",
+				"the Anthropic tool delta has no matching start",
 			)
 		}
 		s.toolJSON[index] += partial
@@ -1611,7 +1611,7 @@ func (s *anthropicChatStreamState) handleBlockDelta(
 		}, nil)
 	default:
 		return fmt.Errorf(
-			"Anthropic content block delta %q cannot update %q in Chat Completions",
+			"the Anthropic content block delta %q cannot update %q in Chat Completions",
 			deltaType,
 			blockType,
 		)
@@ -1623,15 +1623,15 @@ func (s *anthropicChatStreamState) handleBlockStop(
 	event map[string]json.RawMessage,
 ) error {
 	if !s.started || s.finished {
-		return fmt.Errorf("Anthropic content_block_stop order is invalid")
+		return fmt.Errorf("the Anthropic content_block_stop order is invalid")
 	}
 	var index int
 	if json.Unmarshal(event["index"], &index) != nil || index < 0 {
-		return fmt.Errorf("Anthropic content block stop index is invalid")
+		return fmt.Errorf("the Anthropic content block stop index is invalid")
 	}
 	if _, exists := s.blocks[index]; !exists || s.stopped[index] {
 		return fmt.Errorf(
-			"Anthropic content block stop has no active block",
+			"the Anthropic content block stop has no active block",
 		)
 	}
 	if s.blocks[index] == "tool_use" {
@@ -1654,7 +1654,7 @@ func (s *anthropicChatStreamState) handleBlockStop(
 		if json.Unmarshal([]byte(arguments), &object) != nil ||
 			object == nil {
 			return fmt.Errorf(
-				"Anthropic streamed tool input must encode a JSON object",
+				"the Anthropic streamed tool input must encode a JSON object",
 			)
 		}
 	}
@@ -1668,23 +1668,23 @@ func (s *anthropicChatStreamState) handleMessageDelta(
 	payload []byte,
 ) error {
 	if !s.started || s.finished {
-		return fmt.Errorf("Anthropic message_delta order is invalid")
+		return fmt.Errorf("the Anthropic message_delta order is invalid")
 	}
 	for index := range s.blocks {
 		if !s.stopped[index] {
 			return fmt.Errorf(
-				"Anthropic message_delta arrived before content blocks stopped",
+				"the Anthropic message_delta arrived before content blocks stopped",
 			)
 		}
 	}
 	usage, found := extractAnthropicMessagesUsage(payload)
 	if !found {
-		return fmt.Errorf("Anthropic message_delta usage is invalid")
+		return fmt.Errorf("the Anthropic message_delta usage is invalid")
 	}
 	s.usage = anthropicOperationMessages.mergeUsage(s.usage, usage)
 	var delta map[string]json.RawMessage
 	if json.Unmarshal(event["delta"], &delta) != nil || delta == nil {
-		return fmt.Errorf("Anthropic message_delta is invalid")
+		return fmt.Errorf("the Anthropic message_delta is invalid")
 	}
 	if err := rejectResponseFields(
 		delta,
@@ -1699,7 +1699,7 @@ func (s *anthropicChatStreamState) handleMessageDelta(
 	if json.Unmarshal(delta["stop_reason"], &stopReason) != nil ||
 		stopReason == "" {
 		return fmt.Errorf(
-			"Anthropic final message_delta stop_reason is invalid",
+			"the Anthropic final message_delta stop_reason is invalid",
 		)
 	}
 	finishReason, err := anthropicChatFinishReason(stopReason)
@@ -1709,7 +1709,7 @@ func (s *anthropicChatStreamState) handleMessageDelta(
 	if finishReason == "tool_calls" && s.nextTool == 0 ||
 		finishReason != "tool_calls" && s.nextTool != 0 {
 		return fmt.Errorf(
-			"Anthropic stop reason and streamed tool_use content are inconsistent",
+			"the Anthropic stop reason and streamed tool_use content are inconsistent",
 		)
 	}
 	s.finished = true

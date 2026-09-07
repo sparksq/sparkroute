@@ -748,7 +748,7 @@ func (h *filesHandler) proxyJSONResponse(
 	resourceStore responsesstate.ResourceStore,
 	privacyContext filePIIContext,
 ) proxyResult {
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	result := proxyResult{
 		gatewayStatus: response.StatusCode,
 		outcome:       ledger.OutcomeUpstreamError,
@@ -914,7 +914,7 @@ func (h *filesHandler) proxyContentResponse(
 	attempt int,
 	privacyContext filePIIContext,
 ) proxyResult {
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	result := proxyResult{
 		gatewayStatus: response.StatusCode,
 		outcome:       ledger.OutcomeUpstreamError,

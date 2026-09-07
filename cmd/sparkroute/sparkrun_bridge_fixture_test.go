@@ -249,7 +249,7 @@ func updateAcceptanceBridgeState(
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
-	defer os.Remove(lockPath)
+	defer func() { _ = os.Remove(lockPath) }()
 
 	var state acceptanceBridgeState
 	raw, err := os.ReadFile(path)

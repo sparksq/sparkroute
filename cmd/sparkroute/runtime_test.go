@@ -195,7 +195,7 @@ func TestManagedConfigurationReconcilerAppliesStaticGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	if _, err := store.Initialize(context.Background(), managed.EmptyDocument(), "bootstrap", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestManagedConfigurationReconcilerAppliesStaticGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer telemetryRuntime.Shutdown(context.Background())
+	defer func() { _ = telemetryRuntime.Shutdown(context.Background()) }()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	options := runtimeBuildOptions{

@@ -400,7 +400,7 @@ func (c *Client) Project(
 		c.recordOperationalFailure(parent, "transport_unavailable", 0, trace.DurationMS)
 		return nil, trace, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	trace.HTTPStatus = response.StatusCode
 	trace.RequestID = truncate(strings.TrimSpace(response.Header.Get("X-MM-Bridge-Request-ID")), 256)
 	payload, readErr := io.ReadAll(io.LimitReader(response.Body, c.maxResponseBytes+1))
@@ -602,7 +602,7 @@ func (c *Client) probeGET(
 	if err != nil {
 		return nil, 0, transportError(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	payload, readErr := io.ReadAll(io.LimitReader(response.Body, maximumBytes+1))
 	if readErr != nil {
 		return nil, response.StatusCode, readErr

@@ -159,7 +159,7 @@ func (s *Store) List(
 	if err != nil {
 		return clientcredentials.Page{}, fmt.Errorf("list SQLite client credentials: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := make([]clientcredentials.Credential, 0)
 	for rows.Next() {
 		record, err := scanRecord(rows)
@@ -291,7 +291,7 @@ func (s *Store) ListAudit(
 	if err != nil {
 		return clientcredentials.AuditPage{}, fmt.Errorf("list SQLite client credential audit: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	events := make([]clientcredentials.AuditEvent, 0)
 	for rows.Next() {
 		var event clientcredentials.AuditEvent

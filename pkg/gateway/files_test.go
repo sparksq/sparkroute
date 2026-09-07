@@ -79,7 +79,7 @@ func TestFilesLifecycleAndResponsesConsumption(t *testing.T) {
 			if err != nil {
 				t.Errorf("FormFile() error = %v", err)
 			} else {
-				defer file.Close()
+				defer func() { _ = file.Close() }()
 				body, readErr := io.ReadAll(file)
 				if readErr != nil {
 					t.Errorf("read uploaded file: %v", readErr)

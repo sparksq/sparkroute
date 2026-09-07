@@ -312,8 +312,8 @@ func sanitizeRuntimeReason(reason string) string {
 		return reason[:MaxRuntimeReasonBytes]
 	}
 	for _, current := range reason {
-		if !(current >= 'a' && current <= 'z' || current >= '0' && current <= '9' ||
-			current == '-' || current == '_') {
+		if (current < 'a' || current > 'z') && (current < '0' || current > '9') &&
+			current != '-' && current != '_' {
 			return ""
 		}
 	}

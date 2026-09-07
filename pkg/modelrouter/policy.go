@@ -178,7 +178,6 @@ type RouteDecision struct {
 	At               time.Time          `json:"at"`
 	MMProjection     *MMProjectionTrace `json:"mm_projection,omitempty"`
 	projectionPolicy *MMProjectionPolicy
-	requestStarted   time.Time
 }
 
 // RoutePlan is an immutable snapshot of routing policy and eligibility.
@@ -738,7 +737,7 @@ func writePolicyAtomic(path string, p RoutingPolicy) error {
 		return err
 	}
 	tmp := f.Name()
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 	if err = f.Chmod(0600); err == nil {
 		_, err = f.Write(b)
 	}

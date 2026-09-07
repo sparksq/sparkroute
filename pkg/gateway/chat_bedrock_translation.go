@@ -1195,18 +1195,18 @@ func translateBedrockResponseToChatCompletionsLegacy(
 	var source bedrockChatResponse
 	if err := json.Unmarshal(body, &source); err != nil {
 		return nil, missingUsage(), fmt.Errorf(
-			"Bedrock response must be a JSON object",
+			"the Bedrock response must be a JSON object",
 		)
 	}
 	usage, found := extractBedrockUsage(body)
 	if !found {
 		return nil, missingUsage(), fmt.Errorf(
-			"Bedrock response must contain valid usage",
+			"the Bedrock response must contain valid usage",
 		)
 	}
 	if source.Output.Message.Role != "assistant" {
 		return nil, usage, fmt.Errorf(
-			"Bedrock output message role must be assistant",
+			"the Bedrock output message role must be assistant",
 		)
 	}
 	content := strings.Builder{}
@@ -1214,7 +1214,7 @@ func translateBedrockResponseToChatCompletionsLegacy(
 	for index, block := range source.Output.Message.Content {
 		if block == nil {
 			return nil, usage, fmt.Errorf(
-				"Bedrock output content item %d must be an object",
+				"the Bedrock output content item %d must be an object",
 				index,
 			)
 		}
@@ -1229,7 +1229,7 @@ func translateBedrockResponseToChatCompletionsLegacy(
 				var text string
 				if err := json.Unmarshal(raw, &text); err != nil {
 					return nil, usage, fmt.Errorf(
-						"Bedrock output text must be a string",
+						"the Bedrock output text must be a string",
 					)
 				}
 				content.WriteString(text)
@@ -1244,7 +1244,7 @@ func translateBedrockResponseToChatCompletionsLegacy(
 					toolUse.Name == "" ||
 					!json.Valid(toolUse.Input) {
 					return nil, usage, fmt.Errorf(
-						"Bedrock output toolUse is invalid",
+						"the Bedrock output toolUse is invalid",
 					)
 				}
 				var input map[string]json.RawMessage
@@ -1253,7 +1253,7 @@ func translateBedrockResponseToChatCompletionsLegacy(
 					&input,
 				); err != nil || input == nil {
 					return nil, usage, fmt.Errorf(
-						"Bedrock output toolUse input must be an object",
+						"the Bedrock output toolUse input must be an object",
 					)
 				}
 				toolCalls = append(toolCalls, map[string]any{
@@ -1266,14 +1266,14 @@ func translateBedrockResponseToChatCompletionsLegacy(
 				})
 			default:
 				return nil, usage, fmt.Errorf(
-					"Bedrock output content field %q cannot be represented in Chat Completions",
+					"the Bedrock output content field %q cannot be represented in Chat Completions",
 					field,
 				)
 			}
 		}
 		if active != 1 {
 			return nil, usage, fmt.Errorf(
-				"Bedrock output content must contain one union member",
+				"the Bedrock output content must contain one union member",
 			)
 		}
 	}
@@ -1319,7 +1319,7 @@ func bedrockChatFinishReason(reason string) (string, error) {
 		return "content_filter", nil
 	default:
 		return "", fmt.Errorf(
-			"Bedrock stop reason %q cannot be represented in Chat Completions",
+			"the Bedrock stop reason %q cannot be represented in Chat Completions",
 			reason,
 		)
 	}
@@ -1398,12 +1398,12 @@ func proxyBedrockChatCompletionsStream(
 		if err == io.EOF {
 			if !state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock ConverseStream ended before messageStop",
+					"the Bedrock ConverseStream ended before messageStop",
 				)
 			}
 			if state.includeUsage && !state.sawUsage {
 				return result, fmt.Errorf(
-					"Bedrock ConverseStream ended before required usage metadata",
+					"the Bedrock ConverseStream ended before required usage metadata",
 				)
 			}
 			if err := writeSSEData(destination, []byte("[DONE]")); err != nil {
@@ -1440,12 +1440,12 @@ func proxyBedrockChatCompletionsStream(
 		}
 		if messageType := message.header(":message-type"); messageType != "" && messageType != "event" {
 			return result, fmt.Errorf(
-				"Bedrock event-stream message type is invalid",
+				"the Bedrock event-stream message type is invalid",
 			)
 		}
 		if !json.Valid(message.payload) {
 			return result, fmt.Errorf(
-				"Bedrock event-stream payload is invalid",
+				"the Bedrock event-stream payload is invalid",
 			)
 		}
 		eventType := message.header(":event-type")
@@ -1453,7 +1453,7 @@ func proxyBedrockChatCompletionsStream(
 		case "messageStart":
 			if state.started || state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock messageStart order is invalid",
+					"the Bedrock messageStart order is invalid",
 				)
 			}
 			var event struct {
@@ -1462,7 +1462,7 @@ func proxyBedrockChatCompletionsStream(
 			if json.Unmarshal(message.payload, &event) != nil ||
 				event.Role != "assistant" {
 				return result, fmt.Errorf(
-					"Bedrock messageStart role is invalid",
+					"the Bedrock messageStart role is invalid",
 				)
 			}
 			state.started = true
@@ -1474,7 +1474,7 @@ func proxyBedrockChatCompletionsStream(
 		case "contentBlockStart":
 			if !state.started || state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockStart order is invalid",
+					"the Bedrock contentBlockStart order is invalid",
 				)
 			}
 			var event struct {
@@ -1492,12 +1492,12 @@ func proxyBedrockChatCompletionsStream(
 				event.Start.ToolUse.ToolUseID == "" ||
 				event.Start.ToolUse.Name == "" {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockStart is invalid or unrepresentable",
+					"the Bedrock contentBlockStart is invalid or unrepresentable",
 				)
 			}
 			if _, exists := state.toolIndexes[event.ContentBlockIndex]; exists {
 				return result, fmt.Errorf(
-					"Bedrock tool content block index is duplicated",
+					"the Bedrock tool content block index is duplicated",
 				)
 			}
 			toolIndex := state.nextTool
@@ -1519,7 +1519,7 @@ func proxyBedrockChatCompletionsStream(
 		case "contentBlockDelta":
 			if !state.started || state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockDelta order is invalid",
+					"the Bedrock contentBlockDelta order is invalid",
 				)
 			}
 			var event struct {
@@ -1534,7 +1534,7 @@ func proxyBedrockChatCompletionsStream(
 			if json.Unmarshal(message.payload, &event) != nil ||
 				event.ContentBlockIndex < 0 {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockDelta is invalid",
+					"the Bedrock contentBlockDelta is invalid",
 				)
 			}
 			if event.Delta.Text != nil &&
@@ -1554,7 +1554,7 @@ func proxyBedrockChatCompletionsStream(
 					state.toolIndexes[event.ContentBlockIndex]
 				if !exists {
 					return result, fmt.Errorf(
-						"Bedrock tool delta has no matching start",
+						"the Bedrock tool delta has no matching start",
 					)
 				}
 				if err := state.writeChunk(destination, map[string]any{
@@ -1570,12 +1570,12 @@ func proxyBedrockChatCompletionsStream(
 				break
 			}
 			return result, fmt.Errorf(
-				"Bedrock contentBlockDelta is unrepresentable",
+				"the Bedrock contentBlockDelta is unrepresentable",
 			)
 		case "contentBlockStop":
 			if !state.started || state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockStop order is invalid",
+					"the Bedrock contentBlockStop order is invalid",
 				)
 			}
 			var event struct {
@@ -1584,13 +1584,13 @@ func proxyBedrockChatCompletionsStream(
 			if json.Unmarshal(message.payload, &event) != nil ||
 				event.ContentBlockIndex < 0 {
 				return result, fmt.Errorf(
-					"Bedrock contentBlockStop is invalid",
+					"the Bedrock contentBlockStop is invalid",
 				)
 			}
 		case "messageStop":
 			if !state.started || state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock messageStop order is invalid",
+					"the Bedrock messageStop order is invalid",
 				)
 			}
 			var event struct {
@@ -1598,7 +1598,7 @@ func proxyBedrockChatCompletionsStream(
 			}
 			if json.Unmarshal(message.payload, &event) != nil {
 				return result, fmt.Errorf(
-					"Bedrock messageStop is invalid",
+					"the Bedrock messageStop is invalid",
 				)
 			}
 			finishReason, err := bedrockChatFinishReason(
@@ -1618,18 +1618,18 @@ func proxyBedrockChatCompletionsStream(
 		case "metadata":
 			if !state.stopped {
 				return result, fmt.Errorf(
-					"Bedrock metadata arrived before messageStop",
+					"the Bedrock metadata arrived before messageStop",
 				)
 			}
 			if state.sawUsage {
 				return result, fmt.Errorf(
-					"Bedrock metadata event is duplicated",
+					"the Bedrock metadata event is duplicated",
 				)
 			}
 			usage, found := extractBedrockUsage(message.payload)
 			if !found {
 				return result, fmt.Errorf(
-					"Bedrock metadata usage is invalid",
+					"the Bedrock metadata usage is invalid",
 				)
 			}
 			state.sawUsage = true
@@ -1644,7 +1644,7 @@ func proxyBedrockChatCompletionsStream(
 			}
 		default:
 			return result, fmt.Errorf(
-				"Bedrock event type %q cannot be represented in Chat Completions",
+				"the Bedrock event type %q cannot be represented in Chat Completions",
 				eventType,
 			)
 		}

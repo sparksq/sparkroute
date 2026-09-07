@@ -216,7 +216,7 @@ func translateGeminiEmbeddingResponseToOpenAI(
 	if err := json.Unmarshal(body, &envelope); err != nil ||
 		envelope == nil {
 		return nil, missingUsage(), fmt.Errorf(
-			"Gemini embedding response must be a JSON object",
+			"the Gemini embedding response must be a JSON object",
 		)
 	}
 	responseName := "Gemini EmbedContent response"
@@ -238,7 +238,7 @@ func translateGeminiEmbeddingResponseToOpenAI(
 	if expectedInputs == 1 {
 		if !rawNonNull(envelope["embedding"]) {
 			return nil, missingUsage(), fmt.Errorf(
-				"Gemini EmbedContent response must contain embedding",
+				"the Gemini EmbedContent response must contain embedding",
 			)
 		}
 		rawEmbeddings = append(
@@ -250,7 +250,7 @@ func translateGeminiEmbeddingResponseToOpenAI(
 		&rawEmbeddings,
 	) != nil || len(rawEmbeddings) != expectedInputs {
 		return nil, missingUsage(), fmt.Errorf(
-			"Gemini BatchEmbedContents response must contain %d ordered embeddings",
+			"the Gemini BatchEmbedContents response must contain %d ordered embeddings",
 			expectedInputs,
 		)
 	}
@@ -304,7 +304,7 @@ func parseGeminiContentEmbedding(
 		json.Unmarshal(raw, &embedding) != nil ||
 		embedding == nil {
 		return nil, fmt.Errorf(
-			"Gemini embedding item %d must be an object",
+			"the Gemini embedding item %d must be an object",
 			index,
 		)
 	}
@@ -317,7 +317,7 @@ func parseGeminiContentEmbedding(
 	}
 	if rawNonNull(embedding["shape"]) {
 		return nil, fmt.Errorf(
-			"Gemini embedding item %d shape cannot be represented by the OpenAI Embeddings API",
+			"the Gemini embedding item %d shape cannot be represented by the OpenAI Embeddings API",
 			index,
 		)
 	}
@@ -326,14 +326,14 @@ func parseGeminiContentEmbedding(
 		json.Unmarshal(embedding["values"], &values) != nil ||
 		len(values) == 0 {
 		return nil, fmt.Errorf(
-			"Gemini embedding item %d values must be a non-empty number array",
+			"the Gemini embedding item %d values must be a non-empty number array",
 			index,
 		)
 	}
 	if expectedDimensions != 0 &&
 		int64(len(values)) != expectedDimensions {
 		return nil, fmt.Errorf(
-			"Gemini embedding item %d dimension is %d, expected %d",
+			"the Gemini embedding item %d dimension is %d, expected %d",
 			index,
 			len(values),
 			expectedDimensions,
@@ -357,7 +357,7 @@ func parseGeminiEmbeddingUsage(
 	if json.Unmarshal(raw, &usageFields) != nil ||
 		usageFields == nil {
 		return missingUsage(), fmt.Errorf(
-			"Gemini usageMetadata must be an object",
+			"the Gemini usageMetadata must be an object",
 		)
 	}
 	if err := rejectGeminiEmbeddingResponseFields(
@@ -373,7 +373,7 @@ func parseGeminiEmbeddingUsage(
 		&promptTokens,
 	) != nil || promptTokens < 0 {
 		return missingUsage(), fmt.Errorf(
-			"Gemini usageMetadata.promptTokenCount must be a non-negative integer",
+			"the Gemini usageMetadata.promptTokenCount must be a non-negative integer",
 		)
 	}
 	var details []geminiModalityUsage
@@ -384,14 +384,14 @@ func parseGeminiEmbeddingUsage(
 			&rawDetails,
 		) != nil {
 			return missingUsage(), fmt.Errorf(
-				"Gemini usageMetadata.promptTokenDetails must be an array of objects",
+				"the Gemini usageMetadata.promptTokenDetails must be an array of objects",
 			)
 		}
 		details = make([]geminiModalityUsage, 0, len(rawDetails))
 		for index, detail := range rawDetails {
 			if detail == nil {
 				return missingUsage(), fmt.Errorf(
-					"Gemini promptTokenDetails item %d must be an object",
+					"the Gemini promptTokenDetails item %d must be an object",
 					index,
 				)
 			}
@@ -411,7 +411,7 @@ func parseGeminiEmbeddingUsage(
 				&parsed.Modality,
 			) != nil || parsed.Modality == "" {
 				return missingUsage(), fmt.Errorf(
-					"Gemini promptTokenDetails item %d modality must be a non-empty string",
+					"the Gemini promptTokenDetails item %d modality must be a non-empty string",
 					index,
 				)
 			}
@@ -421,7 +421,7 @@ func parseGeminiEmbeddingUsage(
 				&count,
 			) != nil || count < 0 {
 				return missingUsage(), fmt.Errorf(
-					"Gemini promptTokenDetails item %d tokenCount must be a non-negative integer",
+					"the Gemini promptTokenDetails item %d tokenCount must be a non-negative integer",
 					index,
 				)
 			}

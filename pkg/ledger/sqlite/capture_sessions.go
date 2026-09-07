@@ -61,7 +61,7 @@ func (s *Store) ListCaptureSessions(ctx context.Context, query savedtrace.Captur
 	if err != nil {
 		return nil, fmt.Errorf("list SQLite capture sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var sessions []savedtrace.CaptureSession
 	for rows.Next() {
 		var session savedtrace.CaptureSession

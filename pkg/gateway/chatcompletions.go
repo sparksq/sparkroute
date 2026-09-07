@@ -688,7 +688,6 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 					observation.disableSavedTrace()
 				}
 				piiSession = nil
-				piiMediaInspectionRequired = false
 			}
 			projectionTrace.State = "fallback"
 		} else {
@@ -2243,8 +2242,8 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 					result.failureClass = "guardrail_failed"
 				default:
 					callerBody := postResult.body
-					traceBody := postResult.body
 					if piiSession != nil {
+						var traceBody []byte
 						traceBody, err = h.operation.redactPIIResponse(
 							request.Context(),
 							postResult.body,
@@ -2489,7 +2488,7 @@ func (h *chatCompletionsHandler) proxyResponse(
 		idleBody = newStreamIdleReadCloser(response.Body, streamIdleTimeout)
 		response.Body = idleBody
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	modelName, rewriteModel := presentedModelName(selection)
 	result := proxyResult{
 		gatewayStatus: response.StatusCode,
@@ -2737,11 +2736,12 @@ func (h *chatCompletionsHandler) proxyResponse(
 				status := http.StatusServiceUnavailable
 				code := "state_affinity_unavailable"
 				message := "provider-owned item routing state could not be persisted"
-				if failureClass == "responses_item_state_invalid" {
+				switch failureClass {
+				case "responses_item_state_invalid":
 					status = http.StatusBadGateway
 					code = "upstream_response_error"
 					message = "upstream returned invalid provider-owned item state"
-				} else if failureClass == "responses_item_state_conflict" {
+				case "responses_item_state_conflict":
 					status = http.StatusBadGateway
 					code = "upstream_response_error"
 					message = "upstream returned an item ID with conflicting affinity"
@@ -3566,7 +3566,7 @@ func (h *chatCompletionsHandler) buildUpstreamRequest(
 
 func readBoundedBody(w http.ResponseWriter, request *http.Request, limit int64) ([]byte, error) {
 	body := http.MaxBytesReader(w, request.Body, limit)
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	return io.ReadAll(body)
 }
 
@@ -3647,10 +3647,6 @@ func isAWSEventStream(value string) bool {
 	mediaType, _, err := mime.ParseMediaType(value)
 	return err == nil &&
 		mediaType == "application/vnd.amazon.eventstream"
-}
-
-func isEventStream(value string) bool {
-	return isSSEStream(value) || isAWSEventStream(value)
 }
 
 func isRetryableStatus(status int) bool {

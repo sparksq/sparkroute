@@ -31,7 +31,7 @@ func TestResponsesBackgroundResourceLifecycle(t *testing.T) {
 		switch {
 		case request.Method == http.MethodPost &&
 			request.URL.Path == "/v1/responses":
-			defer request.Body.Close()
+			defer func() { _ = request.Body.Close() }()
 			var body map[string]json.RawMessage
 			if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 				t.Errorf("decode create body: %v", err)

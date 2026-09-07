@@ -299,14 +299,6 @@ type virtualRequestMatch struct {
 	Kwargs  map[string]any
 }
 
-func resolveVirtualRequest(policy RoutingPolicy, requested string) (virtualRequestMatch, bool, error) {
-	return compileRoutingPolicy(policy).resolveVirtualRequest(requested)
-}
-
-func policyOwnsVirtualRequest(policy RoutingPolicy, requested string) bool {
-	return compileRoutingPolicy(policy).ownsVirtualRequest(requested)
-}
-
 func (r *RouterManager) OwnsVirtualRequest(requested string) bool {
 	compiled := r.runtime.Load()
 	return compiled != nil && compiled.ownsVirtualRequest(requested)

@@ -196,7 +196,7 @@ func (s *Store) List(
 	if err != nil {
 		return savedtrace.Page{}, fmt.Errorf("list SQLite saved traces: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	records := make([]savedtrace.Record, 0, plan.Limit+1)
 	for rows.Next() {
 		record, err := scanSavedTrace(rows)

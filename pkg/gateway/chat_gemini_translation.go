@@ -758,7 +758,7 @@ func encodeGeminiToolCallID(
 ) (string, error) {
 	if providerID == "" || thoughtSignature == "" {
 		return "", fmt.Errorf(
-			"Gemini signed tool-call identity is incomplete",
+			"the Gemini signed tool-call identity is incomplete",
 		)
 	}
 	encoded, err := json.Marshal(geminiEncodedToolCallID{
@@ -1042,7 +1042,7 @@ func parseGeminiChatPayload(
 	if err := json.Unmarshal(payload, &envelope); err != nil ||
 		envelope == nil {
 		return nil, nil, missingUsage(), false, fmt.Errorf(
-			"Gemini response must be a JSON object",
+			"the Gemini response must be a JSON object",
 		)
 	}
 	if err := rejectGeminiChatResponseFields(
@@ -1055,7 +1055,7 @@ func parseGeminiChatPayload(
 	}
 	if rawNonNull(envelope["error"]) {
 		return envelope, nil, missingUsage(), false, fmt.Errorf(
-			"Gemini success response must not contain an error",
+			"the Gemini success response must not contain an error",
 		)
 	}
 	for _, field := range []string{"modelVersion", "responseId"} {
@@ -1065,7 +1065,7 @@ func parseGeminiChatPayload(
 		var value string
 		if json.Unmarshal(envelope[field], &value) != nil {
 			return nil, nil, missingUsage(), false, fmt.Errorf(
-				"Gemini response %s must be a string",
+				"the Gemini response %s must be a string",
 				field,
 			)
 		}
@@ -1082,19 +1082,19 @@ func parseGeminiChatPayload(
 			&candidates,
 		); err != nil {
 			return nil, nil, usage, foundUsage, fmt.Errorf(
-				"Gemini candidates must be an array of objects",
+				"the Gemini candidates must be an array of objects",
 			)
 		}
 	}
 	if len(candidates) > 1 {
 		return nil, nil, usage, foundUsage, fmt.Errorf(
-			"Gemini returned multiple candidates that cannot be represented for a single-choice Chat Completions request",
+			"upstream Gemini returned multiple candidates that cannot be represented for a single-choice Chat Completions request",
 		)
 	}
 	if blocked {
 		if len(candidates) != 0 {
 			return nil, nil, usage, foundUsage, fmt.Errorf(
-				"Gemini prompt feedback and candidates are inconsistent",
+				"the Gemini prompt feedback and candidates are inconsistent",
 			)
 		}
 		return envelope, &geminiChatCandidate{
@@ -1127,7 +1127,7 @@ func geminiPromptBlocked(raw json.RawMessage) (bool, error) {
 	var reason string
 	if json.Unmarshal(feedback["blockReason"], &reason) != nil {
 		return false, fmt.Errorf(
-			"Gemini promptFeedback.blockReason must be a string",
+			"the Gemini promptFeedback.blockReason must be a string",
 		)
 	}
 	switch reason {
@@ -1135,7 +1135,7 @@ func geminiPromptBlocked(raw json.RawMessage) (bool, error) {
 		return true, nil
 	default:
 		return false, fmt.Errorf(
-			"Gemini prompt block reason %q cannot be represented in Chat Completions",
+			"the Gemini prompt block reason %q cannot be represented in Chat Completions",
 			reason,
 		)
 	}
@@ -1145,7 +1145,7 @@ func parseGeminiChatCandidate(
 	raw map[string]json.RawMessage,
 ) (*geminiChatCandidate, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("Gemini candidate must be an object")
+		return nil, fmt.Errorf("the Gemini candidate must be an object")
 	}
 	if err := rejectGeminiChatResponseFields(
 		raw,
@@ -1164,7 +1164,7 @@ func parseGeminiChatCandidate(
 	} {
 		if rawActive(raw[field]) {
 			return nil, fmt.Errorf(
-				"Gemini candidate field %q cannot be represented in Chat Completions",
+				"the Gemini candidate field %q cannot be represented in Chat Completions",
 				field,
 			)
 		}
@@ -1173,7 +1173,7 @@ func parseGeminiChatCandidate(
 		var index int
 		if json.Unmarshal(raw["index"], &index) != nil || index != 0 {
 			return nil, fmt.Errorf(
-				"Gemini candidate index must be zero",
+				"the Gemini candidate index must be zero",
 			)
 		}
 	}
@@ -1184,7 +1184,7 @@ func parseGeminiChatCandidate(
 			&result.FinishReason,
 		) != nil || result.FinishReason == "" {
 			return nil, fmt.Errorf(
-				"Gemini candidate finishReason must be a string",
+				"the Gemini candidate finishReason must be a string",
 			)
 		}
 	}
@@ -1195,7 +1195,7 @@ func parseGeminiChatCandidate(
 	if json.Unmarshal(raw["content"], &content) != nil ||
 		content == nil {
 		return nil, fmt.Errorf(
-			"Gemini candidate content must be an object",
+			"the Gemini candidate content must be an object",
 		)
 	}
 	if err := rejectGeminiChatResponseFields(
@@ -1208,14 +1208,14 @@ func parseGeminiChatCandidate(
 	var role string
 	if json.Unmarshal(content["role"], &role) != nil || role != "model" {
 		return nil, fmt.Errorf(
-			"Gemini candidate content must have role model",
+			"the Gemini candidate content must have role model",
 		)
 	}
 	var parts []map[string]json.RawMessage
 	if rawNonNull(content["parts"]) {
 		if json.Unmarshal(content["parts"], &parts) != nil {
 			return nil, fmt.Errorf(
-				"Gemini candidate parts must be an array of objects",
+				"the Gemini candidate parts must be an array of objects",
 			)
 		}
 	}
@@ -1224,7 +1224,7 @@ func parseGeminiChatCandidate(
 	for index, part := range parts {
 		if part == nil {
 			return nil, fmt.Errorf(
-				"Gemini candidate part %d must be an object",
+				"the Gemini candidate part %d must be an object",
 				index,
 			)
 		}
@@ -1240,7 +1240,7 @@ func parseGeminiChatCandidate(
 		}
 		if rawJSONBool(part["thought"]) {
 			return nil, fmt.Errorf(
-				"Gemini thought content cannot be represented in Chat Completions",
+				"the Gemini thought content cannot be represented in Chat Completions",
 			)
 		}
 		var thoughtSignature string
@@ -1250,12 +1250,12 @@ func parseGeminiChatCandidate(
 				&thoughtSignature,
 			) != nil || thoughtSignature == "" {
 				return nil, fmt.Errorf(
-					"Gemini thoughtSignature must be a non-empty string",
+					"the Gemini thoughtSignature must be a non-empty string",
 				)
 			}
 			if !rawNonNull(part["functionCall"]) {
 				return nil, fmt.Errorf(
-					"Gemini non-tool thoughtSignature cannot be represented in Chat Completions",
+					"the Gemini non-tool thoughtSignature cannot be represented in Chat Completions",
 				)
 			}
 		}
@@ -1265,7 +1265,7 @@ func parseGeminiChatCandidate(
 			var value string
 			if json.Unmarshal(part["text"], &value) != nil {
 				return nil, fmt.Errorf(
-					"Gemini candidate part %d text must be a string",
+					"the Gemini candidate part %d text must be a string",
 					index,
 				)
 			}
@@ -1291,7 +1291,7 @@ func parseGeminiChatCandidate(
 			}
 			if _, exists := seenIDs[call.ID]; exists {
 				return nil, fmt.Errorf(
-					"Gemini function call id %q is duplicated",
+					"the Gemini function call id %q is duplicated",
 					call.ID,
 				)
 			}
@@ -1303,16 +1303,15 @@ func parseGeminiChatCandidate(
 			"executableCode", "codeExecutionResult", "videoMetadata",
 		} {
 			if rawNonNull(part[field]) {
-				active++
 				return nil, fmt.Errorf(
-					"Gemini candidate part field %q cannot be represented in Chat Completions",
+					"the Gemini candidate part field %q cannot be represented in Chat Completions",
 					field,
 				)
 			}
 		}
 		if active != 1 {
 			return nil, fmt.Errorf(
-				"Gemini candidate part %d must contain exactly one representable data field",
+				"the Gemini candidate part %d must contain exactly one representable data field",
 				index,
 			)
 		}
@@ -1339,13 +1338,13 @@ func parseGeminiChatFunctionCall(
 		json.Unmarshal(call["name"], &result.Name) != nil ||
 		result.Name == "" {
 		return geminiChatToolCall{}, fmt.Errorf(
-			"Gemini function call identity is invalid",
+			"the Gemini function call identity is invalid",
 		)
 	}
 	var args map[string]json.RawMessage
 	if json.Unmarshal(call["args"], &args) != nil || args == nil {
 		return geminiChatToolCall{}, fmt.Errorf(
-			"Gemini function call args must be a JSON object",
+			"the Gemini function call args must be a JSON object",
 		)
 	}
 	encoded, err := json.Marshal(args)
@@ -1390,7 +1389,7 @@ func geminiChatFinishReason(
 	case "MAX_TOKENS":
 		if hasToolCalls {
 			return "", fmt.Errorf(
-				"Gemini MAX_TOKENS finish reason is inconsistent with function calls",
+				"the Gemini MAX_TOKENS finish reason is inconsistent with function calls",
 			)
 		}
 		return "length", nil
@@ -1399,13 +1398,13 @@ func geminiChatFinishReason(
 		"IMAGE_RECITATION", "ESCALATION":
 		if hasToolCalls {
 			return "", fmt.Errorf(
-				"Gemini filtered finish reason is inconsistent with function calls",
+				"the Gemini filtered finish reason is inconsistent with function calls",
 			)
 		}
 		return "content_filter", nil
 	default:
 		return "", fmt.Errorf(
-			"Gemini finish reason %q cannot be represented in Chat Completions",
+			"the Gemini finish reason %q cannot be represented in Chat Completions",
 			reason,
 		)
 	}
@@ -1423,12 +1422,12 @@ func translateGeminiResponseToChatCompletionsLegacy(
 	}
 	if candidate == nil || candidate.FinishReason == "" {
 		return nil, usage, fmt.Errorf(
-			"Gemini response must contain one finished candidate",
+			"the Gemini response must contain one finished candidate",
 		)
 	}
 	if !foundUsage || usage.Completeness != ledger.UsageComplete {
 		return nil, usage, fmt.Errorf(
-			"Gemini response must contain complete usage",
+			"the Gemini response must contain complete usage",
 		)
 	}
 	finishReason, err := geminiChatFinishReason(
@@ -1549,12 +1548,12 @@ func proxyGeminiChatCompletionsStream(
 	}
 	if !state.started || !state.finished {
 		return state.result, fmt.Errorf(
-			"Gemini GenerateContent stream ended before a finished candidate",
+			"the Gemini GenerateContent stream ended before a finished candidate",
 		)
 	}
 	if state.usage.Completeness != ledger.UsageComplete {
 		return state.result, fmt.Errorf(
-			"Gemini GenerateContent stream ended before complete usage",
+			"the Gemini GenerateContent stream ended before complete usage",
 		)
 	}
 	state.result.usage = state.usage
@@ -1575,19 +1574,19 @@ func (s *geminiChatStreamState) handle(
 ) error {
 	var raw map[string]json.RawMessage
 	if json.Unmarshal(payload, &raw) != nil || raw == nil {
-		return fmt.Errorf("Gemini stream event must be a JSON object")
+		return fmt.Errorf("the Gemini stream event must be a JSON object")
 	}
 	if rawNonNull(raw["error"]) {
 		if s.failed || s.finished {
 			return fmt.Errorf(
-				"Gemini stream error arrived after a terminal candidate",
+				"the Gemini stream error arrived after a terminal candidate",
 			)
 		}
 		return s.handleError(destination, raw["error"])
 	}
 	if s.failed {
 		return fmt.Errorf(
-			"Gemini stream event arrived after an error",
+			"the Gemini stream event arrived after an error",
 		)
 	}
 	_, candidate, usage, foundUsage, err :=
@@ -1604,14 +1603,14 @@ func (s *geminiChatStreamState) handle(
 	if candidate == nil {
 		if !foundUsage {
 			return fmt.Errorf(
-				"Gemini stream event contained neither a candidate nor usage",
+				"the Gemini stream event contained neither a candidate nor usage",
 			)
 		}
 		return nil
 	}
 	if s.finished {
 		return fmt.Errorf(
-			"Gemini candidate arrived after a terminal candidate",
+			"the Gemini candidate arrived after a terminal candidate",
 		)
 	}
 	if !s.started {
@@ -1636,7 +1635,7 @@ func (s *geminiChatStreamState) handle(
 	for _, call := range candidate.ToolCalls {
 		if _, exists := s.toolIDs[call.ID]; exists {
 			return fmt.Errorf(
-				"Gemini streamed function call id %q is duplicated",
+				"the Gemini streamed function call id %q is duplicated",
 				call.ID,
 			)
 		}

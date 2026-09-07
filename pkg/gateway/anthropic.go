@@ -75,41 +75,6 @@ func (o openAIOperation) protocol() string {
 	return "openai"
 }
 
-func (o openAIOperation) allowedProviderTypes() []string {
-	if o.isAnthropic() {
-		return []string{"anthropic"}
-	}
-	if o.isGemini() {
-		return []string{"gemini"}
-	}
-	if o.isBedrock() {
-		return []string{"bedrock"}
-	}
-	if o == openAIOperationChatCompletions {
-		return []string{
-			"openai",
-			"openai_compatible",
-			"bedrock",
-			"anthropic",
-			"gemini",
-		}
-	}
-	if o == openAIOperationEmbeddings {
-		return []string{"openai", "openai_compatible", "gemini"}
-	}
-	return []string{"openai", "openai_compatible"}
-}
-
-func (o openAIOperation) upstreamOperation(
-	providerType string,
-	streaming bool,
-) openAIOperation {
-	return o.upstreamOperationForProtocol(
-		config.ProtocolForProviderType(providerType),
-		streaming,
-	)
-}
-
 func (o openAIOperation) upstreamOperationForProtocol(
 	protocol config.Protocol,
 	streaming bool,

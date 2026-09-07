@@ -101,7 +101,7 @@ func (s *Store) repairJournalTails() error {
 	})
 }
 
-func repairJournalTail(path string) error {
+func repairJournalTail(path string) (resultErr error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func repairJournalTail(path string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { resultErr = errors.Join(resultErr, file.Close()) }()
 	last := []byte{0}
 	if _, err := file.ReadAt(last, info.Size()-1); err != nil {
 		return err
@@ -296,7 +296,7 @@ func (s *Store) List(ctx context.Context, query savedtrace.Query) (savedtrace.Pa
 	}
 	records := make([]savedtrace.Record, 0, len(entries))
 	cache := newSourceFileCache(sources, s.exportOptions.openFiles)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 	for _, entry := range entries {
 		record, loadErr := cache.Load(entry)
 		if loadErr != nil {

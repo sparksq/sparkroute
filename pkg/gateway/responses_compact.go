@@ -216,44 +216,44 @@ func validateResponsesCompactSuccessResponse(body []byte) error {
 	if err := json.Unmarshal(body, &envelope); err != nil ||
 		envelope == nil {
 		return fmt.Errorf(
-			"Responses compact response must be a JSON object",
+			"the Responses compact response must be a JSON object",
 		)
 	}
 	var object string
 	if json.Unmarshal(envelope["object"], &object) != nil ||
 		object != "response.compaction" {
 		return fmt.Errorf(
-			"Responses compact response object must be response.compaction",
+			"the Responses compact response object must be response.compaction",
 		)
 	}
 	var responseID string
 	if json.Unmarshal(envelope["id"], &responseID) != nil {
 		return fmt.Errorf(
-			"Responses compact response id must be a string",
+			"the Responses compact response id must be a string",
 		)
 	}
 	if err := responsesstate.ValidateResponseID(responseID); err != nil {
-		return fmt.Errorf("Responses compact response id: %w", err)
+		return fmt.Errorf("the Responses compact response id: %w", err)
 	}
 	var createdAt int64
 	if json.Unmarshal(envelope["created_at"], &createdAt) != nil ||
 		createdAt < 0 {
 		return fmt.Errorf(
-			"Responses compact response created_at must be a non-negative integer",
+			"the Responses compact response created_at must be a non-negative integer",
 		)
 	}
 	var output []map[string]json.RawMessage
 	if json.Unmarshal(envelope["output"], &output) != nil ||
 		len(output) == 0 {
 		return fmt.Errorf(
-			"Responses compact response output must be a non-empty array of items",
+			"the Responses compact response output must be a non-empty array of items",
 		)
 	}
 	compactionItems := 0
 	for index, item := range output {
 		if item == nil {
 			return fmt.Errorf(
-				"Responses compact output item %d must be an object",
+				"the Responses compact output item %d must be an object",
 				index,
 			)
 		}
@@ -261,7 +261,7 @@ func validateResponsesCompactSuccessResponse(body []byte) error {
 		if json.Unmarshal(item["type"], &itemType) != nil ||
 			itemType == "" {
 			return fmt.Errorf(
-				"Responses compact output item %d type must be a non-empty string",
+				"the Responses compact output item %d type must be a non-empty string",
 				index,
 			)
 		}
@@ -272,13 +272,13 @@ func validateResponsesCompactSuccessResponse(body []byte) error {
 		var itemID string
 		if json.Unmarshal(item["id"], &itemID) != nil {
 			return fmt.Errorf(
-				"Responses compact output item %d id must be a string",
+				"the Responses compact output item %d id must be a string",
 				index,
 			)
 		}
 		if err := responsesstate.ValidateResourceID(itemID); err != nil {
 			return fmt.Errorf(
-				"Responses compact output item %d id: %w",
+				"the Responses compact output item %d id: %w",
 				index,
 				err,
 			)
@@ -289,20 +289,20 @@ func validateResponsesCompactSuccessResponse(body []byte) error {
 			&encryptedContent,
 		) != nil || encryptedContent == "" {
 			return fmt.Errorf(
-				"Responses compact output item %d encrypted_content must be a non-empty string",
+				"the Responses compact output item %d encrypted_content must be a non-empty string",
 				index,
 			)
 		}
 	}
 	if compactionItems != 1 {
 		return fmt.Errorf(
-			"Responses compact response must contain exactly one compaction item",
+			"the Responses compact response must contain exactly one compaction item",
 		)
 	}
 	usage, found := extractOpenAIResponsesUsage(body)
 	if !found || usage.Completeness != ledger.UsageComplete {
 		return fmt.Errorf(
-			"Responses compact response must contain complete usage",
+			"the Responses compact response must contain complete usage",
 		)
 	}
 	return nil

@@ -74,7 +74,7 @@ func runClientCredentialCreate(
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	manager, err := clientcredentials.NewManager(store)
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func runClientCredentialRotate(
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	manager, err := clientcredentials.NewManager(store)
 	if err != nil {
 		return err

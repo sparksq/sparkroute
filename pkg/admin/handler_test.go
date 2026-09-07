@@ -300,7 +300,7 @@ func TestManagedAdminRegistersAuthorizedCredentialAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	manager, _ := clientcredentials.NewManager(store)
 	adminCredential, err := manager.Create(context.Background(), clientcredentials.CreateInput{
 		Name: "admin", PrincipalID: "admin-a",
@@ -359,7 +359,7 @@ func TestManagedConfigurationAPIEnforcesOwnerRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer credentialStore.Close()
+	defer func() { _ = credentialStore.Close() }()
 	manager, err := clientcredentials.NewManager(credentialStore)
 	if err != nil {
 		t.Fatal(err)
@@ -391,7 +391,7 @@ func TestManagedConfigurationAPIEnforcesOwnerRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer configStore.Close()
+	defer func() { _ = configStore.Close() }()
 	if _, err := configStore.Initialize(context.Background(), managed.EmptyDocument(), "bootstrap", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +550,7 @@ func TestExplicitInsecureAdminGetsFullManagedConfigurationAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer configStore.Close()
+	defer func() { _ = configStore.Close() }()
 	if _, err := configStore.Initialize(context.Background(), managed.EmptyDocument(), "bootstrap", ""); err != nil {
 		t.Fatal(err)
 	}

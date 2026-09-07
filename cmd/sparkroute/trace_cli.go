@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ import (
 	tracefilesystem "github.com/sparksq/sparkroute/pkg/savedtrace/filesystem"
 )
 
-func runTraceExport(ctx context.Context, args []string, stdout io.Writer) error {
+func runTraceExport(ctx context.Context, args []string, stdout io.Writer) (resultErr error) {
 	flags := flag.NewFlagSet("sparkroute traces export", flag.ContinueOnError)
 	flags.SetOutput(stdout)
 	storage := flags.String(
@@ -102,12 +103,12 @@ func runTraceExport(ctx context.Context, args []string, stdout io.Writer) error 
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	output, closeOutput, err := traceExportOutput(*outputPath, stdout)
 	if err != nil {
 		return err
 	}
-	defer closeOutput()
+	defer func() { resultErr = errors.Join(resultErr, closeOutput()) }()
 	switch strings.ToLower(strings.TrimSpace(*format)) {
 	case "jsonl":
 		if *requireComplete || *projection != "canonical" {

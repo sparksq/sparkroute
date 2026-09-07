@@ -349,7 +349,11 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		if err != nil {
 			return fmt.Errorf("open standalone client credential store: %w", err)
 		}
-		defer clientCredentialStore.Close()
+		defer func() {
+			if err := clientCredentialStore.Close(); err != nil {
+				logger.Error("close client credential store", slog.Any("err", err))
+			}
+		}()
 		clientCredentialManager, err = clientcredentials.NewManager(clientCredentialStore)
 		if err != nil {
 			return err
@@ -467,7 +471,11 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 			return fmt.Errorf("open standalone SQLite configuration store: %w", openErr)
 		}
 		managedConfigStore = store
-		defer managedConfigStore.Close()
+		defer func() {
+			if err := managedConfigStore.Close(); err != nil {
+				logger.Error("close managed configuration store", slog.Any("err", err))
+			}
+		}()
 		_, _, loadErr := store.Load(ctx)
 		if errors.Is(loadErr, configsqlite.ErrNoActiveConfiguration) {
 			bootstrap := managed.EmptyDocument()
@@ -577,13 +585,13 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		usageStore,
 	)
 	if err != nil {
-		closeLedgerWriter(logger, usageWriter)
+		_ = closeLedgerWriter(logger, usageWriter)
 		return err
 	}
 	var traceRecorder *savedtrace.AsyncRecorder
 	if traceStore != nil {
 		if *traceMaxBodyBytes <= 0 || *traceMaxBodyBytes > savedtrace.MaxBodyBytes {
-			closeLedgerWriter(logger, usageWriter)
+			_ = closeLedgerWriter(logger, usageWriter)
 			if !traceStoreShared {
 				_ = traceStore.Close()
 			}
@@ -594,7 +602,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		}
 		overflowPolicy, err := savedtrace.ParseOverflowPolicy(*traceOverflowPolicy)
 		if err != nil {
-			closeLedgerWriter(logger, usageWriter)
+			_ = closeLedgerWriter(logger, usageWriter)
 			if !traceStoreShared {
 				_ = traceStore.Close()
 			}
@@ -620,7 +628,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 			},
 		)
 		if err != nil {
-			closeLedgerWriter(logger, usageWriter)
+			_ = closeLedgerWriter(logger, usageWriter)
 			if !traceStoreShared {
 				_ = traceStore.Close()
 			}
@@ -649,8 +657,8 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		},
 	)
 	if err != nil {
-		closeSavedTraceRecorder(logger, traceRecorder)
-		closeLedgerWriter(logger, usageWriter)
+		_ = closeSavedTraceRecorder(logger, traceRecorder)
+		_ = closeLedgerWriter(logger, usageWriter)
 		if traceStore != nil && !traceStoreShared {
 			_ = traceStore.Close()
 		}
@@ -658,9 +666,9 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	}
 	promptFingerprinter, err := promptcache.NewRandomFingerprinter()
 	if err != nil {
-		closePromptCache(logger, promptCache)
-		closeSavedTraceRecorder(logger, traceRecorder)
-		closeLedgerWriter(logger, usageWriter)
+		_ = closePromptCache(logger, promptCache)
+		_ = closeSavedTraceRecorder(logger, traceRecorder)
+		_ = closeLedgerWriter(logger, usageWriter)
 		if traceStore != nil && !traceStoreShared {
 			_ = traceStore.Close()
 		}
@@ -672,9 +680,9 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		version.Version,
 	)
 	if err != nil {
-		closePromptCache(logger, promptCache)
-		closeSavedTraceRecorder(logger, traceRecorder)
-		closeLedgerWriter(logger, usageWriter)
+		_ = closePromptCache(logger, promptCache)
+		_ = closeSavedTraceRecorder(logger, traceRecorder)
+		_ = closeLedgerWriter(logger, usageWriter)
 		if traceStore != nil && !traceStoreShared {
 			_ = traceStore.Close()
 		}
@@ -699,10 +707,10 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	}
 	initialRuntime, err := buildRuntimeGeneration(document, configVersion, runtimeOptions)
 	if err != nil {
-		closeTelemetry(logger, telemetryRuntime)
-		closePromptCache(logger, promptCache)
-		closeSavedTraceRecorder(logger, traceRecorder)
-		closeLedgerWriter(logger, usageWriter)
+		_ = closeTelemetry(logger, telemetryRuntime)
+		_ = closePromptCache(logger, promptCache)
+		_ = closeSavedTraceRecorder(logger, traceRecorder)
+		_ = closeLedgerWriter(logger, usageWriter)
 		if traceStore != nil && !traceStoreShared {
 			_ = traceStore.Close()
 		}
@@ -809,7 +817,7 @@ func validateStandaloneLifecycleTargets(targets []lifecycle.Target) error {
 		}
 		if target.Source == lifecycle.EndpointActivatable && target.Binding.RecipeRevision == "" {
 			return fmt.Errorf(
-				"Sparkrun deployment %q requires endpoint_source.recipe_revision",
+				"the Sparkrun deployment %q requires endpoint_source.recipe_revision",
 				target.Deployment,
 			)
 		}

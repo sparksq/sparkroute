@@ -775,7 +775,7 @@ func (h *conversationsHandler) proxyResponse(
 	ownerScope string,
 	resourceStore responsesstate.ResourceStore,
 ) proxyResult {
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	result := proxyResult{
 		gatewayStatus: response.StatusCode,
 		outcome:       ledger.OutcomeUpstreamError,

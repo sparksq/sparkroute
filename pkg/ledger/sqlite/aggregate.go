@@ -188,7 +188,7 @@ func sqliteAggregateBreakdown(
 			err,
 		)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	groups := make([]ledger.AggregateGroup, 0, ledger.MaxAggregateGroups+1)
 	for rows.Next() {
 		var group ledger.AggregateGroup

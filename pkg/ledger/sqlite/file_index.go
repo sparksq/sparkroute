@@ -136,7 +136,7 @@ func (s *Store) ListFiles(
 	if err != nil {
 		return responsesstate.FilePage{}, fmt.Errorf("list SQLite files: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	page := responsesstate.FilePage{Records: make([]responsesstate.FileRecord, 0, query.Limit)}
 	for rows.Next() {
 		record, scanErr := scanSQLiteFile(rows)

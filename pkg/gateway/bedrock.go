@@ -279,13 +279,13 @@ func validateBedrockModelID(model string) error {
 		strings.HasPrefix(model, "/") ||
 		strings.HasSuffix(model, "/") {
 		return fmt.Errorf(
-			"Bedrock upstream model must be a valid model identifier",
+			"the Bedrock upstream model must be a valid model identifier",
 		)
 	}
 	for _, segment := range strings.Split(model, "/") {
 		if segment == "" || segment == "." || segment == ".." {
 			return fmt.Errorf(
-				"Bedrock upstream model must be a valid model identifier",
+				"the Bedrock upstream model must be a valid model identifier",
 			)
 		}
 	}
@@ -298,7 +298,7 @@ func validateBedrockModelID(model string) error {
 			continue
 		}
 		return fmt.Errorf(
-			"Bedrock upstream model must be a valid model identifier",
+			"the Bedrock upstream model must be a valid model identifier",
 		)
 	}
 	return nil
@@ -580,14 +580,14 @@ func validateBedrockSuccessResponse(body []byte) error {
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(body, &envelope); err != nil ||
 		envelope == nil {
-		return fmt.Errorf("Bedrock response must be a JSON object")
+		return fmt.Errorf("the Bedrock response must be a JSON object")
 	}
 	if _, err := bedrockObject(envelope["output"], "output"); err != nil {
 		return err
 	}
 	if _, found := extractBedrockUsage(body); !found {
 		return fmt.Errorf(
-			"Bedrock response must contain valid usage",
+			"the Bedrock response must contain valid usage",
 		)
 	}
 	return nil

@@ -839,9 +839,7 @@ func validateHost(host string) error {
 	if net.ParseIP(host) != nil {
 		return nil
 	}
-	if strings.HasSuffix(host, ".") {
-		host = strings.TrimSuffix(host, ".")
-	}
+	host = strings.TrimSuffix(host, ".")
 	for _, label := range strings.Split(host, ".") {
 		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
 			return fmt.Errorf("sparkrun endpoint host is invalid")

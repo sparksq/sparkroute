@@ -18,7 +18,7 @@ func TestEmbeddingsPassthroughAndUsage(t *testing.T) {
 
 	captured := make(chan capturedUpstreamRequest, 1)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		defer request.Body.Close()
+		defer func() { _ = request.Body.Close() }()
 		raw, err := io.ReadAll(request.Body)
 		if err != nil {
 			t.Errorf("ReadAll() error = %v", err)

@@ -425,7 +425,7 @@ func geminiOperationURL(
 		strings.TrimSpace(model) != model ||
 		strings.Contains(model, "/") {
 		return "", fmt.Errorf(
-			"Gemini upstream model must be a non-empty models/* identifier",
+			"the Gemini upstream model must be a non-empty models/* identifier",
 		)
 	}
 	var action string
@@ -1063,10 +1063,10 @@ func validateGeminiSuccessResponse(
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(body, &envelope); err != nil ||
 		envelope == nil {
-		return fmt.Errorf("Gemini response must be a JSON object")
+		return fmt.Errorf("the Gemini response must be a JSON object")
 	}
 	if rawNonNull(envelope["error"]) {
-		return fmt.Errorf("Gemini success response must not contain an error")
+		return fmt.Errorf("the Gemini success response must not contain an error")
 	}
 	if operation == geminiOperationCountTokens {
 		if _, found := extractGeminiCountTokensUsage(body); !found {

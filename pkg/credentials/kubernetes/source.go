@@ -19,7 +19,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/credentials"
 )
 
-var ErrSecretNotFound = errors.New("Kubernetes Secret was not found")
+var ErrSecretNotFound = errors.New("the Kubernetes Secret was not found")
 
 // Secret is one immutable Kubernetes Secret API projection. Callers should
 // treat Data as sensitive and clear values when they are no longer needed.
@@ -75,7 +75,7 @@ func New(options Options) (*Source, error) {
 	if options.MaxResponseBytes < 0 ||
 		options.MaxResponseBytes > maxMaxResponseBytes {
 		return nil, fmt.Errorf(
-			"Kubernetes Secret maximum response bytes must be between 1 and %d",
+			"the Kubernetes Secret maximum response bytes must be between 1 and %d",
 			maxMaxResponseBytes,
 		)
 	}
@@ -84,14 +84,14 @@ func New(options Options) (*Source, error) {
 		return nil, fmt.Errorf("parse Kubernetes API URL: %w", err)
 	}
 	if baseURL.Scheme != "https" &&
-		!(baseURL.Scheme == "http" && options.AllowInsecureHTTP) {
-		return nil, fmt.Errorf("Kubernetes API URL must use HTTPS")
+		(baseURL.Scheme != "http" || !options.AllowInsecureHTTP) {
+		return nil, fmt.Errorf("the Kubernetes API URL must use HTTPS")
 	}
 	if baseURL.Host == "" ||
 		baseURL.User != nil ||
 		baseURL.RawQuery != "" ||
 		baseURL.Fragment != "" {
-		return nil, fmt.Errorf("Kubernetes API URL must be an origin URL")
+		return nil, fmt.Errorf("the Kubernetes API URL must be an origin URL")
 	}
 	baseURL.Path = strings.TrimSuffix(baseURL.Path, "/")
 
@@ -133,7 +133,7 @@ func New(options Options) (*Source, error) {
 		}
 		roots := x509.NewCertPool()
 		if !roots.AppendCertsFromPEM(certificate) {
-			return nil, fmt.Errorf("Kubernetes service-account CA contains no certificates")
+			return nil, fmt.Errorf("the Kubernetes service-account CA contains no certificates")
 		}
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{
@@ -147,7 +147,7 @@ func New(options Options) (*Source, error) {
 		_ *http.Request,
 		_ []*http.Request,
 	) error {
-		return fmt.Errorf("Kubernetes Secret API redirects are disabled")
+		return fmt.Errorf("the Kubernetes Secret API redirects are disabled")
 	}
 
 	return &Source{
@@ -174,13 +174,13 @@ func (s *Source) Resolve(
 	value, exists := payload.Data[key]
 	if !exists {
 		return credentials.Material{}, fmt.Errorf(
-			"Kubernetes Secret data key %q is not present",
+			"the Kubernetes Secret data key %q is not present",
 			key,
 		)
 	}
 	if len(value) == 0 {
 		return credentials.Material{}, fmt.Errorf(
-			"Kubernetes Secret data key %q is empty",
+			"the Kubernetes Secret data key %q is empty",
 			key,
 		)
 	}
@@ -206,7 +206,7 @@ func (s *Source) ReadSecret(
 	}
 	if _, allowed := s.allowedNamespaces[namespace]; !allowed {
 		return Secret{}, fmt.Errorf(
-			"Kubernetes Secret namespace %q is not allowed",
+			"the Kubernetes Secret namespace %q is not allowed",
 			namespace,
 		)
 	}
@@ -228,7 +228,7 @@ func (s *Source) ReadSecret(
 	if err != nil {
 		return Secret{}, fmt.Errorf("read Kubernetes Secret: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode == http.StatusNotFound {
 		return Secret{}, ErrSecretNotFound
 	}
@@ -244,7 +244,7 @@ func (s *Source) ReadSecret(
 	}
 	if int64(len(raw)) > s.maxResponseBytes {
 		return Secret{}, fmt.Errorf(
-			"Kubernetes Secret response exceeds %d bytes",
+			"the Kubernetes Secret response exceeds %d bytes",
 			s.maxResponseBytes,
 		)
 	}
@@ -298,17 +298,17 @@ func readToken(tokenFile string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open Kubernetes service-account token: %w", err)
 	}
-	defer handle.Close()
+	defer func() { _ = handle.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(handle, maxTokenBytes+1))
 	if err != nil {
 		return "", fmt.Errorf("read Kubernetes service-account token: %w", err)
 	}
 	if len(raw) > int(maxTokenBytes) {
-		return "", fmt.Errorf("Kubernetes service-account token is too large")
+		return "", fmt.Errorf("the Kubernetes service-account token is too large")
 	}
 	token := strings.TrimSpace(string(raw))
 	if token == "" {
-		return "", fmt.Errorf("Kubernetes service-account token is empty")
+		return "", fmt.Errorf("the Kubernetes service-account token is empty")
 	}
 	return token, nil
 }
@@ -339,7 +339,7 @@ func validateDNSLabel(name, value string, limit int, allowDot bool) error {
 
 func validateDataKey(value string) error {
 	if value == "" || len(value) > 253 {
-		return fmt.Errorf("Kubernetes Secret data key is invalid")
+		return fmt.Errorf("the Kubernetes Secret data key is invalid")
 	}
 	for _, character := range []byte(value) {
 		if character >= 'a' && character <= 'z' ||
@@ -350,7 +350,7 @@ func validateDataKey(value string) error {
 			character == '.' {
 			continue
 		}
-		return fmt.Errorf("Kubernetes Secret data key %q is invalid", value)
+		return fmt.Errorf("the Kubernetes Secret data key %q is invalid", value)
 	}
 	return nil
 }

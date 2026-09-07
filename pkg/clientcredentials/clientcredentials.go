@@ -482,13 +482,6 @@ func validateListQuery(query ListQuery) error {
 	return nil
 }
 
-func normalizeListLimit(limit int) int {
-	if limit == 0 {
-		return defaultListLimit
-	}
-	return limit
-}
-
 func validateMutation(id, actor string) error {
 	if err := validateCredentialID(id); err != nil {
 		return err

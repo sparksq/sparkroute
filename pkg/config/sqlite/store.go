@@ -226,7 +226,7 @@ func (s *Store) ListSets(ctx context.Context) ([]managed.SetMetadata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list SQLite managed sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	sets := make([]managed.SetMetadata, 0, 2)
 	for rows.Next() {
 		metadata, err := scanSetMetadata(rows)
@@ -506,7 +506,7 @@ func (s *Store) loadSets(ctx context.Context, query queryer) (map[managed.Owner]
 	if err != nil {
 		return nil, fmt.Errorf("load SQLite managed sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	sets := make(map[managed.Owner]config.Document, 2)
 	for rows.Next() {
 		var owner managed.Owner

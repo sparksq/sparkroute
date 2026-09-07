@@ -30,7 +30,7 @@ func TestChatCompletionsModelVisibilityAccess(t *testing.T) {
 	}))
 	defer upstream.Close()
 	document := proxyDocument(upstream.URL + "/v1")
-	for _, model := range []config.VirtualModel{
+	document.VirtualModels = append(document.VirtualModels, []config.VirtualModel{
 		{
 			Name:       "hidden-model",
 			Aliases:    []string{"hidden-alias"},
@@ -43,9 +43,7 @@ func TestChatCompletionsModelVisibilityAccess(t *testing.T) {
 			Visibility: config.ModelVisibilityInternal,
 			Pools:      document.VirtualModels[0].Pools,
 		},
-	} {
-		document.VirtualModels = append(document.VirtualModels, model)
-	}
+	}...)
 	handler, err := NewDataHandler(document, DataOptions{})
 	if err != nil {
 		t.Fatalf("NewDataHandler() error = %v", err)
@@ -617,7 +615,7 @@ func TestChatCompletionsStreamingPostGuardrailReleasesAllowedWindowsIncrementall
 	if err != nil {
 		t.Fatalf("Do() error = %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	reader := bufio.NewReader(response.Body)
 	firstLine, err := reader.ReadString('\n')

@@ -11,9 +11,9 @@ func TestStreamIdleReadCloserTimesOutBlockedRead(t *testing.T) {
 	t.Parallel()
 
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 	source := newStreamIdleReadCloser(reader, 20*time.Millisecond)
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 	started := time.Now()
 	_, err := source.Read(make([]byte, 1))
 	if err == nil {
@@ -34,7 +34,7 @@ func TestStreamIdleReadCloserDoesNotCountDownstreamDelay(t *testing.T) {
 		io.NopCloser(strings.NewReader("ab")),
 		20*time.Millisecond,
 	)
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 	buffer := make([]byte, 1)
 	if count, err := source.Read(buffer); count != 1 || err != nil {
 		t.Fatalf("first Read() = %d, %v", count, err)

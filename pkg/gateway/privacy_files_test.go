@@ -54,7 +54,7 @@ func TestPreparePIIFileUploadInspectsOnlyTypedTextAndMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	body, _ := io.ReadAll(file)
 	for name, value := range map[string]string{
 		"filename": fileHeader.Filename,

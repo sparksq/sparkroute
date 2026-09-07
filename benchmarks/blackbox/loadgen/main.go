@@ -200,7 +200,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer requestFile.Close()
+	defer func() { _ = requestFile.Close() }()
 	encoder := json.NewEncoder(requestFile)
 	var outputMu sync.Mutex
 
@@ -401,7 +401,7 @@ func executeRequest(
 	if err != nil {
 		return finishRequest(result, started, firstByte, 0, 0, classifyError(err))
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, opts.maxResponseBytes+1))
 	if readErr != nil {
 		return finishRequest(result, started, firstByte, response.StatusCode, int64(len(body)), "read: "+readErr.Error())
@@ -755,7 +755,7 @@ func captureCPUProfile(
 	if err != nil {
 		return fmt.Errorf("capture CPU profile: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 		return fmt.Errorf("capture CPU profile: status %d: %s", response.StatusCode, strings.TrimSpace(string(body)))

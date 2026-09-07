@@ -37,7 +37,7 @@ func TestClientCredentialBootstrapCommandCreatesUsableAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	manager, _ := clientcredentials.NewManager(store)
 	principal, err := manager.AuthenticateBearer(context.Background(), issued.APIKey)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestClientCredentialEnsureAdoptsAndRotatesExistingNamedCredential(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	manager, _ = clientcredentials.NewManager(store)
 	if _, err := manager.AuthenticateBearer(context.Background(), existing.APIKey); err == nil {
 		t.Fatal("old API key remained valid after ensure")

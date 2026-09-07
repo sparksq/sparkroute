@@ -433,8 +433,8 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 				}
 				value := int64(0)
 				if options.PinnedDeployment == "" &&
-					!(model.Selection.Mode == config.SelectionWeightedHash &&
-						options.SelectionKey != "") {
+					(model.Selection.Mode != config.SelectionWeightedHash ||
+						options.SelectionKey == "") {
 					value, err = picker.Pick(totalWeight)
 					if err != nil {
 						return Plan{}, err
@@ -592,17 +592,6 @@ func providerTypeAllowed(providerType string, allowed []string) bool {
 		}
 	}
 	return false
-}
-
-func weightedIndex(targets []config.WeightedTarget, value int64) int {
-	var boundary int64
-	for index, target := range targets {
-		boundary += int64(target.Weight)
-		if value < boundary {
-			return index
-		}
-	}
-	panic("weighted index called with an out-of-range value")
 }
 
 func effectiveResponseModel(mode config.ResponseModelMode) config.ResponseModelMode {

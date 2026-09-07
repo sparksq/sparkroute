@@ -730,7 +730,7 @@ func responsesCompactOpaqueState(
 	}
 	if trimmed[0] != '[' {
 		return nil, fmt.Errorf(
-			"Responses compact input must be a string or array",
+			"the Responses compact input must be a string or array",
 		)
 	}
 	var items []map[string]json.RawMessage
@@ -751,14 +751,14 @@ func responsesCompactOpaqueState(
 				&encryptedContent,
 			) != nil {
 			return nil, fmt.Errorf(
-				"Responses compact input item %d has invalid opaque state",
+				"the Responses compact input item %d has invalid opaque state",
 				index,
 			)
 		}
 		if existing, exists := result[itemID]; exists &&
 			existing != encryptedContent {
 			return nil, fmt.Errorf(
-				"Responses compact input contains conflicting state for %s",
+				"the Responses compact input contains conflicting state for %s",
 				itemID,
 			)
 		}
@@ -774,7 +774,7 @@ func mergePostGuardrailReplacement(
 ) ([]byte, error) {
 	if operation == openAIOperationResponsesCompact {
 		return nil, fmt.Errorf(
-			"Responses compact post guardrails cannot replace canonical output",
+			"the Responses compact post guardrails cannot replace canonical output",
 		)
 	}
 	var originalEnvelope map[string]json.RawMessage

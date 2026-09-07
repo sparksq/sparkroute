@@ -339,7 +339,7 @@ func (s *Source) webIdentity(
 			err,
 		)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	body, err := readBounded(response.Body, maxCredentialResponseBytes)
 	if err != nil {
 		return SigningMaterial{}, fmt.Errorf(
@@ -515,7 +515,7 @@ func (s *Source) imds(ctx context.Context) (SigningMaterial, error) {
 		)
 	}
 	token, readErr := readBounded(response.Body, 8192)
-	response.Body.Close()
+	_ = response.Body.Close()
 	if readErr != nil {
 		return SigningMaterial{}, fmt.Errorf(
 			"read IMDSv2 token: %w",
@@ -553,7 +553,7 @@ func (s *Source) imds(ctx context.Context) (SigningMaterial, error) {
 		)
 	}
 	roleBody, readErr := readBounded(response.Body, 8192)
-	response.Body.Close()
+	_ = response.Body.Close()
 	if readErr != nil {
 		return SigningMaterial{}, fmt.Errorf(
 			"read IMDSv2 role: %w",
@@ -607,7 +607,7 @@ func (s *Source) retrieveJSONCredentials(
 	if err != nil {
 		return SigningMaterial{}, fmt.Errorf("%s: %w", action, err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	body, err := readBounded(response.Body, maxCredentialResponseBytes)
 	if err != nil {
 		return SigningMaterial{}, fmt.Errorf("%s: %w", action, err)
@@ -692,7 +692,7 @@ func (s *Source) readBoundedToken(fileName string) (string, error) {
 		if openErr != nil {
 			return "", openErr
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		raw, err = readBounded(file, maxWorkloadTokenBytes)
 		if err != nil {
 			return "", err

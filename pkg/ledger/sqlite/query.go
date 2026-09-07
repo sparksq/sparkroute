@@ -122,7 +122,7 @@ func (s *Store) ListRequests(
 	if err != nil {
 		return ledger.RequestPage{}, fmt.Errorf("list SQLite request records: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	records := make([]ledger.RequestRecord, 0, plan.Limit+1)
 	for rows.Next() {
@@ -213,7 +213,7 @@ func (s *Store) ListAttempts(
 	if err != nil {
 		return ledger.AttemptPage{}, fmt.Errorf("list SQLite attempt records: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	records := make([]ledger.AttemptRecord, 0, plan.Limit+1)
 	for rows.Next() {
@@ -288,7 +288,7 @@ func (s *Store) ListRuntimeEvents(
 	if err != nil {
 		return ledger.RuntimeEventPage{}, fmt.Errorf("list SQLite runtime events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	records := make([]ledger.RuntimeEventRecord, 0, plan.Limit+1)
 	for rows.Next() {
 		record, err := scanRuntimeEvent(rows)

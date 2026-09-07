@@ -82,7 +82,7 @@ func preparePIIFileUpload(
 		}
 		parts++
 		if parts > maximumMultipartPIIParts {
-			part.Close()
+			_ = part.Close()
 			return nil, "", fmt.Errorf("multipart upload contains too many parts")
 		}
 		payload, readErr := io.ReadAll(io.LimitReader(part, maximumRequestBytes+1))

@@ -24,7 +24,7 @@ func TestReaderAndRetentionConformance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	ledgertest.RunConformance(t, store, nil)
 	responsesstatetest.RunFileStoreConformance(t, store)
 }
@@ -103,7 +103,7 @@ func TestStorePersistsIdempotentRequestAndAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	now := time.Now().UTC()
 	zero := int64(0)
@@ -182,7 +182,7 @@ func TestSavedTraceRoundTripAndMetadataFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	started := time.Unix(100, 123).UTC()
 	record := savedtrace.Record{
 		Version:          savedtrace.SchemaVersion,
@@ -263,7 +263,7 @@ func TestStoreBatchIsTransactional(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	now := time.Now()
 	valid := ledger.NewRequestRecord(ledger.RequestRecord{
@@ -361,7 +361,7 @@ func TestResponseAffinityPersistsAndRejectsConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	got, found, err := store.Resolve(ctx, affinity.Scope, affinity.ResponseID)
 	if err != nil || !found || !responsesstate.SameRoute(got, affinity) {
 		t.Fatalf("Resolve() = %#v, %v, %v", got, found, err)
@@ -420,7 +420,7 @@ func TestResourceAffinityPersistsAndTombstones(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	got, found, err := store.ResolveResource(ctx, affinity.ResourceKey)
 	if err != nil || !found || !responsesstate.SameResourceRoute(got, affinity) {
 		t.Fatalf("ResolveResource() = %#v, %v, %v", got, found, err)
@@ -522,7 +522,7 @@ func TestSeekPaginationMigrationBackfillsExistingRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() migrated store error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	var startedNS int64
 	if err := store.db.QueryRowContext(
 		context.Background(),

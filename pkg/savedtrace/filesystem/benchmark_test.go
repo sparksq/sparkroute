@@ -19,7 +19,7 @@ func BenchmarkRegressionMatrixTraceFilesystemGroupCommit(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	const batchSize = 256
 	started := time.Unix(100, 0).UTC()
 	var sequence int
