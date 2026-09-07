@@ -78,8 +78,8 @@ func providerProtocol(document config.Document, providerName string) string {
 		if provider.Name != providerName {
 			continue
 		}
-		if provider.Type == "openai" || provider.Type == "openai_compatible" {
-			return "openai"
+		if protocol := config.ProtocolForProviderType(provider.Type); protocol != "" {
+			return string(protocol)
 		}
 		return provider.Type
 	}

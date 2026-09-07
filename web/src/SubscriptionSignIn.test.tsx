@@ -62,7 +62,7 @@ describe("Codex subscription configuration", () => {
       return <><ProviderDeploymentEditor document={document} disabled={false} onChange={setDocument} subscriptionAuth={{ token: "test", enabled: true }} /><output aria-label="Saved draft">{JSON.stringify(document)}</output></>;
     }
     render(<Editor />);
-    fireEvent.click(screen.getByRole("button", { name: "Use Codex subscription" }));
+    fireEvent.change(screen.getByLabelText("Authentication type"), { target: { value: "codex_subscription" } });
     await waitFor(() => expect(screen.getByRole("button", { name: "Sign in with ChatGPT" })).toBeEnabled());
     expect(screen.getByLabelText("Subscription profile")).toHaveValue("codex");
     fireEvent.click(screen.getByRole("button", { name: "Add deployment" }));

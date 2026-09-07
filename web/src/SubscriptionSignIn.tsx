@@ -61,10 +61,10 @@ export function SubscriptionSignIn({ profile, token, enabled }: { profile: strin
           </div>
           {error ? <p role="alert">{error}</p> : null}
           <div className="button-row">
-            {status?.state === "connected" ? <button type="button" disabled={busy} onClick={() => void change("logout")}>Sign out of subscription</button>
-              : pending ? <button type="button" disabled={busy} onClick={() => void change("cancel")}>Cancel sign-in</button>
-              : <button type="button" disabled={busy || !status} onClick={() => void change("login")}>{status?.state === "failed" || status?.state === "expired" ? "Try sign-in again" : "Sign in with ChatGPT"}</button>}
-            {error ? <button type="button" disabled={busy} onClick={() => { setError(""); setRefresh((value) => value + 1); }}>Check status</button> : null}
+            {status?.state === "connected" ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void change("logout")}>Sign out of subscription</button>
+              : pending ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void change("cancel")}>Cancel sign-in</button>
+              : <button className="secondary-button" type="button" disabled={busy || !status} onClick={() => void change("login")}>{status?.state === "failed" || status?.state === "expired" ? "Try sign-in again" : "Sign in with ChatGPT"}</button>}
+            {error ? <button className="secondary-button" type="button" disabled={busy} onClick={() => { setError(""); setRefresh((value) => value + 1); }}>Check status</button> : null}
           </div>
         </>}
       <p><a href="https://learn.chatgpt.com/docs/auth#login-on-headless-devices" target="_blank" rel="noreferrer">OpenAI device-code login help</a></p>

@@ -246,6 +246,9 @@ func (d Document) Validate() error {
 			return fmt.Errorf("%s.native_protocols: %w", path, err)
 		}
 		provider := d.provider(deployment.Provider)
+		if provider.Type == "openai_responses" && !deployment.SupportsNativeProtocol(provider, ProtocolOpenAI) {
+			return fmt.Errorf("%s.native_protocols: OpenAI Responses providers require the openai protocol", path)
+		}
 		if provider.Type == "openai_subscription" {
 			if deployment.Credential != "" || deployment.EndpointSource.Type.Effective() != EndpointSourceStatic ||
 				len(deployment.NativeProtocols) != 0 && (len(deployment.NativeProtocols) != 1 || deployment.NativeProtocols[0] != ProtocolOpenAI) {

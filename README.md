@@ -123,9 +123,41 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/SPARKRUN_INTEGRATION_READINESS.md`](docs/SPARKRUN_INTEGRATION_READINESS.md),
 and [`docs/TRACE_DATASET_EXPORT.md`](docs/TRACE_DATASET_EXPORT.md).
 
+## Native provider configuration
+
+The console separates the provider's native API from its authentication:
+
+| Provider type | Default native protocol | API capability |
+| --- | --- | --- |
+| OpenAI (Chat), `openai` | OpenAI | Baseline Chat Completions |
+| OpenAI (Responses), `openai_responses` | OpenAI | Responses, automatically enabled |
+| Anthropic, `anthropic` | Anthropic Messages | Baseline Messages |
+| OpenAI compatible (custom), `openai_compatible` | OpenAI | Existing explicit capability behavior |
+| Google Gemini, `gemini` | Gemini | Existing explicit capability behavior |
+| Amazon Bedrock, `bedrock` | Bedrock Converse | Existing explicit capability behavior |
+
+Provider selection sets the native protocol default. Responses providers imply
+`responses` for every associated deployment, including configuration supplied
+as JSON. An explicitly unsupported Responses capability conflicts with that
+provider type and is rejected. Other capabilities remain model-specific.
+The console adds deployments under the selected provider and preserves other
+capability declarations. A Responses-native provider is not sent Chat
+Completions requests; Chat-to-Responses translation is not implemented.
+
+AWS region appears only for Bedrock. Its Base URL control is hidden; new
+Bedrock configurations derive the runtime endpoint from the region and use
+AWS SigV4 with a workload credential reference. Existing custom endpoints in
+JSON remain preserved.
+
 ## Codex subscription providers
 
-The provider editor supports **Use Codex subscription** and **Sign in with ChatGPT**.
+Select **Codex Subscription** in **Authentication type** for an OpenAI provider,
+then choose **Sign in with ChatGPT**. The native API becomes OpenAI (Responses).
+Changing authentication back to None, Bearer, or Custom header leaves subscription
+mode; endpoint and credential-reference drafts are restored during editing.
+Switching authentication does not sign out a shared subscription profile.
+Already saved subscription providers switch back to the standard OpenAI endpoint
+and need their ordinary API credential reference configured again.
 Choose a credential profile name, request a one-time device code, open the OpenAI
 sign-in link, and complete authentication. Enable device-code login in your
 ChatGPT security settings or workspace permissions if necessary. The console

@@ -1052,6 +1052,11 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		deployment config.Deployment,
 	) (routing.ProtocolRoute, bool) {
 		ingress := config.Protocol(h.operation.protocol())
+		// A Responses-native endpoint need not expose Chat Completions.
+		// Chat-to-Responses translation is not currently implemented.
+		if provider.Type == "openai_responses" && h.operation == openAIOperationChatCompletions {
+			return routing.ProtocolRoute{}, false
+		}
 		if provider.Type == "openai_subscription" {
 			if h.operation != openAIOperationResponses || rawJSONBool(envelope["store"]) || rawJSONBool(envelope["background"]) ||
 				rawNonNull(envelope["previous_response_id"]) || rawNonNull(envelope["conversation"]) {

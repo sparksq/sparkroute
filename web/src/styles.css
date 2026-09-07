@@ -1573,8 +1573,17 @@ tbody tr:last-child td {
   user-select: all;
 }
 
+.provider-field-grid,
 .provider-auth-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+
+.subscription-sign-in .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 12px;
 }
 
 .header-list {

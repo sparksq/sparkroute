@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -86,7 +87,7 @@ const (
 // a provider type. Explicit Deployment.NativeProtocols override this default.
 func ProtocolForProviderType(providerType string) Protocol {
 	switch providerType {
-	case "openai", "openai_compatible", "openai_subscription":
+	case "openai", "openai_compatible", "openai_responses", "openai_subscription":
 		return ProtocolOpenAI
 	case "anthropic":
 		return ProtocolAnthropic
@@ -220,7 +221,8 @@ func (p UnknownCapabilityPolicy) Effective() UnknownCapabilityPolicy {
 
 // ResolveCapabilityPolicies materializes routing precedence: deployment
 // override, provider default, document default, then the supplied edition
-// default. The deployment slice is copied; the source document is not mutated.
+// default. Native Responses providers also imply the Responses capability.
+// The deployment slice is copied; the source document is not mutated.
 func (d Document) ResolveCapabilityPolicies(
 	editionDefault UnknownCapabilityPolicy,
 ) Document {
@@ -232,15 +234,21 @@ func (d Document) ResolveCapabilityPolicies(
 		globalDefault = editionDefault
 	}
 	providerDefaults := make(map[string]UnknownCapabilityPolicy, len(d.Providers))
+	providerResponses := make(map[string]bool, len(d.Providers))
 	for _, provider := range d.Providers {
 		value := provider.CapabilityDefaults.Unknown
 		if value == "" {
 			value = globalDefault
 		}
 		providerDefaults[provider.Name] = value
+		providerResponses[provider.Name] = provider.Type == "openai_responses"
 	}
 	d.Deployments = append([]Deployment(nil), d.Deployments...)
 	for index := range d.Deployments {
+		deployment := &d.Deployments[index]
+		if providerResponses[deployment.Provider] && !slices.Contains(deployment.Capabilities, CapabilityResponses) {
+			deployment.Capabilities = append(slices.Clone(deployment.Capabilities), CapabilityResponses)
+		}
 		if d.Deployments[index].CapabilityPolicy.Unknown != "" {
 			continue
 		}
