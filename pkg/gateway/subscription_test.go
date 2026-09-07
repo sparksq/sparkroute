@@ -17,7 +17,9 @@ import (
 	llmauth "github.com/scitrera/go-llm/auth"
 	openaiauth "github.com/scitrera/go-llm/auth/openai"
 	"github.com/sparksq/sparkroute/pkg/config"
+	"github.com/sparksq/sparkroute/pkg/identity"
 	"github.com/sparksq/sparkroute/pkg/providerauth"
+	"github.com/sparksq/sparkroute/pkg/responsesstate"
 	"github.com/sparksq/sparkroute/pkg/routing"
 )
 
@@ -80,11 +82,12 @@ func TestSubscriptionBufferedAndStreamingWithAuthRecovery(t *testing.T) {
 			})
 			doc := responsesDocument("")
 			doc.Providers[0].Type, doc.Providers[0].SubscriptionProfile = "openai_subscription", "codex"
-			handler, err := NewDataHandler(doc, DataOptions{ProviderAuth: auth, HTTPClient: &http.Client{Transport: transport}})
+			state := responsesstate.NewMemoryStore(responsesstate.MemoryOptions{})
+			handler, err := NewDataHandler(doc, DataOptions{ProviderAuth: auth, ResponsesState: state, HTTPClient: &http.Client{Transport: transport}})
 			if err != nil {
 				t.Fatal(err)
 			}
-			r := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(fmt.Sprintf(`{"model":"default","input":"hello","stream":%t,"store":false}`, streaming)))
+			r := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(fmt.Sprintf(`{"model":"default","input":"hello","stream":%t}`, streaming)))
 			r.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, r)
@@ -96,6 +99,9 @@ func TestSubscriptionBufferedAndStreamingWithAuthRecovery(t *testing.T) {
 			}
 			if calls != 2 || refreshes.Load() != 1 || requestBodies[0] != requestBodies[1] {
 				t.Fatal("auth replay was not bounded or changed request")
+			}
+			if _, found, err := state.Resolve(t.Context(), responsesCallerScope(identity.Identity{}), "resp_1"); err != nil || found {
+				t.Fatal("subscription response was incorrectly bound as provider-stored")
 			}
 			for _, endpoint := range []string{"/v1/chat/completions", "/v1/embeddings", "/v1/responses/compact"} {
 				r := httptest.NewRequest(http.MethodPost, endpoint, strings.NewReader(`{"model":"default","input":"hello","messages":[{"role":"user","content":"hello"}]}`))

@@ -846,12 +846,21 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		fail(http.StatusBadRequest, ledger.OutcomeRejected, requestValidationCode(err), err.Error())
 		return
 	}
+	_, explicitResponseStore := envelope["store"]
+	defaultResponseStore := h.operation == openAIOperationResponses && !explicitResponseStore
+	if defaultResponseStore {
+		// Leave existing routing diagnostics and defaults unchanged for models
+		// that have no subscription target. Unknown models are handled below.
+		hasSubscription, _ := h.snapshot.HasTargetProviderType(requestedModel, []string{"openai_subscription"}, internalInvocation)
+		defaultResponseStore = hasSubscription
+	}
 	if h.operation == openAIOperationResponses {
 		filtered := make([]config.Capability, 0, len(requiredCapabilities))
 		for _, capability := range requiredCapabilities {
-			if capability != config.CapabilityResponses {
-				filtered = append(filtered, capability)
+			if capability == config.CapabilityResponses || defaultResponseStore && capability == config.CapabilityStoredCompletion {
+				continue
 			}
+			filtered = append(filtered, capability)
 		}
 		requiredCapabilities = filtered
 	}
@@ -1043,22 +1052,29 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		deployment config.Deployment,
 	) (routing.ProtocolRoute, bool) {
 		ingress := config.Protocol(h.operation.protocol())
-		if provider.Type == "openai_subscription" && h.operation != openAIOperationResponses {
-			return routing.ProtocolRoute{}, false
+		if provider.Type == "openai_subscription" {
+			if h.operation != openAIOperationResponses || rawJSONBool(envelope["store"]) || rawJSONBool(envelope["background"]) ||
+				rawNonNull(envelope["previous_response_id"]) || rawNonNull(envelope["conversation"]) {
+				return routing.ProtocolRoute{}, false
+			}
 		}
 		if h.operation == openAIOperationResponses &&
 			deployment.SupportsNativeProtocol(provider, config.ProtocolOpenAI) {
+			// Storage defaults differ by provider. Ordinary OpenAI routes still
+			// require stored_completions when store is omitted; Codex forces false.
+			var providerRequired []config.Capability
+			if defaultResponseStore && provider.Type != "openai_subscription" {
+				providerRequired = append(providerRequired, config.CapabilityStoredCompletion)
+			}
 			if deployment.DeclaresCapability(config.CapabilityResponses) {
 				return routing.ProtocolRoute{
-					Protocol: config.ProtocolOpenAI,
-					Native:   true,
-					RequiredCapabilities: []config.Capability{
-						config.CapabilityResponses,
-					},
+					Protocol:             config.ProtocolOpenAI,
+					Native:               true,
+					RequiredCapabilities: append(providerRequired, config.CapabilityResponses),
 				}, true
 			}
 			if responsesChatError == nil {
-				return routing.ProtocolRoute{Protocol: config.ProtocolOpenAI}, true
+				return routing.ProtocolRoute{Protocol: config.ProtocolOpenAI, RequiredCapabilities: providerRequired}, true
 			}
 			return routing.ProtocolRoute{}, false
 		}
@@ -2458,6 +2474,11 @@ func (h *chatCompletionsHandler) proxyResponse(
 	requestBody []byte,
 	privacyContext streamPIIContext,
 ) proxyResult {
+	if selection.Provider.Type == "openai_subscription" {
+		// The Codex profile always sends store=false, including when omitted by
+		// the caller. Do not advertise a retrievable provider-side resource.
+		responseState.storesResponse = false
+	}
 	upstreamProtocol := selectionUpstreamProtocol(selection)
 	translatedBedrock := h.operation ==
 		openAIOperationChatCompletions &&

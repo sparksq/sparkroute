@@ -344,7 +344,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		return json.NewEncoder(stdout).Encode(version.BuildInfo())
 	}
 	var providerAuth *providerauth.Service
-	if *providerAuthPath == "" && *configSourceMode == "sqlite" && *configSQLitePath != "" && *configSQLitePath != ":memory:" {
+	if *providerAuthPath == "" && strings.EqualFold(strings.TrimSpace(*configSourceMode), "sqlite") && *configSQLitePath != "" && *configSQLitePath != ":memory:" {
 		*providerAuthPath = *configSQLitePath + ".provider-auth.db"
 	}
 	if *providerAuthPath != "" && !*configCheck {
