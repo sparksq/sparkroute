@@ -1,0 +1,47 @@
+static_resources:
+  listeners:
+    - name: benchmark_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 18095
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: benchmark
+                codec_type: AUTO
+                route_config:
+                  name: benchmark_route
+                  virtual_hosts:
+                    - name: benchmark
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: benchmark_upstream
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: benchmark_upstream
+      type: STATIC
+      connect_timeout: 2s
+      load_assignment:
+        cluster_name: benchmark_upstream
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 18000
+
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 18195

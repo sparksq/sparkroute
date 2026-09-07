@@ -1,0 +1,57 @@
+{
+  "providers": [
+    {
+      "name": "gemini",
+      "type": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "auth": {
+        "type": "header",
+        "header": "X-Goog-Api-Key",
+        "credential": "env://GEMINI_API_KEY"
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "gemini-flash",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "capabilities": [
+        "tools",
+        "vision",
+        "audio_input",
+        "audio_output",
+        "file_input",
+        "structured_outputs",
+        "json_mode",
+        "reasoning",
+        "logprobs",
+        "seed",
+        "multiple_choices",
+        "service_tier",
+        "stored_completions",
+        "provider_hosted_tools",
+        "token_counting"
+      ],
+      "max_concurrency": 64
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "gemini-flash",
+      "aliases": ["default"],
+      "response_model": "virtual",
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "gemini-flash",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

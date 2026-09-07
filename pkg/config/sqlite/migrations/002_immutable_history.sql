@@ -1,0 +1,1 @@
+-- Reserved migration version; OSS configuration now stores current state only.

@@ -1,0 +1,79 @@
+# Authoritative versions for SparkRoute.
+# Run: sync-versions             to apply
+# Run: sync-versions --check     to verify (CI-friendly)
+
+# First tagged iteration. The Go module, the embedded admin UI and the container
+# image all ship as one artifact, so they carry one number rather than drifting
+# apart the way three independently-bumped manifests would.
+sparkroute: 0.0.1
+
+project_rules:
+  sparkroute:
+    # Root module: its version is the plain `vX.Y.Z` tag, so there are no
+    # per-module tags to reconcile and no `module_tags` setting is needed.
+    - { type: gomod,      path: go.mod }
+    # `var Version = "..."` in pkg/version, overridden at release time by the
+    # ldflags below. Syncing the baked default keeps `go install` and plain
+    # `go build` from reporting a version the repo never released. It sits in
+    # its own package because the gateway (User-Agent) and telemetry (distro
+    # attributes) packages read it too, and `main` cannot be imported.
+    - { type: go_version, path: pkg/version/version.go }
+    # Private and embedded into the binary rather than published; carried here
+    # only so its version does not drift from the artifact it ships inside.
+    - { type: package,    path: web/package.json }
+
+# Minimum required by go-llm v0.2.0; release CI pins its toolchain separately.
+go_toolchain:
+  go: "1.25.13"
+
+ci:
+  test_branches: [ main ]
+  repo_tools_source: "git+https://github.com/scitrera/repo-tools.git@4a2ae8b966a875f6dc21ec8c142220a0471e06e8"
+  only_workflows: [version-check, test-go, test-npm]
+  # One `v*.*.*` tag drives the release binaries and the image alike.
+  github_release: true
+  go:
+    # Distinct from go_toolchain.go above, which is the module's *minimum*.
+    # Pin the toolchain used for release qualification and reproducible builds.
+    go_version: "1.25.14"
+    binaries:
+      - name: sparkroute
+        package: ./cmd/sparkroute
+        # $VERSION and $COMMIT are exported before `go build`; stamping version
+        # here is what makes a released binary report its tag rather than the
+        # in-tree default.
+        ldflags: "-s -w -buildid= -X github.com/sparksq/sparkroute/pkg/version.Version=$VERSION -X github.com/sparksq/sparkroute/pkg/version.Commit=$COMMIT"
+        extra_files: [ LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES.md, README.md ]
+  npm:
+    # No publish job is generated for `web`: package.json marks it private, and
+    # it ships embedded in the Go binary rather than to npm.
+    build: true
+    extra_steps:
+      # `pkg/adminui/ui` is vite's build output and is committed, because
+      # `//go:embed all:ui` bakes it into the binary at compile time — that is
+      # what lets `go build`, `go install` and the release cross-compile matrix
+      # work without a Node toolchain. The cost of committing a build artifact
+      # is that it can silently fall behind `web/src`, and nothing would notice
+      # until users saw a stale admin UI in a released binary. The Build step
+      # above has already regenerated it, so comparing against the index is a
+      # free staleness check.
+      - name: Verify the embedded admin UI matches web/src
+        working_directory: '.'
+        run: |
+          if ! git diff --exit-code -- pkg/adminui/ui; then
+            echo "::error::embedded admin UI is stale; build web/ and commit its output."
+            exit 1
+          fi
+
+docker:
+  ghcr: sparksq
+  images:
+    sparkroute:
+      context: .
+      dockerfile: Dockerfile
+      version_from: sparkroute
+      build_args:
+        # The Dockerfile's `ARG VERSION` feeds both the ldflags stamp and the
+        # OCI image.version label, so it has to be the same number the image is
+        # tagged with rather than the placeholder default.
+        VERSION: "${image_version}"

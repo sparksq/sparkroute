@@ -1,0 +1,35 @@
+name: Regression benchmark matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go.sum
+
+      - name: Correctness smoke
+        run: ./benchmarks/regression-matrix/run.sh --mode smoke
+
+      - name: Repeated benchmark matrix
+        run: ./benchmarks/regression-matrix/run.sh --mode benchmark --benchtime 2s --count 5 --output "$RUNNER_TEMP/regression-bench.txt"
+
+      - name: Upload raw benchmark evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: regression-benchmark-${{ github.sha }}
+          path: ${{ runner.temp }}/regression-bench.txt
+          if-no-files-found: error
+          retention-days: 30

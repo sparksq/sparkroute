@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-vllm",
+  "object": "chat.completion",
+  "created": 1785283201,
+  "model": "meta-llama/Llama-3.3-70B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "vLLM fixture",
+        "tool_calls": []
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 8,
+    "completion_tokens": 4,
+    "total_tokens": 12
+  },
+  "prompt_logprobs": null
+}

@@ -1,0 +1,84 @@
+# Repository-owned: releases include source, notices, and exact build identity.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  go:
+    uses: ./.github/workflows/test-go.yml
+  web:
+    uses: ./.github/workflows/test-npm.yml
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.14'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: '0.9.17'
+      - name: Check version and generated workflows
+        run: |
+          python scripts/update-versions.py --check
+          python scripts/generate-ci-gha.py --check
+      - name: Test release packaging
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Verify tag and build release archives
+        run: python scripts/build-release.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sparkroute-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  native:
+    needs: [build]
+    uses: ./.github/workflows/native-platforms.yml
+
+  github-release:
+    needs: [go, web, build, native]
+    if: github.ref_type == 'tag' && github.repository == 'sparksq/sparkroute'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: sparkroute-distributions
+          path: dist/
+      - name: Verify checksums
+        working-directory: dist
+        run: sha256sum --check checksums.txt
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  container:
+    needs: [go, web, build, native]
+    if: github.ref_type == 'tag' && github.repository == 'sparksq/sparkroute'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-docker.yml

@@ -1,0 +1,39 @@
+{
+  "providers": [
+    {
+      "name": "benchmark-provider",
+      "type": "openai_compatible",
+      "base_url": "http://127.0.0.1:18000/v1"
+    }
+  ],
+  "deployments": [
+    {
+      "name": "benchmark-deployment",
+      "provider": "benchmark-provider",
+      "model": "upstream-model",
+      "capabilities": ["stream_usage"]
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "benchmark",
+      "limits": {
+        "max_attempts": 1,
+        "overall_timeout": "1m",
+        "per_try_timeout": "30s",
+        "stream_idle_timeout": "30s"
+      },
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "benchmark-deployment",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

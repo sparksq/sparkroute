@@ -1,0 +1,26 @@
+{
+  "id": "chatcmpl-ollama",
+  "object": "chat.completion",
+  "created": 1785283202,
+  "model": "qwen3:8b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Ollama fixture"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 6,
+    "completion_tokens": 5,
+    "total_tokens": 11
+  },
+  "created_at": "2026-07-29T12:00:00Z",
+  "done": true,
+  "done_reason": "stop",
+  "prompt_eval_count": 6,
+  "eval_count": 5
+}

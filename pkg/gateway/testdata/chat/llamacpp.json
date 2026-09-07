@@ -1,0 +1,26 @@
+{
+  "id": "chatcmpl-llamacpp",
+  "object": "chat.completion",
+  "created": 1785283203,
+  "model": "local.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "llama.cpp fixture"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 2,
+    "total_tokens": 11
+  },
+  "timings": {
+    "prompt_n": 9,
+    "predicted_n": 2,
+    "predicted_per_second": 42.5
+  }
+}

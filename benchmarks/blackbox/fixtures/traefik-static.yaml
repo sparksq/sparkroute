@@ -1,0 +1,14 @@
+entryPoints:
+  benchmark:
+    address: 127.0.0.1:18096
+
+providers:
+  file:
+    filename: /etc/traefik/benchmark-dynamic.yaml
+    watch: false
+
+api:
+  dashboard: false
+
+log:
+  level: ERROR

@@ -1,0 +1,54 @@
+{
+  "providers": [
+    {
+      "name": "anthropic",
+      "type": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "auth": {
+        "type": "header",
+        "header": "X-Api-Key",
+        "credential": "env://ANTHROPIC_API_KEY"
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "claude",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "capabilities": [
+        "tools",
+        "parallel_tool_calls",
+        "vision",
+        "file_input",
+        "reasoning",
+        "structured_outputs",
+        "citations",
+        "prompt_caching",
+        "service_tier",
+        "provider_hosted_tools",
+        "token_counting",
+        "stream_usage"
+      ],
+      "max_concurrency": 64
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "claude",
+      "aliases": ["default"],
+      "response_model": "virtual",
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "claude",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

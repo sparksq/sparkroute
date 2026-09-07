@@ -1,0 +1,12 @@
+http:
+  routers:
+    benchmark:
+      entryPoints:
+        - benchmark
+      rule: PathPrefix(`/`)
+      service: benchmark
+  services:
+    benchmark:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:18000

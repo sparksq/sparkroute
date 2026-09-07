@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "revision": 1,
+  "default_virtual_model": "auto",
+  "virtual_models": {
+    "auto": {
+      "strategy": "balanced",
+      "models": ["local-default"],
+      "aliases": ["smart"],
+      "kwargs": {
+        "fast": {
+          "strategy": "fastest"
+        },
+        "private": {
+          "provider_priority": ["local"]
+        }
+      }
+    }
+  },
+  "models": {
+    "local-default": {
+      "enabled": true,
+      "weight": 100,
+      "priority": 1,
+      "size_b": 8,
+      "input_price": 0,
+      "output_price": 0,
+      "context": 32768,
+      "tags": ["local"]
+    }
+  },
+  "keyword_rules": []
+}

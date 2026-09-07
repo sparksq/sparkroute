@@ -1,0 +1,15 @@
+/sparkroute
+/.work/
+/dist/
+*.db
+*.db-shm
+*.db-wal
+.agents/
+.codex/
+.omc/
+.omo/
+.slop/
+
+# Node
+node_modules/
+__pycache__/

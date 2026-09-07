@@ -1,0 +1,104 @@
+{
+  "model_routing": {
+    "version": 2,
+    "revision": 1,
+    "default_virtual_model": "auto",
+    "virtual_models": {
+      "auto": {
+        "strategy": "balanced",
+        "models": ["local-default"],
+        "aliases": ["smart"]
+      }
+    },
+    "models": {
+      "local-default": {
+        "enabled": true,
+        "weight": 100,
+        "priority": 1,
+        "size_b": 8,
+        "context": 32768,
+        "tags": ["local"]
+      }
+    }
+  },
+  "providers": [
+    {
+      "name": "local",
+      "type": "openai_compatible",
+      "base_url": "http://127.0.0.1:8000/v1",
+      "default_headers": {
+        "X-API-Version": {
+          "value": "2026-01-01"
+        }
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "local-default",
+      "provider": "local",
+      "model": "upstream-model",
+      "upstream_headers": {
+        "X-Model-Profile": {
+          "value": "default",
+          "scope": "inference"
+        }
+      },
+      "capabilities": [
+        "tools",
+        "vision",
+        "developer_messages",
+        "structured_outputs",
+        "json_mode",
+        "seed",
+        "parallel_tool_calls",
+        "stream_usage"
+      ],
+      "max_concurrency": 64,
+      "circuit": {
+        "consecutive_failures": 5,
+        "minimum_samples": 20,
+        "sample_window": 50,
+        "failure_rate": 0.5,
+        "base_ejection_time": "30s",
+        "max_ejection_time": "10m"
+      }
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "local-default",
+      "aliases": ["default"],
+      "response_model": "virtual",
+      "selection": {
+        "mode": "weighted_random"
+      },
+      "limits": {
+        "max_attempts": 3,
+        "overall_timeout": "10m",
+        "per_try_timeout": "2m",
+        "stream_idle_timeout": "2m"
+      },
+      "retry": {
+        "base_backoff": "100ms",
+        "max_backoff": "2s",
+        "max_retry_after": "30s",
+        "budget": {
+          "ratio": 0.2,
+          "min_concurrency": 1
+        }
+      },
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "local-default",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

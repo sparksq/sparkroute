@@ -1,0 +1,8 @@
+: vllm keepalive
+
+data: {"id":"chatcmpl-vllm-stream","object":"chat.completion.chunk","created":1785283205,"model":"meta-llama/Llama-3.3-70B-Instruct","choices":[{"index":0,"delta":{"content":"vLLM"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-vllm-stream","object":"chat.completion.chunk","created":1785283205,"model":"meta-llama/Llama-3.3-70B-Instruct","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+

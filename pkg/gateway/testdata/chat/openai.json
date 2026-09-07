@@ -1,0 +1,34 @@
+{
+  "id": "chatcmpl-openai",
+  "object": "chat.completion",
+  "created": 1785283200,
+  "model": "gpt-4.1",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "fixture response",
+        "refusal": null,
+        "annotations": []
+      },
+      "finish_reason": "stop",
+      "logprobs": null
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 11,
+    "completion_tokens": 3,
+    "total_tokens": 14,
+    "prompt_tokens_details": {
+      "cached_tokens": 2
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "service_tier": "default",
+  "system_fingerprint": "fp_fixture"
+}

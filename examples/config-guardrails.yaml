@@ -1,0 +1,115 @@
+{
+  "providers": [
+    {
+      "name": "generation-local",
+      "type": "openai_compatible",
+      "base_url": "http://127.0.0.1:8000/v1"
+    },
+    {
+      "name": "safety-local-a",
+      "type": "openai_compatible",
+      "base_url": "http://127.0.0.1:8001/v1"
+    },
+    {
+      "name": "safety-local-b",
+      "type": "openai_compatible",
+      "base_url": "http://127.0.0.1:8002/v1"
+    }
+  ],
+  "deployments": [
+    {
+      "name": "generation",
+      "provider": "generation-local",
+      "model": "generation-upstream"
+    },
+    {
+      "name": "safety-a",
+      "provider": "safety-local-a",
+      "model": "safety-upstream"
+    },
+    {
+      "name": "safety-b",
+      "provider": "safety-local-b",
+      "model": "safety-upstream"
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "assistant",
+      "visibility": "public",
+      "guardrails": {
+        "pre": [
+          {
+            "name": "request-safety",
+            "model": "safety",
+            "prompt": "Block inappropriate requests.",
+            "failure_mode": "fail_closed"
+          }
+        ],
+        "post": [
+          {
+            "name": "response-pii",
+            "model": "safety",
+            "prompt": "Block output containing PII. For a non-streaming post phase, replacement may redact the choices.",
+            "failure_mode": "fail_closed",
+            "allow_replacement": true
+          }
+        ],
+        "stream": {
+          "window_bytes": 16384,
+          "context_bytes": 65536
+        }
+      },
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "generation",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "assistant-preview",
+      "visibility": "hidden",
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "generation",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "safety",
+      "visibility": "internal",
+      "limits": {
+        "max_attempts": 2,
+        "overall_timeout": "30s",
+        "per_try_timeout": "15s"
+      },
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "safety-a",
+              "weight": 50
+            },
+            {
+              "deployment": "safety-b",
+              "weight": 50
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+name: Native release qualification
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux_amd64, suffix: tar.gz}
+          - {runner: ubuntu-24.04-arm, target: linux_arm64, suffix: tar.gz}
+          - {runner: macos-15-intel, target: darwin_amd64, suffix: tar.gz}
+          - {runner: macos-15, target: darwin_arm64, suffix: tar.gz}
+          - {runner: windows-2025, target: windows_amd64, suffix: zip}
+          - {runner: windows-11-arm, target: windows_arm64, suffix: zip}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.14'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Test native bridge and identity contracts
+        run: go test ./pkg/sparkrun ./pkg/identity ./pkg/version
+      - uses: actions/download-artifact@v8
+        with:
+          name: sparkroute-distributions
+          path: dist/
+      - name: Run the actual release archive
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          SUFFIX: ${{ matrix.suffix }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          archives = list(Path('dist').glob('sparkroute_*_' + os.environ['TARGET'] + '.' + os.environ['SUFFIX']))
+          if len(archives) != 1:
+              raise SystemExit('Expected exactly one platform archive')
+          subprocess.run([sys.executable, 'scripts/smoke-gateway.py', str(archives[0])], check=True)
+          PY

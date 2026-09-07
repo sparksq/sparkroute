@@ -1,0 +1,56 @@
+{
+  "providers": [
+    {
+      "name": "bedrock",
+      "type": "bedrock",
+      "region": "us-east-1",
+      "auth": {
+        "type": "aws_sigv4",
+        "credential": "workload://aws"
+      }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "claude-bedrock",
+      "provider": "bedrock",
+      "model": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+      "capabilities": [
+        "tools",
+        "vision",
+        "audio_input",
+        "file_input",
+        "structured_outputs",
+        "reasoning",
+        "citations",
+        "prompt_caching",
+        "service_tier",
+        "provider_hosted_tools",
+        "provider_guardrails",
+        "provider_prompts",
+        "x-bedrock-additional-fields",
+        "x-bedrock-request-metadata",
+        "stream_usage"
+      ],
+      "max_concurrency": 64
+    }
+  ],
+  "virtual_models": [
+    {
+      "name": "claude-bedrock",
+      "aliases": ["default"],
+      "response_model": "virtual",
+      "pools": [
+        {
+          "priority": 0,
+          "targets": [
+            {
+              "deployment": "claude-bedrock",
+              "weight": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

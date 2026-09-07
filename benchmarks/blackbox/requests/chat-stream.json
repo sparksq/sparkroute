@@ -1,0 +1,10 @@
+{
+  "model": "benchmark",
+  "messages": [
+    {
+      "role": "user",
+      "content": "benchmark"
+    }
+  ],
+  "stream": true
+}
