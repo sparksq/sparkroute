@@ -623,6 +623,11 @@ describe("AdminApp", () => {
     const activeRevision = "a".repeat(64);
     const nextRevision = "b".repeat(64);
     const empty = { providers: [], deployments: [], virtual_models: [] };
+    const generated = {
+      providers: [{ name: "sparkrun", type: "openai_compatible", base_url: "http://127.0.0.1:8000/v1" }],
+      deployments: [{ name: "generated-target", provider: "sparkrun", model: "upstream" }],
+      virtual_models: [{ name: "new-model", aliases: ["new-model-2"], pools: [{ targets: [{ deployment: "generated-target", weight: 1 }] }] }],
+    };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
       const method = init?.method ?? "GET";
@@ -649,9 +654,9 @@ describe("AdminApp", () => {
       });
       if (path === "/v1/config/managed-sets/sparkrun" && method === "GET") return jsonResponse({
         owner: "sparkrun", revision: "2".repeat(64), updated_at: "2026-08-04T12:00:00Z",
-        updated_by: "sparkrun-a", document: empty,
+        updated_by: "sparkrun-a", document: generated,
       });
-      if (path === "/v1/config") return jsonResponse({ revision: activeRevision, document: empty });
+      if (path === "/v1/config") return jsonResponse({ revision: activeRevision, document: generated });
       if (path === "/v1/config/managed-sets/operator/validate" && method === "POST") return jsonResponse({
         owner: "operator", set_revision: "3".repeat(64), active_revision: activeRevision,
         candidate_revision: nextRevision, valid: true,
@@ -667,20 +672,51 @@ describe("AdminApp", () => {
 
     render(<AdminApp productName="SparkRoute" />);
     fireEvent.click(await screen.findByText("Configuration"));
-    expect(await screen.findByText("Operator configuration")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Providers", level: 2 })).toBeInTheDocument();
+    const tree = within(screen.getByRole("list", { name: "Configuration sections" }));
+    expect(tree.getAllByRole("link")).toHaveLength(5);
+    fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
+    expect(window.location.pathname).toBe("/admin/configuration/models");
+    fireEvent.click(await screen.findByTitle("Add virtual model"));
+    expect(screen.getByRole("option", { name: "generated-target · SparkRun generated" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Canonical name")).toHaveValue("new-model-3");
+    fireEvent.change(screen.getByLabelText("Canonical name"), { target: { value: "assistant" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /Aliases/ }), { target: { value: "chat, coding" } });
+    fireEvent.blur(screen.getByRole("textbox", { name: /Aliases/ }));
+    fireEvent.click(tree.getByRole("link", { name: "Model Deployments" }));
+    expect(screen.getByRole("button", { name: "Add deployment" })).toBeDisabled();
+    fireEvent.click(tree.getByRole("link", { name: "Model Routing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable model routing" }));
+    expect(screen.getByLabelText("new-model", { selector: "input" })).toBeChecked();
+    expect(screen.getByLabelText("assistant", { selector: "input" })).toBeChecked();
+    fireEvent.click(screen.getByRole("link", { name: /Overview/ }));
+    expect(screen.queryByRole("button", { name: "Validate and replace operator set" })).not.toBeInTheDocument();
+    fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
+    expect(screen.getByLabelText("Canonical name")).toHaveValue("assistant");
+    expect(screen.getByRole("textbox", { name: /Aliases/ })).toHaveValue("chat, coding");
+    expect(screen.getByText("Unsaved changes")).toBeVisible();
+    // A popstate navigation changes only the active section, preserving the shared draft.
+    window.history.replaceState({}, "", "/admin/configuration/providers");
+    fireEvent.popState(window);
+    expect(tree.getByRole("link", { name: "Providers" })).toHaveAttribute("aria-current", "page");
     fireEvent.click(screen.getByRole("button", { name: "JSON" }));
-    fireEvent.change(screen.getByLabelText("operator configuration JSON"), {
-      target: { value: JSON.stringify(empty) },
-    });
+    const candidate = JSON.parse((screen.getByLabelText("operator configuration JSON") as HTMLTextAreaElement).value);
+    expect(candidate.providers).toEqual([]);
+    expect(candidate.deployments).toEqual([]);
+    expect(candidate.virtual_models).toHaveLength(1);
+    expect(candidate.virtual_models[0]).toMatchObject({ name: "assistant", aliases: ["chat", "coding"], pools: [{ targets: [{ deployment: "generated-target", weight: 100 }] }] });
     fireEvent.click(screen.getByRole("button", { name: "Validate and replace operator set" }));
 	expect(await screen.findByText(/Stored the current configuration/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([path, options]) =>
       String(path) === "/v1/config/managed-sets/operator" && options?.method === "PUT",
     )).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: /Sparkrun generated/ }));
-    expect(screen.getByText("Sparkrun-generated configuration")).toBeInTheDocument();
-    expect(screen.getByText(/owned by Sparkrun/)).toBeInTheDocument();
+    const saveCall = fetchMock.mock.calls.find(([path, options]) => path === "/v1/config/managed-sets/operator" && options?.method === "PUT");
+    expect(JSON.parse(String(saveCall?.[1]?.body)).document).toEqual(candidate);
+    expect(fetchMock.mock.calls.some(([path, options]) => path === "/v1/config/managed-sets/sparkrun" && options?.method === "PUT")).toBe(false);
+    fireEvent.click(screen.getByRole("link", { name: "SparkRun Generated" }));
+    expect(screen.getByRole("heading", { name: "SparkRun Generated", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText(/owned by SparkRun/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validate and replace operator set" })).not.toBeInTheDocument();
   });
 
@@ -756,8 +792,8 @@ describe("AdminApp", () => {
 
     render(<AdminApp productName="SparkRoute" />);
     fireEvent.click(await screen.findByText("Configuration"));
-    expect(await screen.findByText("Operator configuration")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Model routing" }));
+    expect(await screen.findByRole("heading", { name: "Providers", level: 2 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Model Routing" }));
     expect(screen.getByLabelText("generated-model")).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
     expect(await screen.findByRole("region", { name: "Routing simulation result" })).toHaveTextContent("generated-model");

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AdminAPIError,
   fetchActiveConfiguration,
@@ -20,6 +20,7 @@ import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
 import type { VirtualModelEditorExtension } from "./extensions";
+import { configurationSections, type ConfigurationSection } from "./configurationSections";
 
 const emptyDocument = `{
   "providers": [],
@@ -36,17 +37,17 @@ export function ManagedConfigurationWorkspace({
   bootstrap,
   token,
   virtualModelExtensions,
+  section = "providers",
 }: {
   bootstrap: AdminBootstrap;
   token: string;
   virtualModelExtensions?: VirtualModelEditorExtension[];
+  section?: ConfigurationSection;
 }) {
   const canRead = Boolean(bootstrap.features.config_read);
   const canWriteOperator = Boolean(bootstrap.features.config_write);
   const hasDiscoveredMetadata = Boolean(bootstrap.features.model_routing_discovered_metadata);
-  const [selectedOwner, setSelectedOwner] = useState<ManagedConfigurationOwner>(
-    canRead || canWriteOperator ? "operator" : "sparkrun",
-  );
+  const selectedOwner: ManagedConfigurationOwner = section === "sparkrun" ? "sparkrun" : "operator";
   const [sets, setSets] = useState<ManagedConfigurationSetMetadata[]>([]);
   const [drafts, setDrafts] = useState<Partial<Record<ManagedConfigurationOwner, string>>>({});
   const [storedDocuments, setStoredDocuments] = useState<Partial<Record<ManagedConfigurationOwner, ConfigurationDocument>>>({});
@@ -58,7 +59,8 @@ export function ManagedConfigurationWorkspace({
   const [notice, setNotice] = useState<Notice>();
   const [busy, setBusy] = useState("");
   const [editorMode, setEditorMode] = useState<"structured" | "json">("structured");
-  const [structuredSection, setStructuredSection] = useState<"models" | "routing" | "infrastructure">("models");
+  const infrastructureSection = useRef<"providers" | "deployments">("providers");
+  if (section === "providers" || section === "deployments") infrastructureSection.current = section;
 
   const load = useCallback(async () => {
     setBusy("load");
@@ -76,11 +78,6 @@ export function ManagedConfigurationWorkspace({
         ),
       );
       setStoredDocuments(Object.fromEntries(loadedSets.map((set) => [set.owner, set.document])));
-      setSelectedOwner((current) => (
-        visibleOwners.includes(current) || visibleOwners.length === 0
-          ? current
-          : visibleOwners[0]!
-      ));
       if (canRead) {
         const [active, discovered] = await Promise.all([
           fetchActiveConfiguration(token),
@@ -103,15 +100,40 @@ export function ManagedConfigurationWorkspace({
 
   const draft = drafts[selectedOwner] ?? emptyDocument;
   const parsed = useMemo(() => parseDocument(draft), [draft]);
+  const operatorDraft = drafts.operator ?? emptyDocument;
+  const operatorParsed = useMemo(() => parseDocument(operatorDraft), [operatorDraft]);
+  const generatedDocument = storedDocuments.sparkrun;
+  const generatedDeployments = useMemo(() => documentEntityNames(generatedDocument, "deployments")
+    .map((name) => ({ name, source: "SparkRun generated" })), [generatedDocument]);
   const metadata = sets.find((set) => set.owner === selectedOwner);
   const canEdit = selectedOwner === "operator" && canWriteOperator;
   const mergedCandidateModelNames = useMemo(() => {
-    const names = new Set(documentModelNames(parsed.document));
-    Object.entries(storedDocuments).forEach(([owner, document]) => {
-      if (owner !== selectedOwner) documentModelNames(document).forEach((name) => names.add(name));
-    });
+    const names = new Set(documentEntityNames(operatorParsed.document, "virtual_models"));
+    documentEntityNames(generatedDocument, "virtual_models").forEach((name) => names.add(name));
     return [...names].sort();
-  }, [parsed.document, selectedOwner, storedDocuments]);
+  }, [operatorParsed.document, generatedDocument]);
+  const reservedModelNames = useMemo(() => [
+    ...documentEntityNames(generatedDocument, "virtual_models"),
+    ...(Array.isArray(generatedDocument?.virtual_models) ? generatedDocument.virtual_models : []).flatMap((model) => Array.isArray(model.aliases)
+      ? model.aliases.filter((alias: unknown): alias is string => typeof alias === "string") : []),
+  ], [generatedDocument]);
+  const dirty = drafts.operator !== undefined && (
+    !operatorParsed.document || JSON.stringify(operatorParsed.document) !== JSON.stringify(storedDocuments.operator)
+  );
+
+  // Observe application without reloading or replacing the operator's draft.
+  useEffect(() => {
+    if (!canRead || storedRevision === runtimeRevision) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void fetchActiveConfiguration(token).then((active) => {
+        if (cancelled) return;
+        setRuntimeRevision(active.revision);
+        setActiveDocument(active.document);
+      }).catch(() => { /* Keep the last confirmed serving revision and retry. */ });
+    }, 1000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [canRead, storedRevision, runtimeRevision, token]);
 
   const changeDraft = (value: string) => {
     setDrafts((current) => ({ ...current, [selectedOwner]: value }));
@@ -182,30 +204,23 @@ export function ManagedConfigurationWorkspace({
   };
 
   const structuredChange = (document: ConfigurationDocument) => {
-    changeDraft(JSON.stringify(document, null, 2));
+    setDrafts((current) => ({ ...current, operator: JSON.stringify(document, null, 2) }));
     setNotice({ kind: "info", text: "Draft changed. Validate the merged candidate before saving." });
   };
 
   return (
     <div className="config-workspace">
       <section className="managed-config-overview" aria-label="Managed configuration ownership">
-        {sets.map((set) => (
-          <button
-            aria-pressed={selectedOwner === set.owner}
-            className={selectedOwner === set.owner ? "managed-owner-card active" : "managed-owner-card"}
-            key={set.owner}
-            onClick={() => setSelectedOwner(set.owner)}
-            type="button"
-          >
-            <span>{set.owner === "operator" ? "Operator managed" : "Sparkrun generated"}</span>
-            <strong>{set.owner}</strong>
-            <code>{compactRevision(set.revision)}</code>
-            <small>Updated by {set.updated_by}</small>
-          </button>
-        ))}
+        <div className="managed-owner-card">
+          <span>{selectedOwner === "operator" ? "Operator managed" : "SparkRun generated · Read only"}</span>
+          <strong>{selectedOwner === "operator" ? (dirty ? "Unsaved changes" : "Saved configuration") : "Managed by SparkRun"}</strong>
+          <small>{selectedOwner === "operator"
+            ? "Providers, deployments, aliases and routing share one draft. Save applies all four sections."
+            : "Use these deployments and models as targets in operator-managed aliases and routing."}</small>
+        </div>
         <div className="managed-runtime-card">
           <span>Stored / serving</span>
-          <strong>{storedRevision === runtimeRevision ? "In sync" : "Applying"}</strong>
+          <strong>{!canRead ? "Serving revision unavailable" : storedRevision === runtimeRevision ? "In sync" : "Applying"}</strong>
           <code>{compactRevision(storedRevision)} / {compactRevision(runtimeRevision)}</code>
           <small>{documentSummary(activeDocument)}</small>
         </div>
@@ -215,7 +230,7 @@ export function ManagedConfigurationWorkspace({
         <div className="panel-heading">
           <div>
             <p className="eyebrow">{selectedOwner} managed set</p>
-            <h2>{selectedOwner === "operator" ? "Operator configuration" : "Sparkrun-generated configuration"}</h2>
+            <h2>{configurationSections.find((entry) => entry.id === section)?.label}</h2>
           </div>
           <span className="activity-summary">
             {canEdit ? "Editable" : "Read only"} · {compactRevision(metadata?.revision ?? "")}
@@ -259,53 +274,32 @@ export function ManagedConfigurationWorkspace({
             </button>
           ) : null}
         </div>
-        {editorMode === "structured" ? (
-          parsed.document ? (
+        <div hidden={editorMode !== "structured" || selectedOwner !== "operator"}>
+          {operatorParsed.document ? (
             <>
-              <div className="structured-surface-tabs" aria-label="Structured configuration section" role="group">
-                <button
-                  aria-pressed={structuredSection === "models"}
-                  className={structuredSection === "models" ? "active" : ""}
-                  onClick={() => setStructuredSection("models")}
-                  type="button"
-                >
-                  Virtual models
-                </button>
-                <button
-                  aria-pressed={structuredSection === "routing"}
-                  className={structuredSection === "routing" ? "active" : ""}
-                  onClick={() => setStructuredSection("routing")}
-                  type="button"
-                >
-                  Model routing
-                </button>
-                <button
-                  aria-pressed={structuredSection === "infrastructure"}
-                  className={structuredSection === "infrastructure" ? "active" : ""}
-                  onClick={() => setStructuredSection("infrastructure")}
-                  type="button"
-                >
-                  Providers &amp; deployments
-                </button>
-              </div>
-              {structuredSection === "models" ? (
+              <div hidden={section !== "models"}>
+                {generatedDeployments.length ? <p className="section-help configuration-context">Targets include SparkRun-generated deployments. Saving a virtual model does not change their generated configuration.</p> : null}
                 <VirtualModelEditor
-                  disabled={!canEdit || Boolean(busy)}
-                  document={parsed.document}
+                  disabled={!canWriteOperator || Boolean(busy)}
+                  document={operatorParsed.document}
+                  referencedDeployments={generatedDeployments}
+                  reservedModelNames={reservedModelNames}
                   extensions={virtualModelExtensions}
                   onChange={structuredChange}
                 />
-              ) : structuredSection === "routing" ? (
+              </div>
+              <div hidden={section !== "routing"}>
+                <p className="section-help configuration-context">Route to operator-managed or SparkRun-generated virtual models. To use a deployment directly, first add it to a virtual model.</p>
                 <ModelRoutingEditor
                   canonicalModelNames={mergedCandidateModelNames}
-                  disabled={!canEdit || Boolean(busy)}
+                  disabled={!canWriteOperator || Boolean(busy)}
                   discoveredMetadata={discoveredMetadata}
-                  document={parsed.document}
+                  document={operatorParsed.document}
                   onChange={structuredChange}
                   simulate={bootstrap.features.config_routing_simulation
                     ? (document, requestedModel, routingText, requiredCapabilities) => simulateManagedModelRouting(
                       token,
-                      selectedOwner,
+                      "operator",
                       document,
                       storedRevision,
                       requestedModel,
@@ -314,17 +308,25 @@ export function ManagedConfigurationWorkspace({
                     )
                     : undefined}
                 />
-              ) : (
-                <ProviderDeploymentEditor disabled={!canEdit || Boolean(busy)} document={parsed.document} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
-              )}
+              </div>
+              <div hidden={section !== "providers" && section !== "deployments"}>
+                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canWriteOperator || Boolean(busy)} document={operatorParsed.document} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+              </div>
             </>
           ) : (
             <div className="structured-unavailable">
               <strong>Structured editor unavailable</strong>
-              <p>{parsed.error} Switch to JSON to inspect or repair the document.</p>
+              <p>{operatorParsed.error} Switch to JSON to inspect or repair the document.</p>
             </div>
-          )
-        ) : (
+          )}
+        </div>
+        {editorMode === "structured" && selectedOwner === "sparkrun" ? (
+          generatedDocument ? <>
+            <ProviderDeploymentEditor simplifiedCapabilities disabled document={generatedDocument} onChange={() => {}} />
+            <VirtualModelEditor disabled document={generatedDocument} onChange={() => {}} />
+          </> : <p className="read-only-note">No SparkRun-generated configuration is available to this identity.</p>
+        ) : null}
+        {editorMode === "json" ? (
           <textarea
             aria-invalid={Boolean(parsed.error)}
             aria-label={`${selectedOwner} configuration JSON`}
@@ -334,7 +336,7 @@ export function ManagedConfigurationWorkspace({
             spellCheck={false}
             value={draft}
           />
-        )}
+        ) : null}
         {notice ? <div className={`notice ${notice.kind}`} role="status">{notice.text}</div> : null}
         {canEdit ? (
           <div className="publish-bar">
@@ -354,7 +356,7 @@ export function ManagedConfigurationWorkspace({
         ) : (
           <p className="read-only-note">
             {selectedOwner === "sparkrun"
-              ? "This generated set is owned by Sparkrun and cannot be edited in the console."
+              ? "This generated set is owned by SparkRun and cannot be edited in the console."
               : "This identity can inspect the operator set but cannot replace it."}
           </p>
         )}
@@ -376,10 +378,10 @@ function parseDocument(raw: string): { document?: ConfigurationDocument; error?:
   }
 }
 
-function documentModelNames(document?: ConfigurationDocument): string[] {
-  if (!document || !Array.isArray(document.virtual_models)) return [];
-  return document.virtual_models
-    .map((model) => typeof model.name === "string" ? model.name : "")
+function documentEntityNames(document: ConfigurationDocument | undefined, field: "deployments" | "virtual_models"): string[] {
+  if (!document || !Array.isArray(document[field])) return [];
+  return document[field]
+    .map((entity) => typeof entity.name === "string" ? entity.name : "")
     .filter(Boolean);
 }
 

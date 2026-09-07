@@ -39,13 +39,19 @@ export function VirtualModelEditor({
   disabled,
   extensions = [],
   onChange,
+  referencedDeployments = [],
+  reservedModelNames = [],
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
   extensions?: VirtualModelEditorExtension[];
   onChange: (document: ConfigurationDocument) => void;
+  referencedDeployments?: Array<{ name: string; source: string }>;
+  reservedModelNames?: string[];
 }) {
   const shape = useMemo(() => inspectDocument(document, extensions), [document, extensions]);
+  const deployments = [...new Set([...(shape.deployments ?? []), ...referencedDeployments.map((deployment) => deployment.name)])];
+  const deploymentSources = Object.fromEntries(referencedDeployments.map((deployment) => [deployment.name, deployment.source]));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const models = shape.models ?? [];
@@ -87,9 +93,9 @@ export function VirtualModelEditor({
   };
 
   const addModel = () => {
-    const firstDeployment = shape.deployments?.[0];
+    const firstDeployment = deployments[0];
     if (!firstDeployment) return;
-    const names = new Set(models.map((model) => stringValue(model.name)));
+    const names = new Set([...reservedModelNames, ...models.flatMap((model) => [stringValue(model.name), ...stringArray(model.aliases)])]);
     const name = uniqueName("new-model", names);
     const next: JSONObject = {
       name,
@@ -126,9 +132,9 @@ export function VirtualModelEditor({
           </div>
           <button
             className="icon-button"
-            disabled={disabled || !shape.deployments?.length}
+            disabled={disabled || !deployments.length}
             onClick={addModel}
-            title={shape.deployments?.length ? "Add virtual model" : "Add a deployment first"}
+            title={deployments.length ? "Add virtual model" : "Add a deployment first"}
             type="button"
           >
             +
@@ -247,15 +253,16 @@ export function VirtualModelEditor({
                   </div>
                   <button
                     className="secondary-button"
-                    disabled={!availableDeployments(selected, shape.deployments ?? []).length}
-                    onClick={() => updateModel((model) => addPool(model, shape.deployments ?? []))}
+                    disabled={!availableDeployments(selected, deployments).length}
+                    onClick={() => updateModel((model) => addPool(model, deployments))}
                     type="button"
                   >
                     Add fallback pool
                   </button>
                 </div>
                 <RoutingPools
-                  deployments={shape.deployments ?? []}
+                  deployments={deployments}
+                  deploymentSources={deploymentSources}
                   model={selected}
                   onChange={updateModel}
                 />
@@ -390,10 +397,12 @@ export function VirtualModelEditor({
 function RoutingPools({
   model,
   deployments,
+  deploymentSources,
   onChange,
 }: {
   model: JSONObject;
   deployments: string[];
+  deploymentSources: Record<string, string>;
   onChange: (transform: (model: JSONObject) => JSONObject) => void;
 }) {
   const pools = objectArray(model.pools);
@@ -431,6 +440,7 @@ function RoutingPools({
                   <div className="target-row" key={targetIndex}>
                     <Field label="Deployment">
                       <select
+                        aria-label="Deployment"
                         onChange={(event) => onChange((current) => updateTarget(current, poolIndex, targetIndex, (value) => setString(value, "deployment", event.target.value, true)))}
                         value={stringValue(target.deployment)}
                       >
@@ -438,7 +448,7 @@ function RoutingPools({
                           <option value={stringValue(target.deployment)}>{stringValue(target.deployment)} (unknown)</option>
                         ) : null}
                         {deployments.map((deployment) => (
-                          <option disabled={used.has(deployment)} key={deployment} value={deployment}>{deployment}</option>
+                          <option disabled={used.has(deployment)} key={deployment} value={deployment}>{deployment}{deploymentSources[deployment] ? ` · ${deploymentSources[deployment]}` : ""}</option>
                         ))}
                       </select>
                     </Field>

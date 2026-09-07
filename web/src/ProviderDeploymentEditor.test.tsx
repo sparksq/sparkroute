@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
@@ -6,9 +6,9 @@ import type { ConfigurationDocument } from "./types";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const provider = { name: "cloud", type: "openai", base_url: "https://api.openai.com/v1" };
-function Editor({ initial = { providers: [provider], deployments: [], virtual_models: [] }, disabled = false }: { initial?: ConfigurationDocument; disabled?: boolean }) {
+function Editor({ initial = { providers: [provider], deployments: [], virtual_models: [] }, disabled = false, simplified = false }: { initial?: ConfigurationDocument; disabled?: boolean; simplified?: boolean }) {
   const [document, setDocument] = useState(initial);
-  return <><ProviderDeploymentEditor document={document} disabled={disabled} onChange={setDocument} subscriptionAuth={{ token: "fixture", enabled: true }} /><output aria-label="Draft">{JSON.stringify(document)}</output></>;
+  return <><ProviderDeploymentEditor simplifiedCapabilities={simplified} document={document} disabled={disabled} onChange={setDocument} subscriptionAuth={{ token: "fixture", enabled: true }} /><output aria-label="Draft">{JSON.stringify(document)}</output></>;
 }
 function draft() { return JSON.parse(screen.getByLabelText("Draft").textContent!); }
 function type(value: string) { fireEvent.change(screen.getByLabelText("Provider type"), { target: { value } }); }
@@ -51,6 +51,42 @@ describe("Native provider configuration", () => {
     expect(draft().deployments[0].provider).toBe("claude");
     expect(screen.getByRole("checkbox", { name: "Anthropic" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Openai" })).not.toBeChecked();
+  });
+
+  it("retains entity selections across provider and deployment pages and adds to the chosen provider", () => {
+    function Sections() {
+      const [document, setDocument] = useState<ConfigurationDocument>({ providers: [provider, { name: "second", type: "anthropic", base_url: "https://api.anthropic.com/v1" }], deployments: [], virtual_models: [] });
+      const [section, setSection] = useState<"providers" | "deployments">("providers");
+      return <>
+        <button onClick={() => setSection("providers")}>Providers page</button>
+        <button onClick={() => setSection("deployments")}>Deployments page</button>
+        <ProviderDeploymentEditor document={document} disabled={false} onChange={setDocument} section={section} />
+      </>;
+    }
+    render(<Sections />);
+    fireEvent.click(screen.getByRole("button", { name: /second.*Anthropic/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Deployments page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add deployment" }));
+    expect(screen.getByLabelText("Provider")).toHaveValue("second");
+    fireEvent.click(screen.getByRole("button", { name: "Providers page" }));
+    expect(screen.getByLabelText("Provider name")).toHaveValue("second");
+    fireEvent.click(screen.getByRole("button", { name: "Deployments page" }));
+    expect(screen.getByLabelText("Provider")).toHaveValue("second");
+  });
+
+  it("shows only optional vision and file-input declarations while preserving advanced deployment settings", () => {
+    const deployment = { name: "target", provider: "cloud", model: "model", capabilities: ["tools", "files", "responses", "x-existing"], native_protocols: ["openai", "anthropic"], capability_policy: { unknown: "try" } };
+    render(<Editor simplified initial={{ providers: [provider], deployments: [deployment], virtual_models: [] }} />);
+    fireEvent.click(screen.getByRole("button", { name: /target.*cloud/ }));
+    expect(screen.queryByText("Native upstream protocols")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Extension capabilities")).not.toBeInTheDocument();
+    expect(within(screen.getByText("Deployment capabilities").closest("details")!).getAllByRole("checkbox").map((input) => input.closest("label")?.textContent)).toEqual(["Vision", "Files (file inputs)"]);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Vision" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Files (file inputs)" }));
+    expect(draft().deployments[0]).toEqual({ ...deployment, capabilities: [...deployment.capabilities, "vision", "file_input"] });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Vision" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Files (file inputs)" }));
+    expect(draft().deployments[0]).toEqual(deployment);
   });
 
   it("switches Codex auth on and off without losing the regular URL, credential reference or profile draft", async () => {

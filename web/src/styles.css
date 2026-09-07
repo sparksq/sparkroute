@@ -242,6 +242,39 @@ button {
   gap: 5px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+.managed-console .sidebar {
+  overflow-y: auto;
+}
+
+.configuration-nav-children {
+  display: grid;
+  gap: 3px;
+  margin: 5px 0 8px 22px;
+  border-left: 1px solid #435168;
+  padding: 0 0 0 9px;
+  list-style: none;
+}
+
+.configuration-nav-children .nav-item {
+  padding: 9px 8px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.generated-nav {
+  margin-top: 5px;
+  border-top: 1px solid #435168;
+  padding-top: 5px;
+}
+
+.section-help.configuration-context {
+  padding: 16px 22px;
+}
+
 .nav-item.active {
   background: #1d293b;
   color: white;
@@ -258,43 +291,20 @@ button {
   font-size: 0.65rem;
 }
 
-.feature-summary {
-  display: grid;
-  gap: 9px;
-  margin: 28px 10px;
-}
-
-.feature-summary > span {
-  margin-bottom: 3px;
-  color: #657287;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.feature-summary div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #98a5b7;
-  font-size: 0.72rem;
-}
-
-.feature-summary i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #31b9a5;
-  box-shadow: 0 0 0 3px rgb(49 185 165 / 12%);
-}
-
 .sidebar-footer {
   display: grid;
   gap: 3px;
   margin-top: auto;
   padding: 16px 10px 0;
   border-top: 1px solid #263246;
+}
+
+.sidebar-footer a {
+  color: #9cdbd3;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-underline-offset: 3px;
 }
 
 .sidebar-footer span {
@@ -798,7 +808,7 @@ tbody tr:last-child td {
 
 .managed-config-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -846,11 +856,9 @@ tbody tr:last-child td {
 
 .managed-owner-card small,
 .managed-runtime-card small {
-  overflow: hidden;
   color: #8994a5;
   font-size: 0.65rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
 }
 
 .managed-runtime-card {
@@ -1809,6 +1817,35 @@ details.model-section > summary small {
   padding-bottom: 7px;
 }
 
+.policy-fields input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.circuit-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+
+.circuit-fields label {
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.circuit-fields .wide {
+  grid-column: 1 / -1;
+}
+
+.circuit-fields small {
+  font-weight: 400;
+}
+
+.policy-section > summary {
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
 .preserved-policy-note {
   display: flex;
   align-items: baseline;
@@ -2748,6 +2785,45 @@ button:disabled {
 }
 
 @media (max-width: 960px) {
+  .console-shell.managed-console {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .managed-console .workspace {
+    padding-inline: 24px;
+  }
+
+  .managed-console .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .managed-console .publish-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .managed-console .structured-editor {
+    display: block;
+  }
+
+  .managed-console .model-list {
+    border-right: 0;
+    border-bottom: 1px solid #e4e9ef;
+  }
+
+  .managed-console .model-list-items {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .managed-console .nav-item {
+    justify-content: flex-start;
+    font-size: 0.76rem;
+  }
+
+  .managed-console .nav-glyph {
+    flex-shrink: 0;
+  }
   .console-shell {
     grid-template-columns: 78px minmax(0, 1fr);
   }
@@ -2763,7 +2839,6 @@ button:disabled {
 
   .sidebar-brand div,
   .nav-item:not(.active) span:not(.nav-glyph),
-  .feature-summary,
   .sidebar-footer {
     display: none;
   }
@@ -2852,6 +2927,37 @@ button:disabled {
 }
 
 @media (max-width: 640px) {
+  .managed-console .sidebar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .managed-console .sidebar-brand {
+    justify-content: flex-start;
+  }
+
+  .managed-console .sidebar-brand div {
+    display: grid;
+  }
+
+  .managed-console .sidebar nav {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+
+  .managed-console .configuration-nav {
+    width: 100%;
+  }
+
+  .configuration-nav-children {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .generated-nav {
+    grid-column: 1 / -1;
+  }
   .console-shell {
     display: block;
   }

@@ -45,19 +45,29 @@ export function ProviderDeploymentEditor({
   disabled,
   onChange,
   subscriptionAuth,
+  section = "all",
+  simplifiedCapabilities = false,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
   onChange: (document: ConfigurationDocument) => void;
   subscriptionAuth?: { token: string; enabled: boolean };
+  section?: "all" | "providers" | "deployments";
+  simplifiedCapabilities?: boolean;
 }) {
   const shape = useMemo(() => inspectDocument(document), [document]);
   const providers = shape.providers ?? [];
   const deployments = shape.deployments ?? [];
   const virtualModels = shape.virtualModels ?? [];
-  const [selection, setSelection] = useState<Selection>(() => ({
-    kind: providers.length ? "provider" : "deployment",
-    index: 0,
+  const [selectionState, setSelectionState] = useState<{ kind: Selection["kind"]; provider: number; deployment: number }>(() => ({
+    kind: section === "deployments" ? "deployment" : section === "providers" || providers.length ? "provider" : "deployment",
+    provider: 0,
+    deployment: 0,
+  }));
+  const selectedKind = section === "all" ? selectionState.kind : section === "providers" ? "provider" : "deployment";
+  const selection: Selection = { kind: selectedKind, index: selectionState[selectedKind] };
+  const setSelection = (next: Selection) => setSelectionState((current) => ({
+    ...current, kind: next.kind, [next.kind]: next.index,
   }));
   const [confirmRemove, setConfirmRemove] = useState(false);
   const authDrafts = useRef(new Map<string, AuthDraft>());
@@ -65,17 +75,17 @@ export function ProviderDeploymentEditor({
   useEffect(() => {
     setConfirmRemove(false);
     if (selection.kind === "provider") {
-      if (!providers.length && deployments.length) {
+      if (section === "all" && !providers.length && deployments.length) {
         setSelection({ kind: "deployment", index: 0 });
-      } else if (selection.index >= providers.length) {
+      } else if (selection.index > Math.max(0, providers.length - 1)) {
         setSelection({ kind: "provider", index: Math.max(0, providers.length - 1) });
       }
-    } else if (!deployments.length && providers.length) {
+    } else if (section === "all" && !deployments.length && providers.length) {
       setSelection({ kind: "provider", index: 0 });
-    } else if (selection.index >= deployments.length) {
+    } else if (selection.index > Math.max(0, deployments.length - 1)) {
       setSelection({ kind: "deployment", index: Math.max(0, deployments.length - 1) });
     }
-  }, [deployments.length, providers.length, selection.index, selection.kind]);
+  }, [deployments.length, providers.length, selection.index, selection.kind, section]);
 
   useEffect(() => setConfirmRemove(false), [selection.index, selection.kind]);
 
@@ -147,7 +157,9 @@ export function ProviderDeploymentEditor({
   const addDeployment = () => {
     if (!providers.length) return;
     const names = new Set(deployments.map((deployment) => stringValue(deployment.name)));
-    const provider = selectedProvider ?? providers.find((value) => value.name === selectedDeployment?.provider) ?? providers[0]!;
+    const provider = selectedProvider
+      ?? (selectionState.kind === "provider" ? providers[selectionState.provider] : providers.find((value) => value.name === selectedDeployment?.provider))
+      ?? providers[0]!;
     const next = providerDeploymentDefaults({
       name: uniqueName("new-deployment", names),
       provider: provider.name,
@@ -188,7 +200,7 @@ export function ProviderDeploymentEditor({
   return (
     <div className="structured-editor infrastructure-editor" aria-disabled={disabled}>
       <aside className="model-list infrastructure-list" aria-label="Providers and deployments">
-        <EntityList
+        {section !== "deployments" ? <EntityList
           active={selection.kind === "provider" ? selection.index : -1}
           addLabel="Add provider"
           count={providers.length}
@@ -200,8 +212,8 @@ export function ProviderDeploymentEditor({
           }))}
           onAdd={addProvider}
           onSelect={(index) => setSelection({ kind: "provider", index })}
-        />
-        <EntityList
+        /> : null}
+        {section !== "providers" ? <EntityList
           active={selection.kind === "deployment" ? selection.index : -1}
           addLabel="Add deployment"
           count={deployments.length}
@@ -213,7 +225,7 @@ export function ProviderDeploymentEditor({
           }))}
           onAdd={addDeployment}
           onSelect={(index) => setSelection({ kind: "deployment", index })}
-        />
+        /> : null}
       </aside>
 
       <div className="model-form infrastructure-form">
@@ -234,6 +246,7 @@ export function ProviderDeploymentEditor({
           />
         ) : selectedDeployment ? (
           <DeploymentForm
+            simplifiedCapabilities={simplifiedCapabilities}
             confirmRemove={confirmRemove}
             deployment={selectedDeployment}
             disabled={disabled}
@@ -250,8 +263,10 @@ export function ProviderDeploymentEditor({
           />
         ) : (
           <div className="structured-empty">
-            <strong>No provider or deployment selected</strong>
-            <p>Add a provider, then add an independently routable deployment target.</p>
+            <strong>{section === "deployments" ? "No model deployment selected" : section === "providers" ? "No provider selected" : "No provider or deployment selected"}</strong>
+            <p>{section === "deployments" && !providers.length
+              ? "Create a provider in Configuration → Providers, then add a deployment here. SparkRun-generated deployments are available as targets in Virtual Models / Aliases."
+              : "Add a provider, then add an independently routable deployment target."}</p>
           </div>
         )}
       </div>
@@ -487,6 +502,7 @@ function setProviderType(value: JSONObject, type: string): JSONObject {
 }
 
 function DeploymentForm({
+  simplifiedCapabilities,
   deployment,
   providers,
   subscriptionProviders,
@@ -499,6 +515,7 @@ function DeploymentForm({
   onRemove,
   onCancelRemove,
 }: {
+  simplifiedCapabilities: boolean;
   deployment: JSONObject;
   providers: string[];
   subscriptionProviders: string[];
@@ -557,13 +574,9 @@ function DeploymentForm({
             />
             <small>Overrides the provider credential while retaining its authentication method.</small>
           </Field> : <p className="section-help wide">Authentication is managed by the provider’s Codex subscription profile.</p>}
-          <Field label="Maximum concurrency">
-            <input min="0" max="1000000" step="1" type="number" value={numberInput(deployment.max_concurrency)} onChange={(event) => onChange((value) => setNumber(value, "max_concurrency", event.target.value))} />
-            <small>Zero or blank means unlimited per gateway replica.</small>
-          </Field>
         </div>
 
-        <details className="model-section capability-section" open>
+        {!simplifiedCapabilities ? <details className="model-section capability-section" open>
           <summary><span>Native upstream protocols</span><small>{nativeProtocols.length} enabled</small></summary>
           <p className="section-help">
             Requests prefer a native dialect before an available translation. With no explicit list, the gateway infers one protocol from the provider type.
@@ -589,15 +602,17 @@ function DeploymentForm({
               );
             })}
           </div>
-        </details>
+        </details> : null}
 
         <details className="model-section capability-section" open>
-          <summary><span>Deployment capabilities</span><small>{stringArray(deployment.capabilities).length} declared</small></summary>
-          <p className="section-help">Declarations are authoritative; only enable semantics this target actually supports.
+          <summary><span>Deployment capabilities</span><small>{simplifiedCapabilities ? "Optional" : `${stringArray(deployment.capabilities).length} declared`}</small></summary>
+          <p className="section-help">{simplifiedCapabilities
+            ? "Vision and file inputs are optional declarations. Unchecked leaves support unspecified; requests are tried unless a configured policy says otherwise. The native API follows the provider type. Advanced declarations are preserved and available in JSON."
+            : "Declarations are authoritative; only enable semantics this target actually supports."}
             {responsesProvider(providerType) ? " Responses is required by the selected provider type." : null}
           </p>
           <div className="capability-grid">
-            {standardCapabilities.map((capability) => (
+            {(simplifiedCapabilities ? ["vision", "file_input"] : standardCapabilities).map((capability) => (
               <label key={capability}>
                 <input
                   checked={stringArray(deployment.capabilities).includes(capability) || capability === "responses" && responsesProvider(providerType)}
@@ -605,11 +620,11 @@ function DeploymentForm({
                   onChange={(event) => onChange((value) => toggleCapability(value, capability, event.target.checked))}
                   type="checkbox"
                 />
-                <span>{humanize(capability)}</span>
+                <span>{simplifiedCapabilities && capability === "file_input" ? "Files (file inputs)" : humanize(capability)}</span>
               </label>
             ))}
           </div>
-          <Field label="Extension capabilities" wide>
+          {!simplifiedCapabilities ? <Field label="Extension capabilities" wide>
             <input
               onBlur={() => onChange((value) => setExtensionCapabilities(value, splitList(extensionDraft)))}
               onChange={(event) => setExtensionDraft(event.target.value)}
@@ -617,11 +632,11 @@ function DeploymentForm({
               value={extensionDraft}
             />
             <small>Comma or newline separated; extension names must begin with x-.</small>
-          </Field>
+          </Field> : null}
         </details>
 
         <details className="model-section policy-section">
-          <summary><span>Concurrency and circuit policy</span><small>Zero or blank values use safe gateway defaults</small></summary>
+          <summary><span>Concurrency and circuit policy</span><small>Optional limits and failure handling</small></summary>
           <CircuitFields deployment={deployment} onChange={onChange} />
         </details>
 
@@ -786,7 +801,11 @@ function CircuitFields({
   const circuit = objectValue(deployment.circuit);
   return (
     <div className="policy-fields circuit-fields">
-      <label className="checkbox-field">
+      <Field label="Maximum concurrency">
+        <input aria-label="Maximum concurrency" min="0" max="1000000" step="1" type="number" value={numberInput(deployment.max_concurrency)} onChange={(event) => onChange((value) => setNumber(value, "max_concurrency", event.target.value))} />
+        <small>Zero or blank means unlimited per gateway replica.</small>
+      </Field>
+      <label className="checkbox-field wide">
         <input checked={booleanValue(circuit.disabled)} onChange={(event) => onChange((value) => setNestedBoolean(value, "circuit", "disabled", event.target.checked))} type="checkbox" />
         <span>Disable passive circuit health</span>
       </label>

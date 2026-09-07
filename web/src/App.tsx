@@ -11,6 +11,7 @@ import {
 import { AdminAPIError, fetchBootstrap, fetchStatus, probeMMProjection } from "./api";
 import { ConfigurationWorkspace } from "./ConfigurationWorkspace";
 import { ManagedConfigurationWorkspace } from "./ManagedConfigurationWorkspace";
+import { configurationSection, configurationSections } from "./configurationSections";
 import { TraceExportWorkspace } from "./TraceExportWorkspace";
 import { TrafficWorkspace } from "./TrafficWorkspace";
 import { RuntimeWorkspace } from "./RuntimeWorkspace";
@@ -245,6 +246,13 @@ function ConsoleLayout({
   const [page, setPage] = useState<ConsolePage>(
     pageFromPath(window.location.pathname, pageExtensions),
   );
+  const section = configurationSection(page);
+  const lastConfigurationSection = useRef(section ?? "providers");
+  if (section) lastConfigurationSection.current = section;
+  const [configurationVisited, setConfigurationVisited] = useState(Boolean(section));
+  useEffect(() => {
+    if (section) setConfigurationVisited(true);
+  }, [section]);
   const configurationAvailable = Boolean(
     bootstrap.features.config_read ||
       bootstrap.features.config_validate ||
@@ -273,12 +281,14 @@ function ConsoleLayout({
       runtime: "/admin/runtime",
       traces: "/admin/traces",
     } satisfies Record<BuiltInConsolePage, string>)[next as BuiltInConsolePage]
+      ?? (configurationSection(next) ? `/admin/${next}` : undefined)
       ?? pageExtensions.find((extension) => extension.id === next)?.path
       ?? "/admin/";
     window.history.pushState({}, "", target);
     setPage(next);
   };
-  const heading = ({
+  const heading = (section && bootstrap.features.config_managed_sets
+    ? configurationSections.find((entry) => entry.id === section)?.label : undefined) ?? ({
     overview: "Gateway overview",
     configuration: "Configuration",
     credentials: "Client credentials",
@@ -290,7 +300,7 @@ function ConsoleLayout({
     ?? "Administration";
   const activePageExtension = pageExtensions.find((extension) => extension.id === page);
   return (
-    <div className="console-shell">
+    <div className={bootstrap.features.config_managed_sets ? "console-shell managed-console" : "console-shell"}>
       <aside className="sidebar">
         <div className="sidebar-brand">
           <BrandMark />
@@ -312,10 +322,10 @@ function ConsoleLayout({
             <span className="nav-glyph">O</span>
             Overview
           </a>
-          {configurationAvailable ? (
+          {configurationAvailable ? <div className="configuration-nav">
             <a
-              aria-current={page === "configuration" ? "page" : undefined}
-              className={page === "configuration" ? "nav-item active" : "nav-item"}
+              aria-current={section && !bootstrap.features.config_managed_sets ? "page" : undefined}
+              className={section ? "nav-item active" : "nav-item"}
               href="/admin/configuration"
               onClick={(event) => {
                 event.preventDefault();
@@ -325,7 +335,21 @@ function ConsoleLayout({
               <span className="nav-glyph">C</span>
               Configuration
             </a>
-          ) : null}
+            {bootstrap.features.config_managed_sets ? (
+              <ul className="configuration-nav-children" aria-label="Configuration sections">
+                {configurationSections.map((entry) => (
+                  <li key={entry.id} className={entry.id === "sparkrun" ? "generated-nav" : undefined}>
+                    <a
+                      aria-current={section === entry.id ? "page" : undefined}
+                      className={section === entry.id ? "nav-item active" : "nav-item"}
+                      href={`/admin/configuration/${entry.id}`}
+                      onClick={(event) => { event.preventDefault(); navigate(`configuration/${entry.id}`); }}
+                    >{entry.label}</a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div> : null}
           {credentialsAvailable ? (
             <a
               aria-current={page === "credentials" ? "page" : undefined}
@@ -395,7 +419,6 @@ function ConsoleLayout({
             </a>
           ))}
         </nav>
-        <FeatureSummary features={bootstrap.features} />
         <div className="sidebar-footer">
           <span>Gateway</span>
           <strong>{bootstrap.gateway_version || "development"}</strong>
@@ -421,11 +444,14 @@ function ConsoleLayout({
           </div>
         </header>
 
-        {page === "configuration" ? (
+        {configurationAvailable && bootstrap.features.config_managed_sets && configurationVisited ? (
+          <div hidden={!section}>
+            <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
+          </div>
+        ) : null}
+        {section ? (
           configurationAvailable ? (
-            bootstrap.features.config_managed_sets ? (
-              <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} virtualModelExtensions={virtualModelExtensions} />
-            ) : (
+            bootstrap.features.config_managed_sets ? null : (
               <ConfigurationComponent
                 bootstrap={bootstrap}
                 token={token}
@@ -467,6 +493,8 @@ function pageFromPath(
   extensions: NonNullable<AdminConsoleExtensions["pages"]> = [],
 ): ConsolePage {
   if (pathname === "/admin/configuration") return "configuration";
+  const configurationPage = pathname.replace(/^\/admin\//, "");
+  if (configurationSection(configurationPage)) return configurationPage;
   if (pathname === "/admin/credentials") return "credentials";
   if (pathname === "/admin/traffic") return "traffic";
   if (pathname === "/admin/runtime") return "runtime";
@@ -825,23 +853,6 @@ function StatusPill({
       <i />
       {children}
     </span>
-  );
-}
-
-function FeatureSummary({ features }: { features: Record<string, boolean> }) {
-  const enabled = Object.entries(features)
-    .filter(([, value]) => value)
-    .map(([name]) => humanize(name));
-  return (
-    <section className="feature-summary">
-      <span>Available modules</span>
-      {enabled.map((feature) => (
-        <div key={feature}>
-          <i />
-          {feature}
-        </div>
-      ))}
-    </section>
   );
 }
 

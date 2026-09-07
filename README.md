@@ -123,6 +123,29 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/SPARKRUN_INTEGRATION_READINESS.md`](docs/SPARKRUN_INTEGRATION_READINESS.md),
 and [`docs/TRACE_DATASET_EXPORT.md`](docs/TRACE_DATASET_EXPORT.md).
 
+## Configuration in the console
+
+The Configuration sidebar contains **Providers**, **Model Deployments**,
+**Virtual Models / Aliases**, and **Model Routing** for the operator-managed set.
+These sections share a draft; navigating between them or other console pages
+preserves edits. Saving validates and replaces the whole operator set, and the
+stored/serving indicator follows runtime application. JSON edits apply to the
+whole selected set. Reloading the page or using Refresh reloads stored configuration.
+
+**SparkRun Generated** is a separate read-only view. Operator virtual models can
+target deployments from either owner; generated targets are labeled in the picker.
+Model-routing selectors can use virtual models from both owners. These references
+do not copy or modify generated entities. Names and references are validated
+against the merged configuration when saving.
+
+Deployment capability controls show only optional **Vision** and **Files (file
+inputs)** declarations. An unchecked option leaves support unspecified, so the
+default try-first policy still applies unless overridden. Native protocol defaults
+come from the provider. Existing advanced capabilities and explicit protocol
+overrides are preserved and remain accessible in JSON. File inputs (`file_input`)
+are distinct from a provider's Files resource API (`files`). Concurrency limits and
+passive circuit health settings are grouped under **Concurrency and circuit policy**.
+
 ## Native provider configuration
 
 The console separates the provider's native API from its authentication:
@@ -140,8 +163,8 @@ Provider selection sets the native protocol default. Responses providers imply
 `responses` for every associated deployment, including configuration supplied
 as JSON. An explicitly unsupported Responses capability conflicts with that
 provider type and is rejected. Other capabilities remain model-specific.
-The console adds deployments under the selected provider and preserves other
-capability declarations. A Responses-native provider is not sent Chat
+Choose a deployment's provider in Model Deployments; its native defaults and other
+capability declarations are preserved. A Responses-native provider is not sent Chat
 Completions requests; Chat-to-Responses translation is not implemented.
 
 AWS region appears only for Bedrock. Its Base URL control is hidden; new

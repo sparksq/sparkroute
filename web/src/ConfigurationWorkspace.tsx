@@ -302,6 +302,7 @@ export function ConfigurationWorkspace({
                 />
               ) : (
                 <ProviderDeploymentEditor
+                  simplifiedCapabilities={bootstrap.edition === "standalone"}
                   subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }}
                   disabled={Boolean(busy)}
                   document={parsedDocument.document}
