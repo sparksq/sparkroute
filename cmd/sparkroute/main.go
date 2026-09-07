@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	openaiauth "github.com/scitrera/go-llm/auth/openai"
 	ossadmin "github.com/sparksq/sparkroute/pkg/admin"
 	"github.com/sparksq/sparkroute/pkg/adminapi"
 	"github.com/sparksq/sparkroute/pkg/clientcredentials"
@@ -36,6 +37,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/promptcache"
+	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
 	tracefilesystem "github.com/sparksq/sparkroute/pkg/savedtrace/filesystem"
@@ -322,6 +324,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	)
 	configCheck := flags.Bool("config-check", false, "validate configuration and exit")
 	showVersion := flags.Bool("version", false, "print version and exit")
+	providerAuthPath := flags.String("provider-auth-sqlite", "", "private provider sign-in store; defaults to <config-sqlite>.provider-auth.db for managed configuration")
 	showBuildInfo := flags.Bool("build-info", false, "print release/source identity as JSON and exit")
 	includeAliases := flags.Bool("list-aliases", false, "include aliases in GET /v1/models")
 	if err := flags.Parse(args); err != nil {
@@ -339,6 +342,23 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	}
 	if *showBuildInfo {
 		return json.NewEncoder(stdout).Encode(version.BuildInfo())
+	}
+	var providerAuth *providerauth.Service
+	if *providerAuthPath == "" && *configSourceMode == "sqlite" && *configSQLitePath != "" && *configSQLitePath != ":memory:" {
+		*providerAuthPath = *configSQLitePath + ".provider-auth.db"
+	}
+	if *providerAuthPath != "" && !*configCheck {
+		store, err := providerauth.OpenStore(ctx, *providerAuthPath)
+		if err != nil {
+			return fmt.Errorf("open provider sign-in store: %w", err)
+		}
+		providerAuth = providerauth.New(ctx, store, openaiauth.Config{})
+		defer func() {
+			providerAuth.Close()
+			if err := store.Close(); err != nil {
+				logger.Error("close provider sign-in store", slog.Any("err", err))
+			}
+		}()
 	}
 	var clientCredentialManager *clientcredentials.Manager
 	var clientCredentialStore *clientcredentialsqlite.Store
@@ -701,6 +721,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		AdminEnabled:            true, AdminAuthentication: adminAuthentication,
 		AllowInsecureAdmin: insecureAdmin,
 		ClientCredentials:  clientCredentialManager, ManagedConfig: managedConfigStore,
+		ProviderAuth:    providerAuth,
 		SparkrunCommand: *sparkrunCommand, SparkrunEndpointTTL: *sparkrunEndpointTTL,
 		SparkrunReconcile:   *sparkrunReconcileInterval,
 		SparkrunStopTimeout: *sparkrunStopTimeout,

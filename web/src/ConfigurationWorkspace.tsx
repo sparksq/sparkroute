@@ -302,6 +302,7 @@ export function ConfigurationWorkspace({
                 />
               ) : (
                 <ProviderDeploymentEditor
+                  subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }}
                   disabled={Boolean(busy)}
                   document={parsedDocument.document}
                   onChange={changeStructuredDocument}

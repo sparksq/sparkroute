@@ -24,6 +24,7 @@ const (
 	FeatureCredentialsWrite   = "client_credentials_write"
 	FeatureMMProjectionProbe  = "mm_projection_probe"
 	FeaturePrivacyPII         = "privacy_pii"
+	FeatureProviderAuth       = "provider_auth"
 )
 
 // Bootstrap is the authenticated description of the admin surface compiled

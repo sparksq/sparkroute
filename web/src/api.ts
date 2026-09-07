@@ -111,6 +111,27 @@ export function fetchActiveConfiguration(token: string, signal?: AbortSignal) {
   return requestJSON<ActiveConfiguration>("/v1/config", token, {}, signal);
 }
 
+export interface ProviderSignInStatus {
+  profile: string;
+  state: "signed_out" | "starting" | "pending" | "connected" | "failed" | "expired";
+  email?: string;
+  plan?: string;
+  account_id?: string;
+  expires_at?: string;
+  verification_url?: string;
+  user_code?: string;
+  login_expires_at?: string;
+  message?: string;
+}
+
+export function fetchProviderSignIn(token: string, profile: string, signal?: AbortSignal) {
+  return requestJSON<ProviderSignInStatus>(`/v1/provider-auth/openai/${encodeURIComponent(profile)}`, token, {}, signal);
+}
+
+export function changeProviderSignIn(token: string, profile: string, action: "login" | "cancel" | "logout") {
+  return requestJSON<ProviderSignInStatus>(`/v1/provider-auth/openai/${encodeURIComponent(profile)}/${action}`, token, { method: "POST", body: {} });
+}
+
 export function fetchDiscoveredModelMetadata(token: string, signal?: AbortSignal) {
   return requestJSON<DiscoveredMetadataState>(
     "/v1/model-routing/discovered-metadata",

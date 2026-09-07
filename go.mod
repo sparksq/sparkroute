@@ -1,9 +1,9 @@
 module github.com/sparksq/sparkroute
 
-go 1.25.13
+go 1.25.14
 
 require (
-	github.com/scitrera/go-llm v0.2.0
+	github.com/scitrera/go-llm v0.3.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0

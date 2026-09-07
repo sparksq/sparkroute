@@ -26,6 +26,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/privacy"
 	"github.com/sparksq/sparkroute/pkg/promptcache"
+	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
 	"github.com/sparksq/sparkroute/pkg/routing"
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
@@ -61,6 +62,7 @@ type chatCompletionsHandler struct {
 	snapshot            *routing.Snapshot
 	credentials         credentials.Source
 	client              *http.Client
+	providerAuth        *providerauth.Service
 	maxRequestBytes     int64
 	maxResponseBytes    int64
 	requestIDHeader     string
@@ -146,6 +148,7 @@ func newOpenAIHandler(
 		snapshot:            snapshot,
 		credentials:         options.Credentials,
 		client:              &clientCopy,
+		providerAuth:        options.ProviderAuth,
 		maxRequestBytes:     maxRequestBytes,
 		maxResponseBytes:    maxResponseBytes,
 		requestIDHeader:     requestIDHeader,
@@ -1040,6 +1043,9 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		deployment config.Deployment,
 	) (routing.ProtocolRoute, bool) {
 		ingress := config.Protocol(h.operation.protocol())
+		if provider.Type == "openai_subscription" && h.operation != openAIOperationResponses {
+			return routing.ProtocolRoute{}, false
+		}
 		if h.operation == openAIOperationResponses &&
 			deployment.SupportsNativeProtocol(provider, config.ProtocolOpenAI) {
 			if deployment.DeclaresCapability(config.CapabilityResponses) {
@@ -1977,7 +1983,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 			}
 			continue
 		}
-		response, err := h.client.Do(upstreamRequest)
+		response, err := h.sendUpstream(upstreamRequest, selection)
 		if err != nil {
 			callerCancelled := callerContext.Err() != nil
 			overallTimedOut := !time.Now().Before(overallDeadline)
@@ -2398,7 +2404,7 @@ func nativeProtocolResolver(protocol config.Protocol) routing.ProtocolResolver {
 		provider config.Provider,
 		deployment config.Deployment,
 	) (routing.ProtocolRoute, bool) {
-		if !deployment.SupportsNativeProtocol(provider, protocol) {
+		if provider.Type == "openai_subscription" || !deployment.SupportsNativeProtocol(provider, protocol) {
 			return routing.ProtocolRoute{}, false
 		}
 		return routing.ProtocolRoute{Protocol: protocol, Native: true}, true
@@ -2497,6 +2503,21 @@ func (h *chatCompletionsHandler) proxyResponse(
 		usage:         missingUsage(),
 	}
 	success := response.StatusCode >= 200 && response.StatusCode < 300
+	if success && !streaming && sseStream && selection.Provider.Type == "openai_subscription" {
+		body, err := collectSubscriptionResponse(response.Body, h.maxResponseBytes)
+		_ = response.Body.Close()
+		if err != nil {
+			h.operation.writeError(w, http.StatusBadGateway, "upstream_response_error", "subscription response could not be completed", requestID)
+			result.gatewayStatus, result.outcome, result.failureClass = http.StatusBadGateway, ledger.OutcomeUpstreamError, "subscription_response_error"
+			return result
+		}
+		response.Body = io.NopCloser(bytes.NewReader(body))
+		response.Header.Set("Content-Type", "application/json")
+		response.Header.Del("Content-Length")
+		response.ContentLength = int64(len(body))
+		eventStream, sseStream = false, false
+		contentType = "application/json"
+	}
 	if success {
 		result.outcome = ledger.OutcomeSuccess
 		result.failureClass = ""
@@ -3440,6 +3461,9 @@ func (h *chatCompletionsHandler) buildUpstreamRequest(
 	body []byte,
 	streaming bool,
 ) (*http.Request, error) {
+	if selection.Provider.Type == "openai_subscription" {
+		return h.buildSubscriptionRequest(downstream, requestID, selection, body)
+	}
 	upstreamProtocol := selectionUpstreamProtocol(selection)
 	upstreamOperation := upstreamOperationForSelection(
 		h.operation,

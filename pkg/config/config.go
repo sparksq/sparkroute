@@ -40,12 +40,14 @@ type Document struct {
 }
 
 type Provider struct {
-	Name           string                 `json:"name"`
-	Type           string                 `json:"type"`
-	BaseURL        string                 `json:"base_url,omitempty"`
-	Region         string                 `json:"region,omitempty"`
-	Auth           ProviderAuth           `json:"auth,omitempty"`
-	DefaultHeaders map[string]HeaderValue `json:"default_headers,omitempty"`
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	BaseURL string `json:"base_url,omitempty"`
+	// SubscriptionProfile names a private, renewable credential stored outside configuration.
+	SubscriptionProfile string                 `json:"subscription_profile,omitempty"`
+	Region              string                 `json:"region,omitempty"`
+	Auth                ProviderAuth           `json:"auth,omitempty"`
+	DefaultHeaders      map[string]HeaderValue `json:"default_headers,omitempty"`
 	// ExtraBody supplies bounded top-level inference request defaults. Caller
 	// fields always win, and deployment defaults take precedence over provider
 	// defaults when both define a missing field.
@@ -84,7 +86,7 @@ const (
 // a provider type. Explicit Deployment.NativeProtocols override this default.
 func ProtocolForProviderType(providerType string) Protocol {
 	switch providerType {
-	case "openai", "openai_compatible":
+	case "openai", "openai_compatible", "openai_subscription":
 		return ProtocolOpenAI
 	case "anthropic":
 		return ProtocolAnthropic

@@ -315,7 +315,7 @@ export function ManagedConfigurationWorkspace({
                     : undefined}
                 />
               ) : (
-                <ProviderDeploymentEditor disabled={!canEdit || Boolean(busy)} document={parsed.document} onChange={structuredChange} />
+                <ProviderDeploymentEditor disabled={!canEdit || Boolean(busy)} document={parsed.document} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
               )}
             </>
           ) : (

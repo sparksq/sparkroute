@@ -6,7 +6,7 @@ module used by the enterprise edition.
 
 The Go module is `github.com/sparksq/sparkroute`. Provider protocol clients and
 intermediate request/response types come from the independently reusable
-Apache-2.0 `github.com/scitrera/go-llm v0.2.0` module.
+Apache-2.0 `github.com/scitrera/go-llm v0.3.0` module.
 
 ## Included
 
@@ -122,3 +122,57 @@ multi-architecture-safe stages.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 [`docs/SPARKRUN_INTEGRATION_READINESS.md`](docs/SPARKRUN_INTEGRATION_READINESS.md),
 and [`docs/TRACE_DATASET_EXPORT.md`](docs/TRACE_DATASET_EXPORT.md).
+
+## Codex subscription providers
+
+The provider editor supports **Use Codex subscription** and **Sign in with ChatGPT**.
+Choose a credential profile name, request a one-time device code, open the OpenAI
+sign-in link, and complete authentication. Enable device-code login in your
+ChatGPT security settings or workspace permissions if necessary. The console
+shows pending, expired, failed, and connected states and provides cancellation,
+retry, and sign-out. See [OpenAI authentication](https://learn.chatgpt.com/docs/auth#login-on-headless-devices).
+
+Subscription sign-in uses the account's Codex entitlement and limits. API-key
+providers retain their separate configuration. Subscription providers currently
+support `/v1/responses` with full transcript input, including streaming and
+buffered replies. They require `store: false` (the default for this provider),
+and do not support background execution, previous-response IDs, Conversations,
+Chat Completions, embeddings, or provider-side response resources. Reasoning
+settings and Codex custom `apply_patch` requests use go-llm's subscription profile.
+
+A minimal provider/deployment pair is:
+
+```json
+{
+  "providers": [{"name": "codex", "type": "openai_subscription", "subscription_profile": "personal-codex"}],
+  "deployments": [{"name": "codex-model", "provider": "codex", "model": "YOUR_SUBSCRIPTION_MODEL", "capabilities": ["responses"]}],
+  "virtual_models": []
+}
+```
+
+Add a virtual model targeting that deployment, then validate and save the
+configuration. Changing the profile name selects a different account binding;
+renaming a provider does not move or rename its credentials. Providers that name
+the same profile share the account, token refresh, and sign-out. Signing in does
+not automatically save an edited configuration or change a route.
+
+Managed SQLite configuration automatically uses
+`<config-sqlite>.provider-auth.db` for provider credentials. File configuration
+can enable sign-in with `-provider-auth-sqlite /private/path/provider-auth.db`.
+This store must have a private parent directory and private file permissions
+(or equivalent Windows ACLs). It contains unencrypted renewable credentials and
+must be protected like a password; it is separate from configuration exports,
+client API keys, and Codex CLI credentials. No OAuth token or device-auth ID is
+returned to the browser, logs, or configuration. Backups of this database contain
+secrets. The adjacent `.lock` database prevents concurrent SparkRoute processes
+from sharing refresh-token ownership; use local disk, not network storage.
+
+Sign-in administration requires `config_write` on an authenticated admin
+connection, or the explicitly enabled loopback-only insecure admin mode. Device
+codes are shown only to the administrator who started that sign-in. The fixed
+OpenAI issuer and Codex endpoint cannot be overridden through configuration.
+Credentials refresh before expiry; an upstream 401 permits one refresh and
+replay within the existing request deadline. Logout first joins pending login
+work and removes local credentials even if remote revocation fails; the UI
+reports that failure. Pending sign-ins expire after ten minutes and are
+cancelled on gateway shutdown. Stored credentials survive restarts.

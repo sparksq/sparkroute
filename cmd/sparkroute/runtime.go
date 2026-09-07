@@ -23,6 +23,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/promptcache"
+	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
 	"github.com/sparksq/sparkroute/pkg/routing"
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
@@ -52,6 +53,7 @@ type runtimeBuildOptions struct {
 	AdminAuthentication     identity.Authenticator
 	AllowInsecureAdmin      bool
 	ClientCredentials       *clientcredentials.Manager
+	ProviderAuth            *providerauth.Service
 	ManagedConfig           managed.Store
 	SparkrunCommand         string
 	SparkrunEndpointTTL     time.Duration
@@ -142,7 +144,7 @@ func buildRuntimeGeneration(
 	}
 	dataOptions := gateway.DataOptions{
 		Models:      gateway.ModelListOptions{IncludeAliases: options.IncludeAliases},
-		Credentials: credentialRegistry, Ledger: options.Ledger,
+		Credentials: credentialRegistry, Ledger: options.Ledger, ProviderAuth: options.ProviderAuth,
 		ResponsesState: options.ResponsesState, ConfigRevision: string(revision),
 		MaxSavedTraceBytes: options.MaxSavedTraceBytes,
 		PromptCache:        options.PromptCache, PromptFingerprinter: options.PromptFingerprinter,
@@ -206,6 +208,7 @@ func buildRuntimeGeneration(
 			Authenticator:      options.AdminAuthentication,
 			AllowInsecureAdmin: options.AllowInsecureAdmin,
 			ClientCredentials:  options.ClientCredentials,
+			ProviderAuth:       options.ProviderAuth,
 			ManagedConfig:      options.ManagedConfig,
 		}
 		adminOptions.ModelMetadata, _ = requestModelRouter.(modelrouter.DiscoveredMetadataInspector)

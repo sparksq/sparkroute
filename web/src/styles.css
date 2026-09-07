@@ -1558,6 +1558,21 @@ tbody tr:last-child td {
   font-weight: 500;
 }
 
+.subscription-sign-in {
+  padding: 1rem;
+  line-height: 1.6;
+}
+
+.subscription-sign-in .device-code {
+  display: inline-block;
+  font-family: monospace;
+  letter-spacing: 0.15em;
+  padding: 0.2em 0.6em;
+  border: 1px solid currentColor;
+  border-radius: 0.3em;
+  user-select: all;
+}
+
 .provider-auth-fields {
   align-items: start;
 }

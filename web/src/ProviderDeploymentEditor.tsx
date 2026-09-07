@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { standardCapabilities } from "./VirtualModelEditor";
+import { SubscriptionSignIn } from "./SubscriptionSignIn";
 
 type JSONObject = Record<string, unknown>;
 type Selection = { kind: "provider" | "deployment"; index: number };
@@ -9,10 +10,12 @@ export function ProviderDeploymentEditor({
   document,
   disabled,
   onChange,
+  subscriptionAuth,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
   onChange: (document: ConfigurationDocument) => void;
+  subscriptionAuth?: { token: string; enabled: boolean };
 }) {
   const shape = useMemo(() => inspectDocument(document), [document]);
   const providers = shape.providers ?? [];
@@ -103,6 +106,7 @@ export function ProviderDeploymentEditor({
       name: uniqueName("new-deployment", names),
       provider: providerNames[0],
       model: "upstream-model",
+      ...(providers[0]?.type === "openai_subscription" ? { capabilities: ["responses"] } : {}),
     };
     onChange({ ...document, deployments: [...deployments, next] });
     setSelection({ kind: "deployment", index: deployments.length });
@@ -177,6 +181,7 @@ export function ProviderDeploymentEditor({
             onRemove={removeSelected}
             provider={selectedProvider}
             removeBlocked={removeBlocked}
+            subscriptionAuth={subscriptionAuth}
           />
         ) : selectedDeployment ? (
           <DeploymentForm
@@ -266,6 +271,7 @@ function ProviderForm({
   onChange,
   onRemove,
   onCancelRemove,
+  subscriptionAuth,
 }: {
   provider: JSONObject;
   disabled: boolean;
@@ -275,9 +281,11 @@ function ProviderForm({
   onChange: (transform: (provider: JSONObject) => JSONObject) => void;
   onRemove: () => void;
   onCancelRemove: () => void;
+  subscriptionAuth?: { token: string; enabled: boolean };
 }) {
   const auth = objectValue(provider.auth);
   const authType = stringValue(auth.type);
+  const subscription = provider.type === "openai_subscription";
   return (
     <>
       <FormHeading
@@ -289,33 +297,39 @@ function ProviderForm({
         removeTitle={removeBlocked ? `Used by ${deploymentCount} deployment${deploymentCount === 1 ? "" : "s"}` : "Remove provider"}
         title={stringValue(provider.name) || "Unnamed provider"}
       />
+      <button type="button" disabled={disabled} onClick={() => onChange((value) => setProviderType(value, "openai_subscription"))}>Use Codex subscription</button>
       <fieldset disabled={disabled}>
         <div className="model-field-grid infrastructure-field-grid">
           <Field label="Provider name">
             <input value={stringValue(provider.name)} onChange={(event) => onChange((value) => setString(value, "name", event.target.value, true))} />
           </Field>
           <Field label="Provider type">
-            <input list="provider-types" value={stringValue(provider.type)} onChange={(event) => onChange((value) => setString(value, "type", event.target.value, true))} />
+            <input list="provider-types" value={stringValue(provider.type)} onChange={(event) => onChange((value) => setProviderType(value, event.target.value))} />
             <datalist id="provider-types">
               <option value="openai" />
               <option value="openai_compatible" />
+              <option value="openai_subscription" />
               <option value="anthropic" />
               <option value="gemini" />
               <option value="bedrock" />
             </datalist>
           </Field>
-          <Field label="Base URL" wide>
+          {!subscription ? <><Field label="Base URL" wide>
             <input placeholder="https://api.example/v1" spellCheck={false} value={stringValue(provider.base_url)} onChange={(event) => onChange((value) => setString(value, "base_url", event.target.value))} />
             <small>Required except for Bedrock, where the regional runtime endpoint can be derived.</small>
           </Field>
           <Field label="AWS region">
             <input placeholder="us-east-1" spellCheck={false} value={stringValue(provider.region)} onChange={(event) => onChange((value) => setString(value, "region", event.target.value))} />
           </Field>
+          </> : <Field label="Subscription profile" wide>
+            <input aria-label="Subscription profile" autoComplete="off" spellCheck={false} value={stringValue(provider.subscription_profile)} onChange={(event) => onChange((value) => setString(value, "subscription_profile", event.target.value))} />
+            <small>A reusable name for this account, for example personal-codex. Requests use the fixed Codex Responses endpoint.</small>
+          </Field>}
         </div>
 
         <details className="model-section policy-section" open>
-          <summary><span>Provider authentication</span><small>Resolved only by configured credential sources</small></summary>
-          <div className="policy-fields provider-auth-fields">
+          <summary><span>Provider authentication</span><small>{subscription ? "Codex subscription" : "Resolved only by configured credential sources"}</small></summary>
+          {subscription ? <SubscriptionSignIn key={stringValue(provider.subscription_profile)} profile={stringValue(provider.subscription_profile)} token={subscriptionAuth?.token ?? ""} enabled={subscriptionAuth?.enabled ?? false} /> : <div className="policy-fields provider-auth-fields">
             <Field label="Authentication type">
               <select value={authType} onChange={(event) => onChange((value) => setAuthType(value, event.target.value))}>
                 <option value="">None</option>
@@ -349,7 +363,7 @@ function ProviderForm({
                 </Field>
               </>
             ) : null}
-          </div>
+          </div>}
         </details>
 
         <HeaderSection
@@ -367,6 +381,19 @@ function ProviderForm({
       </fieldset>
     </>
   );
+}
+
+function setProviderType(value: JSONObject, type: string): JSONObject {
+  const next: JSONObject = { ...value, type };
+  if (type === "openai_subscription") {
+    delete next.base_url;
+    delete next.auth;
+    delete next.region;
+    next.subscription_profile ||= "codex";
+  } else {
+    delete next.subscription_profile;
+  }
+  return next;
 }
 
 function DeploymentForm({
@@ -1034,7 +1061,7 @@ function toggleCapability(deployment: JSONObject, capability: string, enabled: b
 }
 
 function defaultProtocolForProviderType(providerType: string) {
-  if (providerType === "openai" || providerType === "openai_compatible") return "openai";
+  if (["openai", "openai_compatible", "openai_subscription"].includes(providerType)) return "openai";
   if (["anthropic", "gemini", "bedrock"].includes(providerType)) return providerType;
   return "";
 }

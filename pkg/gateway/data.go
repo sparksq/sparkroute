@@ -15,6 +15,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/privacy"
 	"github.com/sparksq/sparkroute/pkg/promptcache"
+	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
 	"github.com/sparksq/sparkroute/pkg/routing"
 	"github.com/sparksq/sparkroute/pkg/savedtrace"
@@ -30,6 +31,7 @@ type DataOptions struct {
 	Models              ModelListOptions
 	Credentials         credentials.Source
 	HTTPClient          *http.Client
+	ProviderAuth        *providerauth.Service
 	RoutingPicker       routing.WeightedPicker
 	Ledger              ledger.Recorder
 	ConfigRevision      string
@@ -87,6 +89,11 @@ func (e combinedEligibility) Eligible(deployment string) bool {
 // NewDataPlane constructs the multi-protocol data plane and exposes its
 // content-free runtime target state.
 func NewDataPlane(document config.Document, options DataOptions) (*DataPlane, error) {
+	for _, provider := range document.Providers {
+		if provider.Type == "openai_subscription" && options.ProviderAuth == nil {
+			return nil, fmt.Errorf("subscription provider requires a private provider credential store")
+		}
+	}
 	if err := ValidatePrivacyProvider(document, options.Privacy); err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/privacy"
+	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/routing"
 )
 
@@ -44,6 +45,7 @@ type Options struct {
 	MMProjection      mmprojection.StatusProber
 	ModelMetadata     modelrouter.DiscoveredMetadataInspector
 	Privacy           privacy.StatusSource
+	ProviderAuth      *providerauth.Service
 	// AllowInsecureAdmin grants the local operator full standalone admin
 	// privileges without authentication. Callers must constrain the listener
 	// to loopback; the executable rejects unsafe bind combinations.
@@ -162,6 +164,9 @@ func NewHandler(
 	mux.HandleFunc("/v1/config/validate", h.validateConfiguration)
 	mux.HandleFunc("/v1/config/simulate-routing", h.simulateRouting)
 	privileged := h.authenticated || h.insecureAdmin
+	if options.ProviderAuth != nil && privileged {
+		mux.HandleFunc("/v1/provider-auth/openai/", h.providerAuth)
+	}
 	if options.ManagedConfig != nil && privileged {
 		mux.HandleFunc("/v1/config", h.activeConfiguration)
 		mux.HandleFunc("/v1/config/managed-sets", h.managedSets)
@@ -372,6 +377,7 @@ func (h *handler) serveBootstrap(
 			ID: principal.ID, Roles: append([]string(nil), principal.Roles...),
 		}
 		bootstrap.Features[adminapi.FeatureStatus] = hasRole(principal, RoleStatusRead)
+		bootstrap.Features[adminapi.FeatureProviderAuth] = h.options.ProviderAuth != nil && hasRole(principal, RoleConfigWrite)
 		bootstrap.Features[adminapi.FeatureConfigValidate] =
 			hasRole(principal, RoleConfigRead) || hasRole(principal, RoleConfigWrite)
 		bootstrap.Features[adminapi.FeatureRoutingSimulation] =

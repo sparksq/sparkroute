@@ -107,6 +107,9 @@ def smoke(archive: Path):
                             raise RuntimeError('gateway failed to start: ' + log.read()) from None
                         time.sleep(0.1)
                 assert bootstrap['build'] == info
+                assert bootstrap['features']['provider_auth']
+                sign_in = request(admin + '/v1/provider-auth/openai/smoke', token='smoke-test-token')
+                assert sign_in['state'] == 'signed_out'
                 try:
                     request(admin + '/v1/ui/bootstrap')
                     raise AssertionError('admin accepted unauthenticated request')

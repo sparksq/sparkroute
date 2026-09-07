@@ -4,6 +4,8 @@
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
+*.db.lock
 .agents/
 .codex/
 .omc/

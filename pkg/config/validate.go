@@ -177,6 +177,9 @@ func (d Document) Validate() error {
 			return fmt.Errorf("%s.name: duplicate provider %q", path, provider.Name)
 		}
 		providers[provider.Name] = struct{}{}
+		if err := validateSubscriptionProvider(provider); err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
 		if strings.TrimSpace(provider.Type) == "" {
 			return fmt.Errorf("%s.type: required", path)
 		}
@@ -243,6 +246,15 @@ func (d Document) Validate() error {
 			return fmt.Errorf("%s.native_protocols: %w", path, err)
 		}
 		provider := d.provider(deployment.Provider)
+		if provider.Type == "openai_subscription" {
+			if deployment.Credential != "" || deployment.EndpointSource.Type.Effective() != EndpointSourceStatic ||
+				len(deployment.NativeProtocols) != 0 && (len(deployment.NativeProtocols) != 1 || deployment.NativeProtocols[0] != ProtocolOpenAI) {
+				return fmt.Errorf("%s: subscription deployments require static OpenAI endpoints and provider-owned authentication", path)
+			}
+			if !deployment.DeclaresCapability(CapabilityResponses) {
+				return fmt.Errorf("%s.capabilities: subscription deployments must declare responses", path)
+			}
+		}
 		if err := deployment.EndpointSource.Validate(); err != nil {
 			return fmt.Errorf("%s.endpoint_source: %w", path, err)
 		}
@@ -259,7 +271,7 @@ func (d Document) Validate() error {
 			activationBindings[bindingKey] = deployment.Name
 		}
 		if deployment.EndpointSource.Type.Effective() == EndpointSourceStatic &&
-			provider.BaseURL == "" && provider.Type != "bedrock" {
+			provider.BaseURL == "" && provider.Type != "bedrock" && provider.Type != "openai_subscription" {
 			return fmt.Errorf("%s.endpoint_source: static deployments require provider base_url", path)
 		}
 		if provider.Type == "bedrock" &&
