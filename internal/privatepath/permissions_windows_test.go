@@ -22,6 +22,8 @@ func TestWindowsAccessRules(t *testing.T) {
 		{"private", "O:" + sid + "D:P" + private, true},
 		{"administrator-owned", "O:BAD:P" + private, true},
 		{"creator-owner", "O:" + sid + "D:P" + private + "(A;OICIIO;FA;;;CO)", true},
+		{"owner-rights", "O:" + sid + "D:P(A;OICI;FA;;;OW)", true},
+		{"untrusted-owner-rights", "O:WDD:P(A;OICI;FA;;;OW)", false},
 		{"world-readable", "O:" + sid + "D:P" + private + "(A;;FR;;;WD)", false},
 		{"users-writable", "O:" + sid + "D:P" + private + "(A;;FW;;;BU)", false},
 		{"public-children", "O:" + sid + "D:P" + private + "(A;OICIIO;FR;;;WD)", false},

@@ -52,6 +52,11 @@ func checkDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, user *windows.SID)
 			if trustedSID(sid, user) || ace.Mask == 0 {
 				continue
 			}
+			// OWNER RIGHTS denotes the current owner, which was validated above.
+			// Python's private temporary directories use this form on Windows.
+			if sid.IsWellKnown(windows.WinCreatorOwnerRightsSid) {
+				continue
+			}
 			// Windows substitutes the creator's SID when this rule is inherited.
 			if ace.Header.AceFlags&windows.INHERIT_ONLY_ACE != 0 && sid.IsWellKnown(windows.WinCreatorOwnerSid) {
 				continue
