@@ -6,8 +6,8 @@ flag, no catalog/controller is constructed and the UI omits sparkrun creation
 controls. Configuring a sparkrun endpoint source then returns an enablement
 error, including during config checks and managed configuration validation.
 
-The Model Deployments editor offers Local and sparkrun as creation types.
-Local uses the normal provider form. sparkrun uses recipe selection and a
+The Model Deployments editor offers Standard and sparkrun as creation types.
+Standard uses the normal provider form. sparkrun uses recipe selection and a
 recipe-specific saved-deployment view. Recipe edits use the existing draft
 endpoint with a deployment ID; IDs and virtual-model aliases are preserved.
 
@@ -68,7 +68,8 @@ Anthropic Messages, with conservative defaults for unidentified image versions.
 UI selection persists the wire families plus the native Responses declaration.
 
 Virtual Models / Aliases supports explicit request profiles such as `coding:xhigh`.
-The Request profiles table sits between general model fields and routing pools.
+Only parent models appear in the virtual-model list; their variants stay in the
+Request profiles table between general model fields and routing pools.
 Use **Add profile** to create a selector; use the pencil to expand its parameters
 beneath the row or the X to remove it from the draft. JSON previews stay on one
 line and truncate to fit. The expanded editor selects the request API and values.

@@ -166,8 +166,9 @@ fields and precedes routing pools. The table shows each named selector (such as
 `low` or `xhigh`), a compact JSON preview, and pencil/X actions. **Add profile**
 opens a new draft; the pencil expands parameters directly beneath its row.
 The request API is chosen within the editor. Apply changes to the draft, then
-Validate and Save. Existing profiles remain explicit virtual models sharing the
-original deployment.
+Validate and Save. Only parent models appear in the virtual-model list; variants
+are managed through that parent’s table. Existing profiles remain explicit virtual
+models sharing the original deployment.
 
 See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
 for schema v3 requirements and treatment of older job metadata.
@@ -204,7 +205,7 @@ executable; it does not enable the integration by itself. Without `-sparkrun`,
 catalog routes and controls are disabled and recipe-backed configuration is
 rejected with an enablement hint. Ordinary provider configuration is unaffected.
 
-Choose **Local** in the deployment type selector for the ordinary provider form.
+Choose **Standard** in the deployment type selector for the ordinary provider form.
 Saved sparkrun deployments show recipe and cluster details, with **Edit recipe
 settings** for updates that preserve routing IDs and aliases. Both creation
 flows use the shared draft and Validate → Save.

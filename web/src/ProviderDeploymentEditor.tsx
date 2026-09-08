@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { capabilityOptions } from "./capabilities";
-import { deploymentChoices, deploymentTitle } from "./deploymentTitles";
+import { deploymentChoices, deploymentTitle, sparkrunDeploymentClusters } from "./deploymentTitles";
 import { SparkrunRecipeWizard, durationMinutes } from "./SparkrunRecipeWizard";
 import { sparkRunCatalog } from "./api";
 import { SubscriptionSignIn } from "./SubscriptionSignIn";
@@ -267,7 +267,7 @@ export function ProviderDeploymentEditor({
             <button className="text-button" type="button" onClick={cancelSetup}>Cancel</button></div>
           <div className="deployment-type-field"><Field label="Deployment type">
             <select aria-label="Deployment type" value={editingRecipe ? "sparkrun" : deploymentType} disabled={editingRecipe || disabled} onChange={(e) => { setDeploymentType(e.target.value); if (e.target.value === "sparkrun") setRecipeVisited(true); }}>
-              <option value="local">Local</option><option value="sparkrun">sparkrun</option>
+              <option value="local">Standard</option><option value="sparkrun">sparkrun</option>
             </select>
             <small>{editingRecipe || deploymentType === "sparkrun" ? "Choose a recipe and let sparkrun manage its workload." : "Connect to an existing model endpoint through a provider."}</small>
           </Field></div>
@@ -291,7 +291,7 @@ export function ProviderDeploymentEditor({
           </div>}
         </> : <>
         {readOnlySelected && (selectedProvider || selectedDeployment) ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
-        {selectedDeployment && (sparkrun?.enabled || objectValue(selectedDeployment.endpoint_source).controller === "sparkrun") ? <div className="deployment-type-field"><Field label="Deployment type"><select aria-label="Deployment type" disabled value={objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? "sparkrun" : "local"}><option value="local">Local</option><option value="sparkrun">sparkrun</option></select></Field></div> : null}
+        {selectedDeployment && (sparkrun?.enabled || objectValue(selectedDeployment.endpoint_source).controller === "sparkrun") ? <div className="deployment-type-field"><Field label="Deployment type"><select aria-label="Deployment type" disabled value={objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? "sparkrun" : "local"}><option value="local">Standard</option><option value="sparkrun">sparkrun</option></select></Field></div> : null}
         {selectedProvider ? (
           <ProviderForm
             key={selection.index}
@@ -362,8 +362,8 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
     <dl className="sparkrun-deployment-summary">
       <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
       <div><dt>Native APIs</dt><dd>{[...(stringArray(deployment.native_protocols).includes("openai") ? ["OpenAI (Chat Completions)"] : []), ...(stringArray(deployment.capabilities).includes("responses") ? ["OpenAI (Responses)"] : []), ...(stringArray(deployment.native_protocols).includes("anthropic") ? ["Anthropic Messages"] : [])].join(", ") || "OpenAI (Chat Completions)"}</dd></div>
-      <div><dt>Recipe</dt><dd>{preview?.name || (recipe ? "Pinned recipe" : "Discovered workload")}{preview?.source_path && <small className="recipe-source">{preview.source_path}</small>}</dd></div>
-      <div><dt>Cluster</dt><dd>{stringArray(source.cluster_candidates).join(", ") || "Reported by sparkrun"}</dd></div>
+      <div><dt>Recipe</dt><dd><small className="recipe-source">{preview?.source_path || recipe || "Discovered workload"}</small></dd></div>
+      <div><dt>Cluster</dt><dd>{sparkrunDeploymentClusters(deployment).join(", ") || "Not yet reported"}</dd></div>
       {source.type === "activatable" && <>
         <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 30)} minutes</dd></div>
         <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${source.idle_action === "sleep" ? "Sleep" : "Stop"} after ${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>

@@ -25,6 +25,7 @@ it("adds a named profile into the table after general fields and before routing 
   parameters('{"reasoning_effort":"xhigh"}'); click("Add profile to draft");
   expect(draft().virtual_models[1]).toEqual({ ...base, name: "coding:xhigh", aliases: [], request_overrides: { chat_completions: { reasoning_effort: "xhigh" } } });
   expect(screen.getByLabelText("Canonical name")).toHaveValue("coding");
+  expect(within(screen.getByRole("complementary", { name: "Virtual models" })).queryByText("coding:xhigh")).not.toBeInTheDocument();
   const row = screen.getByRole("button", { name: "Edit profile coding:xhigh" }).closest("tr")!;
   expect(within(row).getByRole("rowheader")).toHaveTextContent("xhigh");
   expect(row.querySelector("code")?.textContent).toBe('{"chat_completions":{"reasoning_effort":"xhigh"}}');
@@ -79,10 +80,27 @@ it("keeps a base model when deleting its default parameter override", () => {
 });
 
 it("preserves routing edits made while profile parameters are expanded", () => {
-  render(<Editor profiles />);
-  fireEvent.click(screen.getByRole("button", { name: "coding:lowpublic" }));
-  click("Edit profile coding:low");
+  render(<Editor baseOverrides />);
+  click("Edit profile coding");
   fireEvent.change(screen.getByLabelText("Relative weight"), { target: { value: "42" } });
   parameters('{"reasoning_effort":"medium"}'); click("Apply parameters to draft");
-  expect(draft().virtual_models[1].pools[0].targets[0].weight).toBe(42);
+  expect(draft().virtual_models[0].pools[0].targets[0].weight).toBe(42);
+});
+
+it("shows only the generated parent when operator variants precede it in the document", () => {
+  render(<Editor generated profiles />);
+  const list = screen.getByRole("complementary", { name: "Virtual models" });
+  expect(within(list).queryByText("coding:low")).not.toBeInTheDocument();
+  expect(within(list).getByText("coding")).toBeInTheDocument();
+  expect(screen.getByLabelText("Canonical name")).toHaveValue("coding");
+  expect(screen.getByLabelText("Canonical name")).toBeDisabled();
+  click("Edit profile coding:low");
+  parameters('{"reasoning_effort":"medium"}'); click("Apply parameters to draft");
+  expect(draft().virtual_models[0].request_overrides.chat_completions).toEqual({ reasoning_effort: "medium" });
+});
+
+it("keeps standalone profiles accessible when their parent is absent", () => {
+  render(<VirtualModelEditor document={{ deployments: [{ name: "one-job" }], virtual_models: [low] }} disabled={false} onChange={() => {}} />);
+  expect(within(screen.getByRole("complementary", { name: "Virtual models" })).getByText("coding:low")).toBeInTheDocument();
+  expect(screen.getByLabelText("Canonical name")).toHaveValue("coding:low");
 });

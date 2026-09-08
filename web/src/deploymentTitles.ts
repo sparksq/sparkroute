@@ -19,3 +19,16 @@ export function deploymentChoices(...documents: (ConfigurationDocument | undefin
     counts.get(titles[index]!)! > 1 ? `${titles[index]} (${deployment.name})` : titles[index],
   ]));
 }
+
+// Generated titles already include cluster names from discovery/runtime status.
+// Match the whole model suffix because model names themselves may contain colons.
+export function sparkrunDeploymentClusters(deployment: Record<string, unknown>): string[] {
+  const title = typeof deployment.title === "string" ? deployment.title : "";
+  const model = typeof deployment.model === "string" ? deployment.model : "";
+  if (model && title.startsWith("sparkrun:") && title.endsWith(`:${model}`)) {
+    const reported = title.slice("sparkrun:".length, -(model.length + 1));
+    if (reported && !["unassigned", "discovered"].includes(reported)) return reported.split(",").map((name) => name.trim()).filter(Boolean);
+  }
+  const source = deployment.endpoint_source as Record<string, unknown> | undefined;
+  return Array.isArray(source?.cluster_candidates) ? source.cluster_candidates.filter((value): value is string => typeof value === "string" && Boolean(value.trim())) : [];
+}

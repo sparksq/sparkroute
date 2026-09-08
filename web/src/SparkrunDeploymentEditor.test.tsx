@@ -46,11 +46,13 @@ it("does not offer or call the integration when it is disabled", () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
-it("stages the normal Local form without creating a partial deployment and cancels cleanly", () => {
+it("stages the normal Standard form without creating a partial deployment and cancels cleanly", () => {
   const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
   render(<Editor initial={{...empty, providers: [provider]}} />);
   fireEvent.click(screen.getByRole("button", {name: "Add deployment"}));
   expect(screen.getByLabelText("Deployment type")).toHaveValue("local");
+  expect(screen.getByRole("option", {name: "Standard"})).toBeInTheDocument();
+  expect(screen.queryByRole("option", {name: "Local"})).not.toBeInTheDocument();
   expect(screen.getByLabelText("Provider")).toHaveValue("cloud");
   expect(draft().deployments).toEqual([]);
   expect(screen.getByLabelText("Editing")).toHaveTextContent("true");
@@ -82,9 +84,21 @@ it("creates sparkrun deployments through the type selector and edits settings wi
 
 it("keeps generated sparkrun deployments read-only", async () => {
   mockCatalog(); render(<Editor generated={integrated} />);
-  expect(await screen.findByText("@registry/coder")).toBeVisible();
+  expect(await screen.findByText("/recipes/coder.yaml")).toBeVisible();
   expect(screen.getByText("sparkrun generated · Read only")).toBeVisible();
   expect(screen.queryByRole("button", {name: "Edit recipe settings"})).not.toBeInTheDocument();
   expect(screen.getByLabelText("Deployment type")).toBeDisabled();
+  expect(draft()).toEqual(empty);
+});
+
+it("shows the recipe path once in small text and uses the reported cluster rather than empty candidates", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...detail, name: detail.source_path }), {headers: {"Content-Type": "application/json"}})));
+  const generated = { ...integrated, deployments: [{ ...deployment, model: "org/model:tag", title: "sparkrun:actual-cluster:org/model:tag", endpoint_source: { ...deployment.endpoint_source, cluster_candidates: [] } }] };
+  render(<Editor generated={generated} />);
+  const path = await screen.findByText(detail.source_path);
+  expect(screen.getAllByText(detail.source_path)).toHaveLength(1);
+  expect(path.tagName).toBe("SMALL");
+  expect(screen.getByText("Cluster").nextElementSibling).toHaveTextContent("actual-cluster");
+  expect(screen.queryByText("Reported by sparkrun")).not.toBeInTheDocument();
   expect(draft()).toEqual(empty);
 });

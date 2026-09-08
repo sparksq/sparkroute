@@ -29,18 +29,24 @@ export function VirtualModelEditor({
   const generatedShape = useMemo(() => inspectDocument(readOnlyDocument ?? { deployments: [], virtual_models: [] }, extensions), [readOnlyDocument, extensions]);
   const deployments = [...new Set([...(shape.deployments ?? []), ...(generatedShape.deployments ?? []), ...referencedDeployments.map((deployment) => deployment.name)])];
   const titles = deploymentChoices(document, readOnlyDocument);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [requestedIndex, setSelectedIndex] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const editableModels = shape.models ?? [];
   const models = [...editableModels, ...(generatedShape.models ?? [])];
+  // Hide variants only when their parent exists, so standalone/orphaned models
+  // remain accessible. Keep original indices for edits and generated ownership.
+  const visibleModels = models.map((model, index) => ({ model, index })).filter(({ model }) => {
+    const name = stringValue(model.name), separator = name.lastIndexOf(":");
+    return !model.request_overrides || separator < 0 || !models.some((parent) => parent.name === name.slice(0, separator));
+  });
+  const selectedIndex = visibleModels.find(({ index }) => index === requestedIndex)?.index ?? visibleModels[0]?.index ?? 0;
   const readOnlySelected = selectedIndex >= editableModels.length;
   const formDisabled = disabled || readOnlySelected;
   const selected = models[selectedIndex];
   // Profiles remain explicit virtual models in the document; group named
   // children here without changing their routing or generated-set ownership.
   const selectedName = stringValue(selected?.name);
-  const parentName = selectedName.includes(":") ? selectedName.slice(0, selectedName.lastIndexOf(":")) : undefined;
-  const profileBase = selected?.request_overrides ? models.find((model) => model.name === parentName) ?? selected : selected;
+  const profileBase = selected;
   const profileRows = profileBase ? models.flatMap((model, index) => model.request_overrides &&
     (model.name === profileBase.name || stringValue(model.name).startsWith(`${profileBase.name}:`))
     ? [{ model, readOnly: index >= editableModels.length }] : []) : [];
@@ -51,8 +57,8 @@ export function VirtualModelEditor({
   const [aliasDraft, setAliasDraft] = useState(aliases.join(", "));
 
   useEffect(() => {
-    if (selectedIndex >= models.length) setSelectedIndex(Math.max(0, models.length - 1));
-  }, [models.length, selectedIndex]);
+    if (requestedIndex !== selectedIndex) setSelectedIndex(selectedIndex);
+  }, [requestedIndex, selectedIndex]);
 
   useEffect(() => {
     setAliasDraft(aliases.join(", "));
@@ -112,7 +118,7 @@ export function VirtualModelEditor({
         <div className="model-list-heading">
           <div>
             <span>Virtual models</span>
-            <strong>{models.length}</strong>
+            <strong>{visibleModels.length}</strong>
           </div>
           <button
             className="icon-button"
@@ -125,7 +131,7 @@ export function VirtualModelEditor({
           </button>
         </div>
         <div className="model-list-items">
-          {models.map((model, index) => (
+          {visibleModels.map(({ model, index }) => (
             <button
               aria-current={index === selectedIndex ? "true" : undefined}
               className={[index === selectedIndex ? "active" : "", index >= editableModels.length ? "generated-entry" : ""].filter(Boolean).join(" ")}
@@ -138,7 +144,7 @@ export function VirtualModelEditor({
               {index >= editableModels.length ? <small className="ownership-label">sparkrun · Read only</small> : null}
             </button>
           ))}
-          {!models.length ? (
+          {!visibleModels.length ? (
             <p>No virtual models. Add one after defining a deployment.</p>
           ) : null}
         </div>
