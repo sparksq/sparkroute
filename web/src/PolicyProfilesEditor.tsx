@@ -48,8 +48,8 @@ export function PolicyProfilesEditor({ document, readOnlyDocument, kind, disable
       <p className="section-help">Reusable {kind === "pii" ? "privacy policies" : "request and response checks"} for operator and sparkrun virtual models. Saving changes updates every model assigned this profile.</p>
       <p className="notice info" role="note">
         {kind === "pii"
-          ? "The built-in PII detector is best effort and may miss or misidentify personal information; it is provided without warranty, and its authors and distributors disclaim liability except as required by law or agreed in writing."
-          : "Guardrails are best effort and may miss harmful content or block legitimate content; they are provided without warranty, and their authors and distributors disclaim liability except as required by law or agreed in writing."}
+          ? "The built-in PII detector is best effort and may miss or misidentify personal information. It comes with no guarantees; you are responsible for protecting your data. Test it for your use case to ensure it meets your goals."
+          : "Guardrails are best effort and may miss harmful content or block legitimate content. They come with no guarantees; you are responsible for their use and results. Test them for your use case to ensure they meet your goals."}
       </p>
       {selected ? <>
         <div className="model-form-heading"><h3>{selected}</h3><button type="button" className="danger-button" disabled={disabled || uses.length > 0} title={uses.length ? "Remove assignments before deleting this profile" : undefined} onClick={remove} onBlur={() => setConfirmRemove(false)}>{confirmRemove ? "Confirm delete profile" : "Delete profile"}</button></div>
