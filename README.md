@@ -150,13 +150,24 @@ generated entities.
 **Advanced Options** contains MMBridge projection status and diagnostics, previously
 shown on Overview. It is separate from the shared configuration draft.
 
-Deployment capability controls show only optional **Vision** and **Files (file
-inputs)** declarations. An unchecked option leaves support unspecified, so the
+The structured UI shares one capability list across deployments, virtual models,
+and routing simulation: **Vision** and **Files** (file inputs). Deployment
+declarations are optional. An unchecked option leaves support unspecified, so the
 default try-first policy still applies unless overridden. Native protocol defaults
 come from the provider. Existing advanced capabilities and explicit protocol
 overrides are preserved and remain accessible in JSON. File inputs (`file_input`)
 are distinct from a provider's Files resource API (`files`). Concurrency limits and
 passive circuit health settings are grouped under **Concurrency and circuit policy**.
+Prompt-cache route affinity controls are hidden; existing settings are preserved
+and remain configurable in JSON.
+
+Under **Virtual Models / Aliases**, **Request profiles** follows the general model
+fields and precedes routing pools. The table shows each named selector (such as
+`low` or `xhigh`), a compact JSON preview, and pencil/X actions. **Add profile**
+opens a new draft; the pencil expands parameters directly beneath its row.
+The request API is chosen within the editor. Apply changes to the draft, then
+Validate and Save. Existing profiles remain explicit virtual models sharing the
+original deployment.
 
 See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
 for schema v3 requirements and treatment of older job metadata.

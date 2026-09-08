@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
-import { standardCapabilities } from "./VirtualModelEditor";
+import { capabilityOptions } from "./capabilities";
 import { deploymentChoices, deploymentTitle } from "./deploymentTitles";
 import { SparkrunRecipeWizard, durationMinutes } from "./SparkrunRecipeWizard";
 import { sparkRunCatalog } from "./api";
@@ -633,14 +633,11 @@ function DeploymentForm({
   onRemove: () => void;
   onCancelRemove: () => void;
 }) {
-  const extensions = stringArray(deployment.capabilities).filter((value) => value.startsWith("x-"));
   const explicitProtocols = stringArray(deployment.native_protocols);
   const defaultProtocol = defaultProtocolForProviderType(providerType);
   const nativeProtocols = explicitProtocols.length
     ? explicitProtocols
     : defaultProtocol ? [defaultProtocol] : [];
-  const [extensionDraft, setExtensionDraft] = useState(extensions.join(", "));
-  useEffect(() => setExtensionDraft(extensions.join(", ")), [deployment.name]);
 
   return (
     <>
@@ -716,31 +713,21 @@ function DeploymentForm({
           <summary><span>Deployment capabilities</span><small>{simplifiedCapabilities ? "Optional" : `${stringArray(deployment.capabilities).length} declared`}</small></summary>
           <p className="section-help">{simplifiedCapabilities
             ? "Vision and file inputs are optional declarations. Unchecked leaves support unspecified; requests are tried unless a configured policy says otherwise. The native API follows the provider type. Advanced declarations are preserved and available in JSON."
-            : "Declarations are authoritative; only enable semantics this target actually supports."}
+            : "Declarations are authoritative; only enable semantics this target actually supports. Other configured declarations are preserved and available in JSON."}
             {responsesProvider(providerType) ? " Responses is required by the selected provider type." : null}
           </p>
           <div className="capability-grid">
-            {(simplifiedCapabilities ? ["vision", "file_input"] : standardCapabilities).map((capability) => (
+            {capabilityOptions.map(({ value: capability, label }) => (
               <label key={capability}>
                 <input
-                  checked={stringArray(deployment.capabilities).includes(capability) || capability === "responses" && responsesProvider(providerType)}
-                  disabled={capability === "responses" && responsesProvider(providerType)}
+                  checked={stringArray(deployment.capabilities).includes(capability)}
                   onChange={(event) => onChange((value) => toggleCapability(value, capability, event.target.checked))}
                   type="checkbox"
                 />
-                <span>{simplifiedCapabilities && capability === "file_input" ? "Files (file inputs)" : humanize(capability)}</span>
+                <span>{label}</span>
               </label>
             ))}
           </div>
-          {!simplifiedCapabilities ? <Field label="Extension capabilities" wide>
-            <input
-              onBlur={() => onChange((value) => setExtensionCapabilities(value, splitList(extensionDraft)))}
-              onChange={(event) => setExtensionDraft(event.target.value)}
-              placeholder="x-provider-feature"
-              value={extensionDraft}
-            />
-            <small>Comma or newline separated; extension names must begin with x-.</small>
-          </Field> : null}
         </details>
 
         <details className="model-section policy-section">
@@ -1318,11 +1305,6 @@ function toggleNativeProtocol(
     ? [...new Set([...current, protocol])]
     : current.filter((value) => value !== protocol);
   return setStringArray(deployment, "native_protocols", next);
-}
-
-function setExtensionCapabilities(deployment: JSONObject, extensions: string[]) {
-  const standard = stringArray(deployment.capabilities).filter((value) => !value.startsWith("x-"));
-  return setStringArray(deployment, "capabilities", [...standard, ...extensions]);
 }
 
 function setEndpointSourceType(deployment: JSONObject, sourceType: string) {

@@ -54,11 +54,6 @@ gateway process restart and observation. Removing a route disables its idle
 policy without stopping its job. This is one local gateway's coordination, not
 multi-replica distributed ownership.
 
-Request profiles such as `coding:xhigh`, richer recipe facets, multiple fallback
-clusters in the wizard, and ColdSnap sleep/wake controls are subsequent work.
-Recipe preview reports registered recipe extensions and those required by the
-recipe; it does not claim an installed plugin is actively managing a live job.
-
 ## Recipe management and native APIs
 
 The recipe public name defaults to `defaults.served_model_name`, falling back to
@@ -73,6 +68,10 @@ Anthropic Messages, with conservative defaults for unidentified image versions.
 UI selection persists the wire families plus the native Responses declaration.
 
 Virtual Models / Aliases supports explicit request profiles such as `coding:xhigh`.
+The Request profiles table sits between general model fields and routing pools.
+Use **Add profile** to create a selector; use the pencil to expand its parameters
+beneath the row or the X to remove it from the draft. JSON previews stay on one
+line and truncate to fit. The expanded editor selects the request API and values.
 `request_overrides` is keyed by ingress operation (`chat_completions`, `responses`,
 `messages`, etc.); values replace caller parameters before protocol translation.
 Profiles share the deployment and lifecycle; the colon has no implicit parser.

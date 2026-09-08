@@ -869,6 +869,7 @@ describe("AdminApp", () => {
               aliases: ["default"],
               visibility: "hidden",
               required_capabilities: ["tools"],
+              selection: { prompt_cache_affinity: { enabled: true, ttl: "7m", min_prefix_bytes: 8192, max_prefixes_per_request: 12, scope: "tenant" } },
               guardrails: {
                 pre: [{ name: "safety", model: "guard", prompt: "preserve me" }],
               },
@@ -898,15 +899,12 @@ describe("AdminApp", () => {
     const aliases = screen.getByLabelText(/^Aliases/);
     fireEvent.change(aliases, { target: { value: "default, production" } });
     fireEvent.blur(aliases);
-    fireEvent.click(screen.getByLabelText("Single Vector Embedding"));
+    fireEvent.click(screen.getByLabelText("Vision"));
     fireEvent.change(screen.getByLabelText("Selection"), { target: { value: "weighted_hash" } });
     fireEvent.change(screen.getByLabelText(/^Stable hash key/), { target: { value: "thread_id" } });
-    fireEvent.click(screen.getByText("Prompt-cache route affinity"));
-    fireEvent.click(screen.getByLabelText("Enable prompt-cache affinity"));
-    fireEvent.change(screen.getByLabelText("Successful-route TTL"), { target: { value: "7m" } });
-    fireEvent.change(screen.getByLabelText("Minimum prefix bytes"), { target: { value: "8192" } });
-    fireEvent.change(screen.getByLabelText("Maximum prefix boundaries"), { target: { value: "12" } });
-    fireEvent.change(screen.getByLabelText("Isolation scope"), { target: { value: "tenant" } });
+    expect(screen.queryByText("Prompt-cache route affinity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Enable prompt-cache affinity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Single Vector Embedding")).not.toBeInTheDocument();
     fireEvent.change(screen.getAllByLabelText("Relative weight")[0]!, {
       target: { value: "60" },
     });
@@ -919,7 +917,7 @@ describe("AdminApp", () => {
     expect(document.virtual_models[0]).toMatchObject({
       name: "chat-v2",
       aliases: ["default", "production"],
-      required_capabilities: ["tools", "single_vector_embedding"],
+      required_capabilities: ["tools", "vision"],
       guardrails: {
         pre: [{ name: "safety", model: "guard", prompt: "preserve me" }],
       },
@@ -950,7 +948,7 @@ describe("AdminApp", () => {
     const validationCall = fetchMock.mock.calls.find(
       ([path, init]) => path === "/v1/config/validate" && init?.method === "POST",
     );
-    expect(validationCall?.[1]?.body).toContain('"single_vector_embedding"');
+    expect(validationCall?.[1]?.body).toContain('"vision"');
     expect(validationCall?.[1]?.body).toContain('"preserve me"');
   });
 
@@ -1078,7 +1076,7 @@ describe("AdminApp", () => {
     fireEvent.change(screen.getByLabelText("Upstream model"), { target: { value: "upstream-v2" } });
     fireEvent.change(screen.getByLabelText(/^Maximum concurrency/), { target: { value: "96" } });
     fireEvent.click(screen.getByLabelText("Anthropic"));
-    fireEvent.click(screen.getByLabelText("Single Vector Embedding"));
+    fireEvent.click(screen.getByLabelText("Vision"));
     fireEvent.click(screen.getByText("Concurrency and circuit policy"));
     fireEvent.change(screen.getByLabelText("Failure rate"), { target: { value: "0.25" } });
 		fireEvent.click(screen.getByText("Endpoint source & lifecycle"));
@@ -1136,7 +1134,7 @@ describe("AdminApp", () => {
       model: "upstream-v2",
       credential: "env://DEPLOYMENT_KEY",
       native_protocols: ["openai", "anthropic"],
-      capabilities: ["tools", "x-existing-feature", "single_vector_embedding"],
+      capabilities: ["tools", "x-existing-feature", "vision"],
       max_concurrency: 96,
       circuit: { failure_rate: 0.25, future_circuit: "preserve-circuit" },
 			endpoint_source: {
@@ -1165,7 +1163,7 @@ describe("AdminApp", () => {
     const validationCall = fetchMock.mock.calls.find(
       ([path, init]) => path === "/v1/config/validate" && init?.method === "POST",
     );
-    expect(validationCall?.[1]?.body).toContain('"single_vector_embedding"');
+    expect(validationCall?.[1]?.body).toContain('"vision"');
     expect(validationCall?.[1]?.body).toContain('"deployment":"deploy-v2"');
   });
 

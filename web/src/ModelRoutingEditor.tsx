@@ -4,7 +4,7 @@ import type {
   DiscoveredMetadataState,
   RoutingSimulationResult,
 } from "./types";
-import { standardCapabilities } from "./VirtualModelEditor";
+import { capabilityOptions } from "./capabilities";
 
 // Keep the editor implementation available while the MMBridge configuration
 // contract settles; existing document fields remain untouched and editable as JSON.
@@ -758,7 +758,7 @@ function RoutingSimulationPanel({ document, endpoints, simulate }: {
       <details className="routing-simulation-capabilities">
         <summary>Required capabilities <small>{capabilities.length} selected</small></summary>
         <div className="capability-grid">
-          {standardCapabilities.map((capability) => <label key={capability}><input checked={capabilities.includes(capability)} onChange={(event) => setCapabilities((current) => event.target.checked ? [...current, capability] : current.filter((item) => item !== capability))} type="checkbox" /><span>{label(capability)}</span></label>)}
+          {capabilityOptions.map(({ value: capability, label }) => <label key={capability}><input checked={capabilities.includes(capability)} onChange={(event) => setCapabilities((current) => event.target.checked ? [...current, capability] : current.filter((item) => item !== capability))} type="checkbox" /><span>{label}</span></label>)}
         </div>
       </details>
       {error ? <div className="notice error">{error}</div> : null}

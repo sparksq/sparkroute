@@ -1,40 +1,12 @@
 import { RequestProfileEditor } from "./RequestProfileEditor";
+import { capabilityOptions, capabilitySelectionSummary } from "./capabilities";
 import { useEffect, useMemo, useState } from "react";
 import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
 import { deploymentChoices } from "./deploymentTitles";
 import type { ConfigurationDocument } from "./types";
 
-export const standardCapabilities = [
-  "tools",
-  "vision",
-  "audio_input",
-  "audio_output",
-  "file_input",
-  "files",
-  "developer_messages",
-  "structured_outputs",
-  "json_mode",
-  "reasoning",
-  "logprobs",
-  "seed",
-  "multiple_choices",
-  "parallel_tool_calls",
-  "prediction",
-  "service_tier",
-  "provider_hosted_tools",
-  "stream_usage",
-  "stored_completions",
-  "responses",
-  "responses_compact",
-  "background_responses",
-  "conversations",
-  "single_vector_embedding",
-  "token_counting",
-  "prompt_caching",
-  "citations",
-  "provider_guardrails",
-  "provider_prompts",
-] as const;
+// Keep affinity configuration available in JSON while its controls are hidden.
+const PROMPT_CACHE_AFFINITY_VISIBLE = false;
 
 export function VirtualModelEditor({
   document,
@@ -64,15 +36,19 @@ export function VirtualModelEditor({
   const readOnlySelected = selectedIndex >= editableModels.length;
   const formDisabled = disabled || readOnlySelected;
   const selected = models[selectedIndex];
+  // Profiles remain explicit virtual models in the document; group named
+  // children here without changing their routing or generated-set ownership.
+  const selectedName = stringValue(selected?.name);
+  const parentName = selectedName.includes(":") ? selectedName.slice(0, selectedName.lastIndexOf(":")) : undefined;
+  const profileBase = selected?.request_overrides ? models.find((model) => model.name === parentName) ?? selected : selected;
+  const profileRows = profileBase ? models.flatMap((model, index) => model.request_overrides &&
+    (model.name === profileBase.name || stringValue(model.name).startsWith(`${profileBase.name}:`))
+    ? [{ model, readOnly: index >= editableModels.length }] : []) : [];
   const aliases = selected ? stringArray(selected.aliases) : [];
-  const extensionCapabilities = selected
-    ? stringArray(selected.required_capabilities).filter((value) => value.startsWith("x-"))
-    : [];
   const selection = selected ? objectValue(selected.selection) : {};
   const selectionMode = stringValue(selection.mode) || "weighted_random";
   const promptCacheAffinity = objectValue(selection.prompt_cache_affinity);
   const [aliasDraft, setAliasDraft] = useState(aliases.join(", "));
-  const [extensionDraft, setExtensionDraft] = useState(extensionCapabilities.join(", "));
 
   useEffect(() => {
     if (selectedIndex >= models.length) setSelectedIndex(Math.max(0, models.length - 1));
@@ -80,7 +56,6 @@ export function VirtualModelEditor({
 
   useEffect(() => {
     setAliasDraft(aliases.join(", "));
-    setExtensionDraft(extensionCapabilities.join(", "));
     setConfirmRemove(false);
   }, [selectedIndex, selected?.name]);
 
@@ -189,9 +164,6 @@ export function VirtualModelEditor({
               </button>
             </div>
 
-            <RequestProfileEditor model={selected} names={[...reservedModelNames, ...models.flatMap((m) => [stringValue(m.name), ...stringArray(m.aliases)])]} disabled={disabled} readOnly={readOnlySelected}
-              onChange={(profile) => updateModel(() => profile)}
-              onAdd={(profile) => {onChange({...document, virtual_models: [...editableModels, profile]}); setSelectedIndex(editableModels.length);}} />
             <fieldset disabled={formDisabled}>
               <div className="model-field-grid">
                 <Field label="Canonical name">
@@ -259,6 +231,30 @@ export function VirtualModelEditor({
                 </Field>
               </div>
 
+            </fieldset>
+            {profileBase && <RequestProfileEditor
+              key={selectedName}
+              model={profileBase}
+              profiles={profileRows}
+              names={[...reservedModelNames, ...models.flatMap((model) => [stringValue(model.name), ...stringArray(model.aliases)])]}
+              disabled={disabled}
+              onAdd={(profile) => {
+                onChange({ ...document, virtual_models: [...editableModels, profile] });
+                if (readOnlySelected) setSelectedIndex(selectedIndex + 1);
+              }}
+              onChange={(name, profile) => onChange({ ...document, virtual_models: editableModels.map((model) => model.name === name ? profile : model) })}
+              onDelete={(name) => {
+                const nextModels = editableModels.flatMap((model) => {
+                  if (model.name !== name) return [model];
+                  if (name !== profileBase.name) return [];
+                  const next = { ...model }; delete next.request_overrides; return [next];
+                });
+                onChange({ ...document, virtual_models: nextModels });
+                const selectedStillPresent = [...nextModels, ...(generatedShape.models ?? [])].findIndex((model) => model.name === selectedName);
+                setSelectedIndex(selectedStillPresent >= 0 ? selectedStillPresent : Math.max(0, models.indexOf(profileBase)));
+              }}
+            />}
+            <fieldset disabled={formDisabled}>
               <section className="model-section">
                 <div className="model-section-heading">
                   <div>
@@ -282,7 +278,7 @@ export function VirtualModelEditor({
                 />
               </section>
 
-              <details className="model-section policy-section">
+              {PROMPT_CACHE_AFFINITY_VISIBLE && <details className="model-section policy-section">
                 <summary>
                   <span>Prompt-cache route affinity</span>
                   <small>{booleanValue(promptCacheAffinity.enabled) ? "Enabled" : "Disabled by default"}</small>
@@ -338,37 +334,28 @@ export function VirtualModelEditor({
                     </select>
                   </Field>
                 </div>
-              </details>
+              </details>}
 
               <details className="model-section capability-section" open>
                 <summary>
                   <span>Required capabilities</span>
-                  <small>{stringArray(selected.required_capabilities).length} selected</small>
+                  <small>{capabilitySelectionSummary(stringArray(selected.required_capabilities))}</small>
                 </summary>
                 <p className="section-help">
-                  Every eligible target must support the full required set. Per-request capabilities are added automatically.
+                  Every eligible target must support the full required set. Per-request capabilities are added automatically. Other configured requirements are preserved and available in JSON.
                 </p>
                 <div className="capability-grid">
-                  {standardCapabilities.map((capability) => (
+                  {capabilityOptions.map(({ value: capability, label }) => (
                     <label key={capability}>
                       <input
                         checked={stringArray(selected.required_capabilities).includes(capability)}
                         onChange={(event) => updateModel((model) => toggleCapability(model, capability, event.target.checked))}
                         type="checkbox"
                       />
-                      <span>{humanize(capability)}</span>
+                      <span>{label}</span>
                     </label>
                   ))}
                 </div>
-                <Field label="Extension capabilities" wide>
-                  <input
-                    onBlur={() => updateModel((model) => setExtensionCapabilities(model, splitList(extensionDraft)))}
-                    onChange={(event) => setExtensionDraft(event.target.value)}
-                    placeholder="x-provider-feature"
-                    value={extensionDraft}
-                  />
-                  <small>Comma or newline separated; extension names must begin with x-.</small>
-                </Field>
               </details>
 
               <details className="model-section policy-section">
@@ -663,11 +650,6 @@ function toggleCapability(model: JSONObject, capability: string, enabled: boolea
     ? [...new Set([...current, capability])]
     : current.filter((value) => value !== capability);
   return setStringArray(model, "required_capabilities", next);
-}
-
-function setExtensionCapabilities(model: JSONObject, extensions: string[]) {
-  const standard = stringArray(model.required_capabilities).filter((value) => !value.startsWith("x-"));
-  return setStringArray(model, "required_capabilities", [...standard, ...extensions]);
 }
 
 function setString(model: JSONObject, field: string, value: string, required = false) {

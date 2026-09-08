@@ -39,9 +39,8 @@ describe("Native provider configuration", () => {
     expect(draft().deployments[0].capabilities).toEqual(["tools", "responses"]);
     fireEvent.click(screen.getByRole("button", { name: "Add deployment" }));
     expect(draft().deployments[1].capabilities).toEqual(["responses"]);
-    const responses = screen.getByRole("checkbox", { name: "Responses" });
-    expect(responses).toBeChecked();
-    expect(responses).toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: "Responses" })).not.toBeInTheDocument();
+    expect(draft().deployments[1].capabilities).toContain("responses");
   });
 
   it("adds deployments to the selected provider and infers Anthropic protocol", () => {
@@ -80,12 +79,12 @@ describe("Native provider configuration", () => {
     fireEvent.click(screen.getByRole("button", { name: /target.*cloud/ }));
     expect(screen.queryByText("Native upstream protocols")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Extension capabilities")).not.toBeInTheDocument();
-    expect(within(screen.getByText("Deployment capabilities").closest("details")!).getAllByRole("checkbox").map((input) => input.closest("label")?.textContent)).toEqual(["Vision", "Files (file inputs)"]);
+    expect(within(screen.getByText("Deployment capabilities").closest("details")!).getAllByRole("checkbox").map((input) => input.closest("label")?.textContent)).toEqual(["Vision", "Files"]);
     fireEvent.click(screen.getByRole("checkbox", { name: "Vision" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Files (file inputs)" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Files" }));
     expect(draft().deployments[0]).toEqual({ ...deployment, capabilities: [...deployment.capabilities, "vision", "file_input"] });
     fireEvent.click(screen.getByRole("checkbox", { name: "Vision" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Files (file inputs)" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Files" }));
     expect(draft().deployments[0]).toEqual(deployment);
   });
 

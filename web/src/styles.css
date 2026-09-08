@@ -3245,9 +3245,32 @@ button:disabled {
 @media (max-width: 640px) { .recipe-embedded .model-field-grid { grid-template-columns: 1fr; } }
 
 /* Optional model-management details share the deployment editor's spacing. */
-.request-profiles { padding: 18px 22px; border-bottom: 1px solid var(--border); }
-.request-profiles h4 { margin: 0 0 8px; }
-.profile-summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.request-profiles { min-width: 0; }
+.request-profiles .model-section-heading h4 { margin: 0; }
+.profile-table-wrap { margin: 0 22px 18px; min-width: 0; }
+.profile-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.profile-table .profile-selector-column { width: 96px; }
+.profile-table .profile-options-column { width: 84px; }
+.profile-table th, .profile-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.profile-table thead th { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: none; letter-spacing: normal; }
+.profile-table tbody th { text-transform: none; letter-spacing: normal; }
+.profile-selector, .profile-summary { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .75rem; }
+.profile-row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.profile-row-actions .profile-delete { color: #a83e31; }
+.profile-empty { color: var(--muted); font-size: .75rem; }
+.profile-table .profile-expanded-row > td { padding: 0; white-space: normal; }
+.profile-editor { padding: 16px; background: #f6f8fb; border: 1px solid var(--border); border-radius: 6px; }
+.profile-editor h5 { margin: 0 0 14px; font-size: .85rem; }
+.profile-editor .model-field-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); padding: 0; }
+.profile-editor .section-help { padding: 0; margin: 12px 0; }
+.profile-editor textarea { width: 100%; min-width: 0; resize: vertical; border: 1px solid #ced6e0; border-radius: 7px; padding: 9px 10px; background: white; color: #2f3a4c; font-family: monospace; }
+.request-profiles > .profile-editor { margin: 12px 22px 18px; }
+@media(max-width: 640px) {
+  .profile-table .profile-selector-column { width: 64px; }
+  .profile-table .profile-options-column { width: 70px; }
+  .profile-table th, .profile-table td { padding: 8px 4px; }
+  .profile-editor .model-field-grid { grid-template-columns: 1fr; }
+}
 .registry-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 0; }
 .registry-row .recipe-actions { margin: 0; }
 .capacity-grid { display: grid; gap: 10px; padding: 14px 0; }
@@ -3260,7 +3283,7 @@ button:disabled {
 .trace-settings label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
 .trace-settings select, .trace-settings input { width: 100%; }
 .trace-header-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: .75rem; align-items: end; margin-bottom: .75rem; }
-.request-profiles button, .trace-settings button, .recipe-wizard details button { border: 1px solid var(--border, #dce4ed); border-radius: .45rem; padding: .55rem .8rem; background: white; color: #30445c; cursor: pointer; }
+.trace-settings button, .recipe-wizard details button { border: 1px solid var(--border, #dce4ed); border-radius: .45rem; padding: .55rem .8rem; background: white; color: #30445c; cursor: pointer; }
 @media(max-width: 700px) { .trace-header-row { grid-template-columns: 1fr; } }
 
 .trace-settings .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
