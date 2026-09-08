@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { SparkRunRecipeWizard } from "./SparkRunRecipeWizard";
+import { SparkrunRecipeWizard } from "./SparkrunRecipeWizard";
 
 const empty = { providers: [], deployments: [], virtual_models: [] };
 const recipe = { reference: "catalog:first", name: "@registry/coder", model: "test/model", runtime: "vllm", description: "A coding recipe", min_nodes: 1, source_path: "/recipes/one/coder.yaml", registry: "registry" };
@@ -24,7 +24,7 @@ function setup(options: { failDraft?: boolean; issue?: boolean; emptyCatalog?: b
   }
  }));
  const onChange = vi.fn();
- render(<SparkRunRecipeWizard token="test-token" document={empty} revision="active" onChange={onChange} onClose={() => {}} />);
+ render(<SparkrunRecipeWizard token="test-token" document={empty} revision="active" onChange={onChange} onClose={() => {}} />);
  return { calls, onChange };
 }
 

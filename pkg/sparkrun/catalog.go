@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/sparksq/sparkroute/pkg/config"
@@ -61,6 +62,7 @@ type Cluster struct {
 }
 
 type RecipeDraft struct {
+	Deployment         string            `json:"deployment,omitempty"`
 	Reference          string            `json:"reference"`
 	RecipeRevision     string            `json:"recipe_revision"`
 	Name               string            `json:"name"`
@@ -118,6 +120,38 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	if input.ActivationTimeout.Value() <= 0 || input.ActivationTimeout.Value() > time.Hour || input.IdleTTL.Value() < 0 {
 		return operator, "", false, fmt.Errorf("cold-start wait must be between zero and 60 minutes; idle timeout cannot be negative")
 	}
+	if input.Deployment != "" {
+		index := slices.IndexFunc(operator.Deployments, func(d config.Deployment) bool { return d.Name == input.Deployment })
+		if index < 0 {
+			return operator, "", false, fmt.Errorf("choose an operator-managed sparkrun deployment to edit")
+		}
+		deployment := operator.Deployments[index]
+		if deployment.EndpointSource.Controller != "sparkrun" || deployment.EndpointSource.Type != config.EndpointSourceActivatable {
+			return operator, "", false, fmt.Errorf("only recipe-backed sparkrun deployments can be edited with recipe settings")
+		}
+		source := deployment.EndpointSource
+		source.Recipe, source.RecipeRevision = details.Reference, details.Revision
+		source.ClusterCandidates, source.Overrides = []string{input.Cluster}, input.Overrides
+		source.ActivationTimeout, source.IdleTTL = input.ActivationTimeout, input.IdleTTL
+		source.MaxQueuedWaiters, source.MaxQueuedBodyBytes = input.MaxQueuedWaiters, input.MaxQueuedBodyBytes
+		source.Revision = ""
+		raw, _ := json.Marshal(source)
+		revision := sha256.Sum256(raw)
+		source.Revision = hex.EncodeToString(revision[:12])
+		// Keep stable routing references and operator policy while changing the recipe binding.
+		deployment.EndpointSource, deployment.Model = source, details.Model
+		deployment.NativeProtocols = details.NativeProtocols
+		previousTitle := "sparkrun:" + strings.Join(operator.Deployments[index].EndpointSource.ClusterCandidates, ",") + ":" + operator.Deployments[index].Model
+		if deployment.Title == previousTitle {
+			deployment.Title = "sparkrun:" + input.Cluster + ":" + details.Model
+		}
+		operator.Deployments = slices.Clone(operator.Deployments)
+		operator.Deployments[index] = deployment
+		if err := ValidateWorkloadSharing(config.Document{Deployments: append(slices.Clone(operator.Deployments), generated.Deployments...)}); err != nil {
+			return operator, "", false, err
+		}
+		return operator, deployment.Name, false, nil
+	}
 	allDeployments := append(slices.Clone(operator.Deployments), generated.Deployments...)
 	deploymentName, reused := "", false
 	for _, deployment := range allDeployments {
@@ -136,7 +170,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		for _, existing := range append(slices.Clone(operator.Providers), generated.Providers...) {
 			if existing.Name == providerName {
 				if !reflect.DeepEqual(existing, provider) {
-					return operator, "", false, fmt.Errorf("the reserved SparkRun provider has conflicting settings")
+					return operator, "", false, fmt.Errorf("the reserved sparkrun provider has conflicting settings")
 				}
 				found = true
 			}
@@ -180,7 +214,7 @@ func ValidateRecipeBindings(ctx context.Context, catalog Catalog, document confi
 			continue
 		}
 		if catalog == nil {
-			return fmt.Errorf("SparkRun catalog is unavailable")
+			return fmt.Errorf("sparkrun catalog is unavailable")
 		}
 		details, err := resolveDetails(ctx, catalog, source.Recipe, source.Overrides)
 		if err != nil {
@@ -197,7 +231,7 @@ func ValidateRecipeBindings(ctx context.Context, catalog Catalog, document confi
 		}
 		for _, name := range source.ClusterCandidates {
 			if !slices.ContainsFunc(clusters.Clusters, func(c Cluster) bool { return c.Name == name && c.HostCount > 0 }) {
-				return fmt.Errorf("configured SparkRun cluster is unavailable")
+				return fmt.Errorf("configured sparkrun cluster is unavailable")
 			}
 		}
 	}
@@ -237,7 +271,7 @@ func ValidateWorkloadSharing(document config.Document) error {
 				overlap = overlap || slices.Contains(names, name)
 			}
 			if overlap {
-				return fmt.Errorf("%s and %s control the same SparkRun workload; share one deployment through virtual models", previous.Name, deployment.Name)
+				return fmt.Errorf("%s and %s control the same sparkrun workload; share one deployment through virtual models", previous.Name, deployment.Name)
 			}
 		}
 		byRevision[source.RecipeRevision] = append(byRevision[source.RecipeRevision], deployment)

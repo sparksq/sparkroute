@@ -159,7 +159,7 @@ export function VirtualModelEditor({
             >
               <span>{stringValue(model.name) || `Model ${index + 1}`}</span>
               <small>{effectiveVisibility(model)}</small>
-              {index >= editableModels.length ? <small className="ownership-label">SparkRun · Read only</small> : null}
+              {index >= editableModels.length ? <small className="ownership-label">sparkrun · Read only</small> : null}
             </button>
           ))}
           {!models.length ? (
@@ -169,7 +169,7 @@ export function VirtualModelEditor({
       </aside>
 
       <div className={readOnlySelected ? "model-form generated-form" : "model-form"}>
-        {selected && readOnlySelected ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
+        {selected && readOnlySelected ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
         {selected ? (
           <>
             <div className="model-form-heading">

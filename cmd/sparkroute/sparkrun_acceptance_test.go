@@ -531,6 +531,7 @@ func buildAcceptanceRuntime(
 		ResponsesState:      state,
 		ModelRouter:         router,
 		SparkrunCommand:     executable,
+		SparkrunEnabled:     true,
 		SparkrunEndpointTTL: 10 * time.Second,
 		SparkrunReconcile:   5 * time.Second,
 		SparkrunStopTimeout: time.Second,

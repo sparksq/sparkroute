@@ -127,7 +127,7 @@ and [`docs/TRACE_DATASET_EXPORT.md`](docs/TRACE_DATASET_EXPORT.md).
 
 The Configuration sidebar contains **Providers**, **Model Deployments**,
 **Virtual Models / Aliases**, **Model Routing**, and **Advanced Options**. Each
-configuration list includes operator and SparkRun-generated entries. Generated
+configuration list includes operator and sparkrun-generated entries. Generated
 entries are grayed out and read-only; selecting one shows its configuration.
 
 The editable sections share one operator draft, preserved across console navigation.
@@ -140,7 +140,7 @@ the page or using Refresh reloads stored configuration.
 
 Operator virtual models can target deployments from either owner. Routing pickers
 show deployment display titles; references retain the stable deployment `name` ID.
-SparkRun titles use `sparkrun:{clusterName}:{model}` where cluster metadata is
+sparkrun titles use `sparkrun:{clusterName}:{model}` where cluster metadata is
 available. Observed job clusters take precedence over configured placement
 candidates; unplaced recipe bindings use `unassigned`. Equal titles are
 disambiguated with their IDs. Model-routing selectors
@@ -161,16 +161,16 @@ passive circuit health settings are grouped under **Concurrency and circuit poli
 See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
 for schema v3 requirements and treatment of older job metadata.
 
-## On-demand SparkRun models
+## On-demand sparkrun models
 
-Open **Configuration → Model Deployments → Add SparkRun recipe** (also available
-under Virtual Models / Aliases). Search the control node's cached registries,
+Open **Configuration → Model Deployments → Add deployment** and select
+**sparkrun** in the **Deployment type** dropdown. Search the control node's cached registries,
 enter a control-node file path, or upload recipe YAML. Preview the selected
 recipe, enter a public name such as `coding`, add aliases, and choose a named
 cluster. Add it to the shared draft, then **Validate → Save**.
 
 Saving does not launch a model. The first request for a configured name starts
-or reuses the recipe on the selected cluster, waits for SparkRun's normal
+or reuses the recipe on the selected cluster, waits for sparkrun's normal
 readiness checks, and routes to the assigned port. Aliases share one workload.
 The cluster's actual name is saved even when it was selected as the default.
 Unrecognized API model names never cause automatic recipe selection.
@@ -187,8 +187,19 @@ file (256 KiB), do not grant trust, and do not include auxiliary build assets.
 Use a configured registry or a control-node recipe directory for those assets.
 Changed recipes require a fresh preview before saving or activation.
 
-The catalog uses the local SparkRun bridge even before the first deployment
-exists. Install the paired plugin and a SparkRun build with the public catalog
+Start SparkRoute with **`-sparkrun`** to enable the integration. The sparkrun
+plugin supplies this flag automatically. `-sparkrun-command` only selects the
+executable; it does not enable the integration by itself. Without `-sparkrun`,
+catalog routes and controls are disabled and recipe-backed configuration is
+rejected with an enablement hint. Ordinary provider configuration is unaffected.
+
+Choose **Local** in the deployment type selector for the ordinary provider form.
+Saved sparkrun deployments show recipe and cluster details, with **Edit recipe
+settings** for updates that preserve routing IDs and aliases. Both creation
+flows use the shared draft and Validate → Save.
+
+The catalog uses the local sparkrun bridge even before the first deployment
+exists. Install the paired plugin and a sparkrun build with the public catalog
 API, then enable `gateway.sparkroute`. Without that integration, ordinary cloud
 provider configuration continues to work. Gateway and plugin require bridge
 schema v3 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).

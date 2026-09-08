@@ -530,7 +530,7 @@ func (c *Controller) stop(
 	}
 	defer unlock()
 	if clusterID == "" {
-		return fmt.Errorf("no tracked SparkRun workload to stop")
+		return fmt.Errorf("no tracked sparkrun workload to stop")
 	}
 	if err := c.workloads.canStop(clusterID); err != nil {
 		return err

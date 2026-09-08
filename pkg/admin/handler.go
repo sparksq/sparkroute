@@ -396,6 +396,7 @@ func (h *handler) serveBootstrap(
 		bootstrap.Principal = &adminapi.Principal{
 			ID: principal.ID, Roles: append([]string(nil), principal.Roles...),
 		}
+		bootstrap.Features["sparkrun"] = h.options.SparkrunCatalog != nil
 		bootstrap.Features["sparkrun_catalog"] = h.options.SparkrunCatalog != nil && hasRole(principal, RoleConfigRead)
 		bootstrap.Features[adminapi.FeatureLifecycleStatus] = h.options.Lifecycle != nil && hasRole(principal, RoleStatusRead)
 		bootstrap.Features[adminapi.FeatureLifecycle] = bootstrap.Features[adminapi.FeatureLifecycleStatus]

@@ -6,6 +6,9 @@ func TestIsPath(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]bool{
+		"/v1/sparkrun/catalog":                  true,
+		"/v1/sparkrun/recipe-draft":             true,
+		"/v1/sparkrun-other":                    false,
 		"/":                                     false,
 		"/v1/models":                            false,
 		"/v1/chat/completions":                  false,

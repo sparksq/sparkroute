@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -269,5 +270,44 @@ func TestManagedConfigurationReconcilerAppliesStaticGeneration(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("configuration reconciler did not stop")
+	}
+}
+
+func TestSparkrunIntegrationIsOptInBeforeAnyDeploymentExists(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		generation, err := buildRuntimeGeneration(managed.EmptyDocument(), "catalog-test", runtimeBuildOptions{
+			Context: context.Background(), Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Telemetry: &otlpexport.Runtime{},
+			AdminEnabled: true, AllowInsecureAdmin: true, SparkrunEnabled: enabled, SparkrunCommand: "/does/not/exist",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		generation.admin.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/ui/bootstrap", nil))
+		var bootstrap struct {
+			Features map[string]bool `json:"features"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &bootstrap); err != nil {
+			t.Fatal(err)
+		}
+		if bootstrap.Features["sparkrun_catalog"] != enabled {
+			t.Fatal("catalog advertisement ignored opt-in", response.Body.String())
+		}
+		request := httptest.NewRequest(http.MethodPost, "/v1/sparkrun/catalog", strings.NewReader(`{"operation":"catalog_clusters","arguments":{}}`))
+		request.Header.Set("Content-Type", "application/json")
+		response = httptest.NewRecorder()
+		generation.admin.ServeHTTP(response, request)
+		expected := http.StatusNotFound
+		if enabled {
+			expected = http.StatusUnprocessableEntity
+		} // registered catalog, missing executable
+		if response.Code != expected {
+			t.Fatalf("enabled=%t: status=%d body=%s", enabled, response.Code, response.Body.String())
+		}
+		generation.close()
+	}
+	document := config.Document{Deployments: []config.Deployment{{Name: "cold", EndpointSource: config.EndpointSource{Controller: "sparkrun", Type: config.EndpointSourceActivatable}}}}
+	if err := validateDocumentForIntegration(document, credentialbuiltin.Options{}, false); err == nil || !strings.Contains(err.Error(), "-sparkrun") {
+		t.Fatal("disabled integration accepted a workload binding", err)
 	}
 }

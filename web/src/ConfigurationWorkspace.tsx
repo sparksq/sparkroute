@@ -337,7 +337,7 @@ export function ConfigurationWorkspace({
         {notice ? <NoticeBanner notice={notice} /> : null}
         <p className="read-only-note">
           This workspace shows the current configuration. Use the managed
-          operator and Sparkrun sources when managed configuration is enabled;
+          operator and sparkrun sources when managed configuration is enabled;
           otherwise import, validate, and export a local draft.
         </p>
       </section>

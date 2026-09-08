@@ -622,7 +622,7 @@ describe("AdminApp", () => {
     });
   });
 
-  it("edits only the operator managed set and keeps Sparkrun generated configuration read-only", async () => {
+  it("edits only the operator managed set and keeps sparkrun generated configuration read-only", async () => {
     const activeRevision = "a".repeat(64);
     const nextRevision = "b".repeat(64);
     const empty = { providers: [], deployments: [], virtual_models: [] };
@@ -724,7 +724,7 @@ describe("AdminApp", () => {
     const saveCall = fetchMock.mock.calls.find(([path, options]) => path === "/v1/config/managed-sets/operator" && options?.method === "PUT");
     expect(JSON.parse(String(saveCall?.[1]?.body)).document).toEqual(candidate);
     expect(fetchMock.mock.calls.some(([path, options]) => path === "/v1/config/managed-sets/sparkrun" && options?.method === "PUT")).toBe(false);
-    expect(screen.queryByRole("link", { name: "SparkRun Generated" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "sparkrun Generated" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Structured" }));
     expect(screen.getByLabelText("Provider name")).toBeDisabled();
     fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
@@ -757,7 +757,7 @@ describe("AdminApp", () => {
     expect(await screen.findByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("simulates an operator routing draft against Sparkrun-owned models", async () => {
+  it("simulates an operator routing draft against sparkrun-owned models", async () => {
     const activeRevision = "a".repeat(64);
     const generated = {
       providers: [{ name: "sparkrun", type: "openai_compatible", base_url: "http://127.0.0.1:8000/v1" }],

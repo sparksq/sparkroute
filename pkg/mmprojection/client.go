@@ -28,9 +28,9 @@ import (
 const (
 	ProviderID = "pilco-mmbridge"
 
-	HopHeader           = "X-SparkRun-MMProjection-Hop"
-	AnalyzerModelHeader = "X-SparkRun-MMProjection-Analyzer-Model"
-	TraceIDHeader       = "X-SparkRun-Trace-ID"
+	HopHeader           = "X-sparkrun-MMProjection-Hop"
+	AnalyzerModelHeader = "X-sparkrun-MMProjection-Analyzer-Model"
+	TraceIDHeader       = "X-sparkrun-Trace-ID"
 
 	AnalyzerChatPath      = "/internal/mmprojection-analyzer/v1/chat/completions"
 	AnalyzerResponsesPath = "/internal/mmprojection-analyzer/v1/responses"

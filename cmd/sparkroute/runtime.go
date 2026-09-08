@@ -56,6 +56,7 @@ type runtimeBuildOptions struct {
 	ClientCredentials       *clientcredentials.Manager
 	ProviderAuth            *providerauth.Service
 	ManagedConfig           managed.Store
+	SparkrunEnabled         bool
 	SparkrunCommand         string
 	SparkrunEndpointTTL     time.Duration
 	SparkrunReconcile       time.Duration
@@ -85,7 +86,7 @@ func buildRuntimeGeneration(
 	revision config.Version,
 	options runtimeBuildOptions,
 ) (*runtimeGeneration, error) {
-	if err := validateRuntimeDocument(document, options.CredentialOptions); err != nil {
+	if err := validateDocumentForIntegration(document, options.CredentialOptions, options.SparkrunEnabled); err != nil {
 		return nil, err
 	}
 	requestModelRouter := options.ModelRouter
@@ -212,7 +213,7 @@ func buildRuntimeGeneration(
 			GatewayVersion: version.Version,
 			BuildInfo:      version.BuildInfo(),
 			ValidateConfig: func(candidate config.Document) error {
-				return validateRuntimeDocument(candidate, options.CredentialOptions)
+				return validateDocumentForIntegration(candidate, options.CredentialOptions, options.SparkrunEnabled)
 			},
 			Authenticator:      options.AdminAuthentication,
 			AllowInsecureAdmin: options.AllowInsecureAdmin,
@@ -226,8 +227,13 @@ func buildRuntimeGeneration(
 		if endpointRegistry != nil {
 			adminOptions.Endpoints = endpointRegistry
 		}
-		if options.SparkrunCommand != "" {
-			adminOptions.SparkrunCatalog, _ = sparkrunruntime.NewClient(options.SparkrunCommand)
+		if options.SparkrunEnabled {
+			catalog, err := sparkrunruntime.NewClient(options.SparkrunCommand)
+			if err != nil {
+				generation.close()
+				return nil, err
+			}
+			adminOptions.SparkrunCatalog = catalog
 		}
 		adminOptions.ModelMetadata, _ = requestModelRouter.(modelrouter.DiscoveredMetadataInspector)
 		if options.MMProjection != nil {
@@ -236,6 +242,17 @@ func buildRuntimeGeneration(
 		generation.admin = ossadmin.NewHandler(document, revision, adminOptions)
 	}
 	return generation, nil
+}
+
+func validateDocumentForIntegration(document config.Document, credentials credentialbuiltin.Options, enabled bool) error {
+	if !enabled {
+		for _, deployment := range document.Deployments {
+			if deployment.EndpointSource.Controller == "sparkrun" {
+				return fmt.Errorf("sparkrun integration is disabled; start SparkRoute with -sparkrun to use deployment %s", deployment.Name)
+			}
+		}
+	}
+	return validateRuntimeDocument(document, credentials)
 }
 
 func validateRuntimeDocument(

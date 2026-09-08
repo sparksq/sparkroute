@@ -138,10 +138,10 @@ func writeCatalogError(writer http.ResponseWriter, err error) {
 	// diagnostics. Subprocess failures contain no command output or secrets.
 	message := err.Error()
 	if strings.Contains(message, "sparkrun bridge") || strings.Contains(message, "gateway bridge") {
-		message = "SparkRun could not be reached on this control node. Install or update SparkRun with the SparkRoute plugin and enable gateway.sparkroute."
+		message = "sparkrun could not be reached on this control node. Install or update sparkrun with the SparkRoute plugin and enable gateway.sparkroute."
 	}
 	if len(message) > 2048 {
-		message = "SparkRun catalog request failed"
+		message = "sparkrun catalog request failed"
 	}
 	writeError(writer, http.StatusUnprocessableEntity, "sparkrun_unavailable", message)
 }

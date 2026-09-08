@@ -17,7 +17,6 @@ import type {
   ManagedConfigurationOwner,
   ManagedConfigurationSetMetadata,
 } from "./types";
-import { SparkRunRecipeWizard } from "./SparkRunRecipeWizard";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
@@ -241,7 +240,7 @@ export function ManagedConfigurationWorkspace({
         <div className="managed-owner-card">
           <span>Configuration</span>
           <strong>{dirty ? "Unsaved changes" : "Saved configuration"}</strong>
-          <small>All sections share one draft. SparkRun entries are read-only; your changes are saved together.</small>
+          <small>All sections share one draft; your changes are saved together.{bootstrap.features.sparkrun ? " sparkrun entries are read-only." : ""}</small>
         </div>
         <div className="managed-runtime-card">
           <span>Stored / serving</span>
@@ -305,14 +304,6 @@ export function ManagedConfigurationWorkspace({
         <div hidden={editorMode !== "structured"}>
           {operatorParsed.document ? (
             <>
-              {(section === "deployments" || section === "models") && canEdit && bootstrap.features.sparkrun_catalog && <>
-                {!recipeWizard && <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => setRecipeWizard(true)}>Add SparkRun recipe</button>}
-                {recipeWizard && <SparkRunRecipeWizard token={token} document={operatorParsed.document} revision={storedRevision}
-                  onClose={() => setRecipeWizard(false)} onChange={(document, reused) => {
-                    structuredChange(document); setRecipeWizard(false);
-                    setNotice({ kind: "info", text: `${reused ? "Model added using the existing deployment and its lifecycle settings." : "On-demand model added to the draft."} Validate, then Save to make it available. Saving does not launch it.` });
-                  }} />}
-              </>}
               <div hidden={section !== "models"}>
                 <VirtualModelEditor
                   disabled={!canEdit || Boolean(busy) || recipeWizard}
@@ -324,8 +315,8 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "routing"}>
-                <p className="section-help configuration-context">Route to operator-managed or SparkRun-generated virtual models. To use a deployment directly, first add it to a virtual model.</p>
-                {generatedDocument?.model_routing ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
+                <p className="section-help configuration-context">Route to configured virtual models. To use a deployment directly, first add it to a virtual model.</p>
+                {generatedDocument?.model_routing ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
                 <ModelRoutingEditor
                   canonicalModelNames={mergedCandidateModelNames}
                   disabled={!canEdit || Boolean(busy) || recipeWizard || Boolean(generatedDocument?.model_routing)}
@@ -346,7 +337,7 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "providers" && section !== "deployments"}>
-                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy) || recipeWizard} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+                <ProviderDeploymentEditor sparkrun={{enabled: Boolean(bootstrap.features.sparkrun_catalog), token, revision: storedRevision, onEditingChange: setRecipeWizard, onPrepared: (document, message) => { structuredChange(document); setNotice({kind: "info", text: message + " Validate, then Save to make it available. Saving does not launch it."}); }}} section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
               </div>
             </>
           ) : (
@@ -358,7 +349,7 @@ export function ManagedConfigurationWorkspace({
         </div>
         {editorMode === "json" ? (
           <>
-          <p className="section-help configuration-context">Edit your configuration here. SparkRun-generated entries are included when validating and saving.</p>
+          <p className="section-help configuration-context">Edit your configuration here. Generated entries are included when validating and saving.</p>
           <textarea
             aria-invalid={Boolean(parsed.error)}
             aria-label={`${selectedOwner} configuration JSON`}
@@ -368,7 +359,7 @@ export function ManagedConfigurationWorkspace({
             spellCheck={false}
             value={draft}
           />
-          {generatedDocument ? <details className="generated-json"><summary>SparkRun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(storedDocuments.sparkrun, null, 2)} /></details> : null}
+          {generatedDocument ? <details className="generated-json"><summary>sparkrun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(storedDocuments.sparkrun, null, 2)} /></details> : null}
           </>
         ) : null}
       </section>

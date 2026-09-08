@@ -203,7 +203,7 @@ func TestConfigCheckAcceptsPinnedSparkrunWithoutStartingBridge(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if err := run(context.Background(), []string{
 		"-config", configPath, "-config-check",
-		"-sparkrun-command", "/does/not/exist",
+		"-sparkrun", "-sparkrun-command", "/does/not/exist",
 	}, &output, logger); err != nil {
 		t.Fatal(err)
 	}

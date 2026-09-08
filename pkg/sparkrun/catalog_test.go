@@ -91,12 +91,43 @@ func TestRecipeDraftRejectsDriftMissingClusterAndDuplicateLifecycle(t *testing.T
 	duplicate := document.Deployments[0]
 	duplicate.Name = "duplicate"
 	document.Deployments = append(document.Deployments, duplicate)
-	if err := ValidateRecipeBindings(context.Background(), f, document); err == nil || !strings.Contains(err.Error(), "same SparkRun workload") {
+	if err := ValidateRecipeBindings(context.Background(), f, document); err == nil || !strings.Contains(err.Error(), "same sparkrun workload") {
 		t.Fatal(err)
 	}
 	document.Deployments = document.Deployments[:1]
 	f.revision = "changed"
 	if err := ValidateRecipeBindings(context.Background(), f, document); err == nil {
 		t.Fatal("accepted recipe drift at save")
+	}
+}
+
+func TestEditRecipeDeploymentPreservesRoutingIdentityAndRevisionsPolicy(t *testing.T) {
+	f := &catalogFixture{revision: "original"}
+	empty := managed.EmptyDocument()
+	input := RecipeDraft{Reference: "catalog:123", RecipeRevision: f.revision, Name: "coding", Aliases: []string{"code"}, Cluster: "lab"}
+	document, id, _, err := PrepareRecipeDraft(context.Background(), f, empty, empty, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := json.Marshal(document.VirtualModels)
+	revision := document.Deployments[0].EndpointSource.Revision
+	document.Deployments[0].Title = "Custom display title"
+	input.Deployment, input.Name, input.Aliases = id, "", nil
+	input.IdleTTL = config.Duration(30 * time.Minute)
+	changed, actual, _, err := PrepareRecipeDraft(context.Background(), f, document, empty, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, _ := json.Marshal(changed.VirtualModels)
+	if actual != id || string(before) != string(after) || len(changed.Deployments) != 1 {
+		t.Fatal("route identity changed")
+	}
+	target := changed.Deployments[0]
+	if target.Title != "Custom display title" || target.EndpointSource.Revision == revision || target.EndpointSource.IdleTTL != input.IdleTTL {
+		t.Fatal("policy edit did not preserve identity", target)
+	}
+	input.Deployment = "generated-or-deleted"
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, empty, document, input); err == nil {
+		t.Fatal("edited a generated deployment")
 	}
 }

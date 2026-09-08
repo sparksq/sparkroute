@@ -282,6 +282,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		"trace-session-interval", traceSessionIntervalDefault,
 		"capture-session durability checkpoint interval",
 	)
+	sparkrunEnabled := flags.Bool("sparkrun", false, "enable sparkrun integration, recipe catalog, and on-demand lifecycle")
 	sparkrunCommand := flags.String(
 		"sparkrun-command",
 		env("SPARKROUTE_SPARKRUN_COMMAND", "sparkrun"),
@@ -484,7 +485,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		store, openErr := configsqlite.Open(ctx, configsqlite.Options{
 			Path: *configSQLitePath,
 			Validator: func(candidate config.Document) error {
-				return validateRuntimeDocument(candidate, credentialOptions)
+				return validateDocumentForIntegration(candidate, credentialOptions, *sparkrunEnabled)
 			},
 		})
 		if openErr != nil {
@@ -520,7 +521,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	if err != nil {
 		return err
 	}
-	if err := validateRuntimeDocument(document, credentialOptions); err != nil {
+	if err := validateDocumentForIntegration(document, credentialOptions, *sparkrunEnabled); err != nil {
 		return err
 	}
 	var requestModelRouter modelrouter.Router
@@ -712,6 +713,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	defer workloads.Close()
 	runtimeOptions := runtimeBuildOptions{
 		SparkrunWorkloads: workloads,
+		SparkrunEnabled:   *sparkrunEnabled,
 		Context:           ctx, Logger: logger, CredentialOptions: credentialOptions,
 		Ledger: usageWriter, ResponsesState: responsesState,
 		SavedTraces: traceRecorder, MaxSavedTraceBytes: *traceMaxBodyBytes,

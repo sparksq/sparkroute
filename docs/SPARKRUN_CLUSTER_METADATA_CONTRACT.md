@@ -1,8 +1,8 @@
-# SparkRun named-cluster display metadata
+# sparkrun named-cluster display metadata
 
 Bridge schema **3** includes optional `cluster_name` to endpoint replies from
 `discover`, `status`, and `ensure_ready`. This is the human-readable named cluster
-recorded in SparkRun job metadata under `cluster`. `cluster_id` and `job_id` remain
+recorded in sparkrun job metadata under `cluster`. `cluster_id` and `job_id` remain
 the opaque workload identifiers; the named cluster scopes adoption and registration against configured cluster
 candidates. Ownership still controls stop permission. Display titles do not
 change endpoint identity or binding revisions/fencing.
@@ -20,9 +20,9 @@ usable endpoint. Older jobs may have no cluster field; overlapping configured ho
 sets cannot establish which named cluster launched such a job, so no host-set
 inference or metadata backfill occurs automatically.
 
-SparkRun discovery and its public proxy endpoint type expose `cluster_name` and
+sparkrun discovery and its public proxy endpoint type expose `cluster_name` and
 `recipe_revision` from the recorded job. The plugin also reads those fields from
-job metadata when running with an older compatible SparkRun host. Healthy endpoint
+job metadata when running with an older compatible sparkrun host. Healthy endpoint
 snapshots enrich recipe-backed deployment titles by matching the **launch recipe
 fingerprint**, never just the model name. This includes bindings that have no
 configured cluster candidates. A local optional display cache retains the snapshot

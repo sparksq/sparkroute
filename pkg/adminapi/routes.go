@@ -20,6 +20,7 @@ func IsPath(path string) bool {
 		"/v1/runtime",
 		"/v1/client-credentials",
 		"/v1/provider-auth",
+		"/v1/sparkrun",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true

@@ -3222,3 +3222,24 @@ button:disabled {
 .recipe-results span, .recipe-results small { color: var(--muted); font-size: .8rem; }
 .recipe-fieldset:disabled { opacity: .7; }
 .recipe-fieldset textarea { resize: vertical; }
+
+.recipe-wizard.recipe-embedded { border: 0; border-radius: 0; padding: 0; margin: 16px 0 0; }
+.deployment-type-field { max-width: 440px; margin-bottom: 24px; }
+.deployment-type-field label { display: grid; gap: 8px; }
+.deployment-type-field select { padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; }
+.deployment-type-field small { color: var(--muted); }
+.sparkrun-deployment-summary { display: grid; gap: 18px; margin: 24px 0; }
+.sparkrun-deployment-summary div { display: grid; gap: 6px; min-width: 0; }
+.sparkrun-deployment-summary dt { color: var(--muted); font-size: .82rem; }
+.sparkrun-deployment-summary dd { margin: 0; overflow-wrap: anywhere; }
+
+.infrastructure-form > .deployment-type-field { margin: 20px 22px 24px; }
+.deployment-type-field label > span { color: var(--muted); font-size: .82rem; font-weight: 700; }
+.infrastructure-form .recipe-wizard.recipe-embedded { padding: 0 22px 22px; }
+.recipe-embedded .model-field-grid { padding: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.recipe-embedded .section-help { padding: 0; margin-bottom: 14px; }
+.recipe-embedded .recipe-fieldset { margin-top: 20px; }
+.sparkrun-deployment-content, .deployment-draft-actions { padding: 0 22px 22px; }
+.sparkrun-deployment-content .section-help { padding: 14px 0 0; }
+.sparkrun-deployment-content .recipe-source { display: block; margin-top: 6px; color: var(--muted); }
+@media (max-width: 640px) { .recipe-embedded .model-field-grid { grid-template-columns: 1fr; } }

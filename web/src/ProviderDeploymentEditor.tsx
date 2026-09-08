@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { standardCapabilities } from "./VirtualModelEditor";
 import { deploymentChoices, deploymentTitle } from "./deploymentTitles";
+import { SparkrunRecipeWizard, durationMinutes } from "./SparkrunRecipeWizard";
+import { sparkRunCatalog } from "./api";
 import { SubscriptionSignIn } from "./SubscriptionSignIn";
 
 type JSONObject = Record<string, unknown>;
@@ -49,6 +51,7 @@ export function ProviderDeploymentEditor({
   section = "all",
   simplifiedCapabilities = false,
   readOnlyDocument,
+  sparkrun,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
@@ -57,6 +60,10 @@ export function ProviderDeploymentEditor({
   section?: "all" | "providers" | "deployments";
   simplifiedCapabilities?: boolean;
   readOnlyDocument?: ConfigurationDocument;
+  sparkrun?: { enabled: boolean; token: string; revision: string;
+    onEditingChange: (editing: boolean) => void;
+    onPrepared: (document: ConfigurationDocument, message: string) => void };
+
 }) {
   const shape = useMemo(() => inspectDocument(document), [document]);
   const generatedShape = useMemo(() => inspectDocument(readOnlyDocument ?? { providers: [], deployments: [], virtual_models: [] }), [readOnlyDocument]);
@@ -80,6 +87,14 @@ export function ProviderDeploymentEditor({
   const readOnlySelected = selection.index >= (selection.kind === "provider" ? editableProviders.length : editableDeployments.length);
   const formDisabled = disabled || readOnlySelected;
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [newDeployment, setNewDeployment] = useState<JSONObject>();
+  const [deploymentType, setDeploymentType] = useState("local");
+  const [recipeVisited, setRecipeVisited] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState(false);
+  const settingUp = Boolean(newDeployment) || editingRecipe;
+  const onEditingChange = sparkrun?.onEditingChange;
+  useEffect(() => { onEditingChange?.(settingUp); return () => onEditingChange?.(false); }, [settingUp, onEditingChange]);
+  const cancelSetup = () => { setNewDeployment(undefined); setEditingRecipe(false); setRecipeVisited(false); setDeploymentType("local"); };
   const authDrafts = useRef(new Map<string, AuthDraft>());
 
   useEffect(() => {
@@ -165,18 +180,22 @@ export function ProviderDeploymentEditor({
   };
 
   const addDeployment = () => {
-    if (!providers.length) return;
+    if (!providers.length && !sparkrun?.enabled) return;
     const names = new Set(deployments.map((deployment) => stringValue(deployment.name)));
     const provider = selectedProvider
       ?? (selectionState.kind === "provider" ? providers[selectionState.provider] : providers.find((value) => value.name === selectedDeployment?.provider))
-      ?? providers[0]!;
+      ?? providers[0] ?? { name: "", type: "openai" };
     const next = providerDeploymentDefaults({
       name: uniqueName("new-deployment", names),
       provider: provider.name,
       model: "upstream-model",
     }, provider);
-    onChange({ ...document, deployments: [...editableDeployments, next] });
-    setSelection({ kind: "deployment", index: editableDeployments.length });
+    if (sparkrun?.enabled) {
+      setNewDeployment(next); setDeploymentType("local"); setSelection({kind: "deployment", index: selectionState.deployment});
+    } else {
+      onChange({ ...document, deployments: [...editableDeployments, next] });
+      setSelection({ kind: "deployment", index: editableDeployments.length });
+    }
   };
 
   const removeSelected = () => {
@@ -215,7 +234,7 @@ export function ProviderDeploymentEditor({
           active={selection.kind === "provider" ? selection.index : -1}
           addLabel="Add provider"
           count={providers.length}
-          disabled={disabled}
+          disabled={disabled || settingUp}
           heading="Providers"
           items={providers.map((provider, index) => ({
             name: stringValue(provider.name),
@@ -229,20 +248,49 @@ export function ProviderDeploymentEditor({
           active={selection.kind === "deployment" ? selection.index : -1}
           addLabel="Add deployment"
           count={deployments.length}
-          disabled={disabled || !providers.length}
+          disabled={disabled || settingUp || (!providers.length && !sparkrun?.enabled)}
           heading="Deployments"
           items={deployments.map((deployment, index) => ({
             name: titles[stringValue(deployment.name)] ?? stringValue(deployment.name),
             readOnly: index >= editableDeployments.length,
-            detail: stringValue(deployment.provider) || "No provider",
+            detail: objectValue(deployment.endpoint_source).controller === "sparkrun" ? (objectValue(deployment.endpoint_source).type === "activatable" ? "On-demand recipe" : "Discovered workload") : stringValue(deployment.provider) || "No provider",
           }))}
           onAdd={addDeployment}
           onSelect={(index) => setSelection({ kind: "deployment", index })}
         /> : null}
       </aside>
 
-      <div className={readOnlySelected ? "model-form infrastructure-form generated-form" : "model-form infrastructure-form"}>
-        {readOnlySelected && (selectedProvider || selectedDeployment) ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
+      <div className={!settingUp && readOnlySelected ? "model-form infrastructure-form generated-form" : "model-form infrastructure-form"}>
+        {settingUp ? <>
+          <div className="model-form-heading"><div><p className="eyebrow">Model deployment</p><h3>{editingRecipe ? "Edit sparkrun deployment" : "New deployment"}</h3></div>
+            <button className="text-button" type="button" onClick={cancelSetup}>Cancel</button></div>
+          <div className="deployment-type-field"><Field label="Deployment type">
+            <select aria-label="Deployment type" value={editingRecipe ? "sparkrun" : deploymentType} disabled={editingRecipe || disabled} onChange={(e) => { setDeploymentType(e.target.value); if (e.target.value === "sparkrun") setRecipeVisited(true); }}>
+              <option value="local">Local</option><option value="sparkrun">sparkrun</option>
+            </select>
+            <small>{editingRecipe || deploymentType === "sparkrun" ? "Choose a recipe and let sparkrun manage its workload." : "Connect to an existing model endpoint through a provider."}</small>
+          </Field></div>
+          {newDeployment && <div hidden={deploymentType !== "local"}>
+            {!providers.length ? <p className="notice info">Add a provider in Configuration → Providers to connect an existing endpoint, or select sparkrun to configure a recipe.</p> : null}
+            <DeploymentForm hideHeading simplifiedCapabilities={simplifiedCapabilities} deployment={newDeployment} providers={providerNames}
+              subscriptionProviders={providers.filter((p) => p.type === "openai_subscription").map((p) => stringValue(p.name))}
+              providerType={stringValue(providers.find((p) => p.name === newDeployment.provider)?.type)} disabled={disabled}
+              routeCount={0} removeBlocked={false} confirmRemove={false} onRemove={cancelSetup} onCancelRemove={() => {}}
+              onChange={(transform) => setNewDeployment((previous) => { if (!previous) return previous; const next = transform(previous); return providerDeploymentDefaults(next, providers.find((p) => p.name === next.provider) ?? {}, stringValue(providers.find((p) => p.name === previous.provider)?.type)); })} />
+            <div className="deployment-draft-actions"><button type="button" className="primary-button" disabled={disabled || !providerNames.includes(stringValue(newDeployment.provider)) || !stringValue(newDeployment.name).trim() || !stringValue(newDeployment.model).trim()}
+              onClick={() => { onChange({...document, deployments: [...editableDeployments, newDeployment]}); setSelection({kind: "deployment", index: editableDeployments.length}); cancelSetup(); }}>Add to draft</button></div>
+          </div>}
+          {sparkrun && (recipeVisited || editingRecipe) && <div hidden={!editingRecipe && deploymentType !== "sparkrun"}>
+            <SparkrunRecipeWizard embedded initialDeployment={editingRecipe ? selectedDeployment : undefined} token={sparkrun.token} document={document} revision={sparkrun.revision} onClose={cancelSetup}
+              onChange={(next, reused, deployment) => {
+                sparkrun.onPrepared(next, editingRecipe ? "Deployment settings updated in the draft." : reused ? "Model added using the existing deployment and its lifecycle settings." : "On-demand model added to the draft.");
+                const index = [...(inspectDocument(next).deployments ?? []), ...(generatedShape.deployments ?? [])].findIndex((d) => d.name === deployment);
+                setSelection({kind: "deployment", index: Math.max(0, index)}); cancelSetup();
+              }} />
+          </div>}
+        </> : <>
+        {readOnlySelected && (selectedProvider || selectedDeployment) ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
+        {selectedDeployment && (sparkrun?.enabled || objectValue(selectedDeployment.endpoint_source).controller === "sparkrun") ? <div className="deployment-type-field"><Field label="Deployment type"><select aria-label="Deployment type" disabled value={objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? "sparkrun" : "local"}><option value="local">Local</option><option value="sparkrun">sparkrun</option></select></Field></div> : null}
         {selectedProvider ? (
           <ProviderForm
             key={selection.index}
@@ -258,6 +306,13 @@ export function ProviderDeploymentEditor({
             removeBlocked={removeBlocked}
             subscriptionAuth={subscriptionAuth}
           />
+        ) : selectedDeployment && sparkrun && objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? (
+          <>
+            <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />
+            <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
+            {sparkrun?.enabled && !readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <button type="button" className="secondary-button" disabled={disabled} onClick={() => setEditingRecipe(true)}>Edit recipe settings</button> : null}
+            <p className="section-help">Manage public names and aliases in Virtual Models / Aliases. Deployment settings are shared by all of its names.</p></div>
+          </>
         ) : selectedDeployment ? (
           <DeploymentForm
             simplifiedCapabilities={simplifiedCapabilities}
@@ -279,13 +334,41 @@ export function ProviderDeploymentEditor({
           <div className="structured-empty">
             <strong>{section === "deployments" ? "No model deployment selected" : section === "providers" ? "No provider selected" : "No provider or deployment selected"}</strong>
             <p>{section === "deployments" && !providers.length
-              ? "Create a provider in Configuration → Providers, then add a deployment here. SparkRun-generated deployments are available as targets in Virtual Models / Aliases."
+              ? sparkrun?.enabled ? "Add a deployment to choose an existing endpoint or a sparkrun recipe. Public model names are managed in Virtual Models / Aliases." : "Create a provider in Configuration → Providers, then add a deployment here."
               : "Add a provider, then add an independently routable deployment target."}</p>
           </div>
         )}
+        </>}
       </div>
     </div>
   );
+}
+
+function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObject; catalog: {enabled: boolean; token: string}}) {
+  const source = objectValue(deployment.endpoint_source);
+  const [preview, setPreview] = useState<{name: string; source_path: string}>();
+  const [error, setError] = useState("");
+  const recipe = stringValue(source.recipe), overrides = JSON.stringify(source.overrides ?? {});
+  useEffect(() => {
+    setPreview(undefined); setError("");
+    if (!catalog.enabled || !recipe) return;
+    const abort = new AbortController();
+    void sparkRunCatalog<{name: string; source_path: string}>(catalog.token, "catalog_resolve", {reference: recipe, overrides: JSON.parse(overrides)}, abort.signal)
+      .then(setPreview).catch(() => { if (!abort.signal.aborted) setError("Recipe details are unavailable. Edit recipe settings to check the selection on the control node."); });
+    return () => abort.abort();
+  }, [catalog.enabled, catalog.token, recipe, overrides]);
+  return <>
+    <dl className="sparkrun-deployment-summary">
+      <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
+      <div><dt>Recipe</dt><dd>{preview?.name || (recipe ? "Pinned recipe" : "Discovered workload")}{preview?.source_path && <small className="recipe-source">{preview.source_path}</small>}</dd></div>
+      <div><dt>Cluster</dt><dd>{stringArray(source.cluster_candidates).join(", ") || "Reported by sparkrun"}</dd></div>
+      {source.type === "activatable" && <>
+        <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 15)} minutes</dd></div>
+        <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
+      </>}
+    </dl>
+    {error && <p className="notice info">{error}</p>}
+  </>;
 }
 
 function EntityList({
@@ -333,7 +416,7 @@ function EntityList({
           >
             <span>{item.name || `${heading.slice(0, -1)} ${index + 1}`}</span>
             <small>{item.detail}</small>
-            {item.readOnly ? <small className="ownership-label">SparkRun · Read only</small> : null}
+            {item.readOnly ? <small className="ownership-label">sparkrun · Read only</small> : null}
           </button>
         ))}
         {!items.length ? <p>No {heading.toLowerCase()} configured.</p> : null}
@@ -517,6 +600,7 @@ function setProviderType(value: JSONObject, type: string): JSONObject {
 }
 
 function DeploymentForm({
+  hideHeading = false,
   simplifiedCapabilities,
   deployment,
   providers,
@@ -530,6 +614,7 @@ function DeploymentForm({
   onRemove,
   onCancelRemove,
 }: {
+  hideHeading?: boolean;
   simplifiedCapabilities: boolean;
   deployment: JSONObject;
   providers: string[];
@@ -554,7 +639,7 @@ function DeploymentForm({
 
   return (
     <>
-      <FormHeading
+      {!hideHeading && <FormHeading
         confirmRemove={confirmRemove}
         disabled={disabled || removeBlocked}
         eyebrow="Independently attributable routing target"
@@ -562,7 +647,7 @@ function DeploymentForm({
         onRemove={onRemove}
         removeTitle={removeBlocked ? `Used by ${routeCount} virtual-model target${routeCount === 1 ? "" : "s"}` : "Remove deployment"}
         title={deploymentTitle(deployment) || "Unnamed deployment"}
-      />
+      />}
       <fieldset disabled={disabled}>
         <div className="model-field-grid infrastructure-field-grid">
           <Field label={deployment.title ? "Deployment ID" : "Deployment name"}>
@@ -663,7 +748,7 @@ function DeploymentForm({
             <span>Endpoint source &amp; lifecycle</span>
             <small>{humanize(stringValue(objectValue(deployment.endpoint_source).type) || "static")}</small>
           </summary>
-          {providerType === "openai_subscription" ? <p className="section-help">Codex subscriptions use a fixed, static endpoint. SparkRun start/stop controls apply to local model providers.</p>
+          {providerType === "openai_subscription" ? <p className="section-help">Codex subscriptions use a fixed, static endpoint. sparkrun start/stop controls apply to local model providers.</p>
             : <EndpointSourceFields deployment={deployment} onChange={onChange} />}
         </details>
 

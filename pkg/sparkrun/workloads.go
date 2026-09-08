@@ -143,7 +143,7 @@ func (w *Workloads) canStop(id string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if job := w.jobs[id]; job != nil && job.active != 0 {
-		return fmt.Errorf("SparkRun workload still has active requests")
+		return fmt.Errorf("sparkrun workload still has active requests")
 	}
 	return nil
 }

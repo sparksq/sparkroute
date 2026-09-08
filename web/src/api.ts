@@ -407,7 +407,7 @@ export function fetchClientCredentialAudit(
   );
 }
 
-export interface SparkRunRecipe {
+export interface SparkrunRecipe {
   reference: string;
   name: string;
   model: string;
@@ -417,7 +417,7 @@ export interface SparkRunRecipe {
   source_path: string;
   min_nodes: number;
 }
-export interface SparkRunRecipeDetails extends SparkRunRecipe {
+export interface SparkrunRecipeDetails extends SparkrunRecipe {
   recipe_revision: string;
   native_protocols: string[];
   capabilities: string[];
@@ -426,7 +426,7 @@ export interface SparkRunRecipeDetails extends SparkRunRecipe {
   defaults: Record<string, unknown>;
   issues: { severity: string; code: string; message: string }[];
 }
-export interface SparkRunOperation {
+export interface SparkrunOperation {
   operation_id: string;
   state: "running" | "succeeded" | "failed";
   phase: string;
@@ -437,7 +437,7 @@ export interface SparkRunOperation {
 export function sparkRunCatalog<T>(token: string, operation: string, args: Record<string, unknown> = {}, signal?: AbortSignal) {
   return requestJSON<T>("/v1/sparkrun/catalog", token, { method: "POST", body: { operation, arguments: args } }, signal);
 }
-export function prepareSparkRunRecipe(token: string, document: ConfigurationDocument, expectedActiveRevision: string, recipe: Record<string, unknown>) {
+export function prepareSparkrunRecipe(token: string, document: ConfigurationDocument, expectedActiveRevision: string, recipe: Record<string, unknown>) {
   return requestJSON<{ document: ConfigurationDocument; deployment: string; reused: boolean }>("/v1/sparkrun/recipe-draft", token, {
     method: "POST", body: { document, expected_active_revision: expectedActiveRevision, recipe },
   });
