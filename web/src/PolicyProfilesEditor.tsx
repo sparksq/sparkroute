@@ -46,6 +46,11 @@ export function PolicyProfilesEditor({ document, readOnlyDocument, kind, disable
     </aside>
     <div className="model-form">
       <p className="section-help">Reusable {kind === "pii" ? "privacy policies" : "request and response checks"} for operator and sparkrun virtual models. Saving changes updates every model assigned this profile.</p>
+      <p className="notice info" role="note">
+        {kind === "pii"
+          ? "The built-in PII detector is best effort and may miss or misidentify personal information; it is provided without warranty, and its authors and distributors disclaim liability except as required by law or agreed in writing."
+          : "Guardrails are best effort and may miss harmful content or block legitimate content; they are provided without warranty, and their authors and distributors disclaim liability except as required by law or agreed in writing."}
+      </p>
       {selected ? <>
         <div className="model-form-heading"><h3>{selected}</h3><button type="button" className="danger-button" disabled={disabled || uses.length > 0} title={uses.length ? "Remove assignments before deleting this profile" : undefined} onClick={remove} onBlur={() => setConfirmRemove(false)}>{confirmRemove ? "Confirm delete profile" : "Delete profile"}</button></div>
         <div className="model-field-grid policy-profile-name"><label>Profile name<input disabled={disabled} value={nameDraft} onChange={e => setNameDraft(e.target.value)} /></label><button type="button" className="secondary-button" disabled={disabled || !validProfileName(nameDraft) || selected === nameDraft || Object.hasOwn(values, nameDraft)} onClick={() => { onChange(renameProfile(document, kind, selected, nameDraft)); setRequested(nameDraft); }}>Rename</button></div>
