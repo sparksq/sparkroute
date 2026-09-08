@@ -109,6 +109,16 @@ func buildRuntimeGeneration(
 	if err != nil {
 		return nil, err
 	}
+	closeProjection, err := configureGenerationMMProjection(document, &options, credentialRegistry)
+	if err != nil {
+		return nil, fmt.Errorf("configure MMBridge: %w", err)
+	}
+	projectionAccepted := false
+	defer func() {
+		if !projectionAccepted {
+			closeProjection()
+		}
+	}()
 	lifecycleTargets, _ := lifecycle.TargetsFromDocument(document)
 	var runtimeController *sparkrunruntime.Controller
 	var endpointRegistry *endpointregistry.Memory
@@ -218,9 +228,11 @@ func buildRuntimeGeneration(
 		),
 	}
 	accepted = true // The generation owns cleanup from this point.
-	generation.closeFn = closeObservability
+	projectionAccepted = true
+	closeResources := func() { closeProjection(); closeObservability() }
+	generation.closeFn = closeResources
 	if runtimeController != nil {
-		generation.closeFn = func() { runtimeController.Close(); closeObservability() }
+		generation.closeFn = func() { runtimeController.Close(); closeResources() }
 		runtimeController.Start(options.Context, func(err error) {
 			options.Logger.Warn("Sparkrun endpoint reconciliation failed", slog.Any("err", err))
 		})

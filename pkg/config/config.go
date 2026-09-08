@@ -31,6 +31,7 @@ type WatchSource interface {
 // Document is the first public configuration schema. It intentionally covers
 // only the fields exercised by the foundation data plane.
 type Document struct {
+	MMProjection       *MMProjectionConfig              `json:"mm_projection,omitempty"`
 	PIIProfiles        map[string]PIIPolicy             `json:"pii_profiles,omitempty"`
 	GuardrailProfiles  map[string]GuardrailPolicy       `json:"guardrail_profiles,omitempty"`
 	ModelPolicies      map[string]ModelPolicyAssignment `json:"model_policies,omitempty"`
@@ -406,13 +407,16 @@ type HeaderValue struct {
 }
 
 // CredentialReferences returns the unique secret references used by provider
-// authentication and custom headers, sorted for deterministic validation.
+// authentication, custom headers, and MMBridge, sorted for deterministic validation.
 func (d Document) CredentialReferences() []credentials.Ref {
 	unique := make(map[credentials.Ref]struct{})
 	add := func(ref credentials.Ref) {
 		if ref != "" {
 			unique[ref] = struct{}{}
 		}
+	}
+	if d.MMProjection != nil && d.MMProjection.Enabled {
+		add(d.MMProjection.TokenRef)
 	}
 	for _, provider := range d.Providers {
 		add(provider.Auth.Credential)

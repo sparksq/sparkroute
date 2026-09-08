@@ -134,6 +134,13 @@ func Merge(sets map[Owner]config.Document) (config.Document, error) {
 			result.GuardrailProfiles = policies.GuardrailProfiles
 			result.ModelPolicies = policies.ModelPolicies
 		}
+		if document.MMProjection != nil {
+			if owner != OwnerOperator {
+				return config.Document{}, fmt.Errorf("mm_projection must be managed by the operator")
+			}
+			connection := *document.MMProjection
+			result.MMProjection = &connection
+		}
 		if document.Observability != nil {
 			if owner != OwnerOperator {
 				return config.Document{}, fmt.Errorf("observability must be managed by the operator")

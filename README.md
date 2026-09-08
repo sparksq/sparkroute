@@ -147,8 +147,14 @@ disambiguated with their IDs. Model-routing selectors
 can use virtual models from both owners. These references do not copy or modify
 generated entities.
 
-**Advanced Options** contains MMBridge projection status and diagnostics, previously
-shown on Overview. It is separate from the shared configuration draft.
+**Advanced Options** includes tracing and a structured **MMBridge projection**
+connection editor in the shared Validate → Save draft. Enable or disable the
+connection, set the bridge `/v1` base URL and bearer-token credential reference,
+and optionally set a default analyzer virtual model and timeout. **Test bridge**
+checks the saved active connection. Routing policies under **Model Routing**
+separately control when projection runs and its failure behavior. See
+[MMBridge configuration](docs/MMBRIDGE_CONFIGURATION.md) for setup and startup
+setting precedence.
 
 The structured UI shares one capability list across deployments, virtual models,
 and routing simulation: **Vision** and **Files** (file inputs). Deployment

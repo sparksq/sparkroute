@@ -239,6 +239,13 @@ func validateModel(model string) error {
 	return nil
 }
 
+// CloseIdleConnections releases pooled connections after this runtime generation drains.
+func (c *Client) CloseIdleConnections() {
+	if c != nil {
+		c.client.CloseIdleConnections()
+	}
+}
+
 func (c *Client) DefaultAnalyzerModel() string {
 	if c == nil {
 		return ""
@@ -389,6 +396,9 @@ func (c *Client) Project(
 		req.Header.Set(TraceIDHeader, truncate(traceID, 128))
 	}
 	analyzerModel := strings.TrimSpace(policy.AnalyzerModel)
+	if analyzerModel == "" {
+		analyzerModel = c.defaultAnalyzerModel
+	}
 	if analyzerModel != "" {
 		req.Header.Set(AnalyzerModelHeader, analyzerModel)
 	}

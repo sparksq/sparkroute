@@ -17,6 +17,7 @@ import type {
   ManagedConfigurationOwner,
   ManagedConfigurationSetMetadata,
 } from "./types";
+import { MMProjectionSettingsEditor } from "./MMProjectionSettingsEditor";
 import { TraceSettingsEditor } from "./TraceSettingsEditor";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { PolicyProfilesEditor } from "./PolicyProfilesEditor";
@@ -306,7 +307,10 @@ export function ManagedConfigurationWorkspace({
         <div hidden={editorMode !== "structured"}>
           {operatorParsed.document ? (
             <>
-              <div hidden={section !== "advanced"}><TraceSettingsEditor document={operatorParsed.document} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange}/></div>
+              <div hidden={section !== "advanced"}>
+                <TraceSettingsEditor document={operatorParsed.document} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange}/>
+                <MMProjectionSettingsEditor document={operatorParsed.document} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange} token={token} canReadStatus={Boolean(bootstrap.features.status)} runtimeRevision={runtimeRevision}/>
+              </div>
               {(["privacy", "guardrails"] as const).map(page => <div key={page} hidden={section !== page}><PolicyProfilesEditor kind={page === "privacy" ? "pii" : "guardrails"} document={operatorParsed.document!} readOnlyDocument={generatedDocument} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange} /></div>)}
               <div hidden={section !== "models"}>
                 <VirtualModelEditor

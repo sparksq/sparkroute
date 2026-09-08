@@ -612,7 +612,7 @@ function MMProjectionFields({ policy, onChange }: {
         Analyzer model
         <input
           onChange={(event) => onChange((current) => setOptionalString(current, "analyzer_model", event.target.value))}
-          placeholder="Use process default"
+          placeholder="Use connection default"
           value={stringValue(policy.analyzer_model)}
         />
       </label>
@@ -632,7 +632,7 @@ function MMProjectionFields({ policy, onChange }: {
           max="900000"
           min="1000"
           onChange={(event) => onChange((current) => setOptionalNumber(current, "timeout_ms", event.target.value))}
-          placeholder="Process default"
+          placeholder="Connection default"
           step="1000"
           type="number"
           value={numberOrBlank(policy.timeout_ms)}

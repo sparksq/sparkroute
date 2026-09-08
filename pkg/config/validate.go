@@ -158,6 +158,9 @@ func (d Document) Validate() error {
 		return err
 	}
 	d = resolved
+	if err := d.MMProjection.Validate(); err != nil {
+		return fmt.Errorf("mm_projection: %w", err)
+	}
 	if err := d.Observability.Validate(); err != nil {
 		return fmt.Errorf("observability: %w", err)
 	}

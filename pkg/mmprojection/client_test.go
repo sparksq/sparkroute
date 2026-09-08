@@ -101,6 +101,39 @@ func TestClientProjectsBoundedAuthenticatedRequest(t *testing.T) {
 	}
 }
 
+func TestClientUsesDefaultAnalyzerUnlessPolicyOverridesIt(t *testing.T) {
+	t.Parallel()
+	models := make(chan string, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		model := request.Header.Get(AnalyzerModelHeader)
+		models <- model
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"version": 1, "applied": true, "media_count": 1, "analyzer_model": model,
+			"body": map[string]any{"model": "public", "messages": []any{map[string]any{"role": "user", "content": "projected"}}},
+		})
+	}))
+	defer server.Close()
+	client, err := New(Options{
+		URL: server.URL + "/v1", TokenReference: "env://BRIDGE_TOKEN",
+		Credentials:          testCredentials{"env://BRIDGE_TOKEN": "bridge-token"},
+		DefaultAnalyzerModel: "default-analyzer",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdleConnections()
+	for _, tc := range []struct{ policy, want string }{{"", "default-analyzer"}, {"route-analyzer", "route-analyzer"}} {
+		_, trace, err := client.Project(context.Background(), []byte(`{"model":"public","messages":[]}`), modelrouter.MMProjectionPolicy{AnalyzerModel: tc.policy}, OperationChat, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := <-models; got != tc.want || trace.AnalyzerModel != tc.want {
+			t.Fatalf("analyzer header=%q, trace=%q, want=%q", got, trace.AnalyzerModel, tc.want)
+		}
+	}
+}
+
 func TestClientClassifiesInvalidMediaWithoutOpeningCircuit(t *testing.T) {
 	t.Parallel()
 

@@ -3338,3 +3338,16 @@ button:disabled {
 .policy-profiles-editor .model-form > .section-help:first-child { padding-top: 18px; }
 .policy-profiles-editor h3 { overflow-wrap: anywhere; }
 @media (max-width: 700px) { .model-policy-assignments .model-field-grid { grid-template-columns: 1fr; } }
+
+.mmbridge-settings { padding: 1.25rem; }
+.mmbridge-settings .section-help { padding: 0; }
+.mmbridge-settings .recipe-fieldset > label { max-width: 36rem; }
+.mmbridge-settings .model-field-grid { padding: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mmbridge-settings input, .mmbridge-settings select { font-weight: 400; }
+.mmbridge-active-connection { margin-top: 1.25rem; }
+.mmbridge-active-connection .panel-heading { padding: 0 0 12px; }
+.mmbridge-active-connection h4 { margin: 0; }
+.mmbridge-active-connection button { white-space: nowrap; }
+.mmbridge-active-connection dd { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+.mmbridge-active-connection dt { color: var(--muted); font-size: 0.8rem; }
+@media (max-width: 700px) { .mmbridge-settings .model-field-grid { grid-template-columns: 1fr; } }

@@ -451,6 +451,7 @@ function ConsoleLayout({
           </div>
         ) : null}
         {section === "advanced" ? (
+          configurationAvailable && bootstrap.features.config_managed_sets ? null :
           status ? <MMProjectionStatusPanel
             canProbe={Boolean(bootstrap.features.mm_projection_probe)}
             initialStatus={status.mm_projection ?? { configured: false, state: "disabled", models: 0, consecutive_failures: 0, circuit_open: false }}
