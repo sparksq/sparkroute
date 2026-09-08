@@ -30,6 +30,11 @@ type privacyRuntime struct {
 }
 
 func (p *privacyRuntime) ForDocument(document config.Document) (*pii.Provider, error) {
+	resolved, err := document.ResolveModelPolicies()
+	if err != nil {
+		return nil, err
+	}
+	document = resolved
 	if p == nil {
 		return pii.NewProvider(document, pii.NewBuiltinDetector(), nil)
 	}

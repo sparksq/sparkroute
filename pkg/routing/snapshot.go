@@ -193,6 +193,11 @@ func (e *UnsupportedCapabilitiesError) Unwrap() error {
 }
 
 func Compile(document config.Document) (*Snapshot, error) {
+	resolved, err := document.ResolveModelPolicies()
+	if err != nil {
+		return nil, err
+	}
+	document = resolved
 	document = document.ResolveCapabilityPolicies(config.UnknownCapabilityTry)
 	if err := document.Validate(); err != nil {
 		return nil, err

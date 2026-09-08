@@ -1,10 +1,51 @@
 # PII and guardrails
 
-Configure either policy under **Configuration → Virtual Models / Aliases**.
-The structured editor applies policy changes to the parent virtual model and
-its existing request profiles. New profiles copy their parent’s policies. Both policies are available in the
-standalone AGPL build. Enterprise uses the same PII engine, with PostgreSQL
-storage remaining in enterprise.
+Create reusable profiles under **Configuration → PII Privacy** and
+**Configuration → Guardrails**, then use **Policy profiles** under
+**Virtual Models / Aliases** to assign them. You can also assign models directly
+from either profile page. Use **Validate**, then **Save**, to publish changes.
+Both policies are available in the standalone AGPL build. Enterprise uses the
+same PII engine, with PostgreSQL storage remaining in enterprise.
+
+Profile definitions and assignments belong to operator configuration, including
+assignments to sparkrun-generated virtual models. Generated model/routing
+settings stay read-only; their policy selectors are editable. Assignments survive
+sparkrun refreshes and remain dormant when a model disappears, applying again if
+the same canonical name returns. Changing a shared profile updates every assigned
+model on configuration reload. Renaming a profile updates its references; remove
+assignments before deleting a profile.
+
+Profiles use these top-level configuration fields (a partial document):
+
+```json
+{
+  "pii_profiles": {
+    "personal": {"mode": "substitute", "entities": ["email", "phone"]}
+  },
+  "guardrail_profiles": {
+    "safe": {"pre": [{"name": "safety", "model": "guard", "prompt": "Block secrets."}]}
+  },
+  "model_policies": {
+    "coding": {"pii_profile": "personal", "guardrail_profile": "safe"},
+    "coding:low": {"pii_profile": ""}
+  }
+}
+```
+
+Assignment keys are canonical virtual-model names; aliases use their canonical
+model's policy. Request-profile variants inherit each policy assignment from
+their parent unless overridden. An omitted reference retains existing inline
+settings (or an inherited assignment); an empty string explicitly disables that
+policy. In this example, `coding:low` disables PII but inherits the guardrail.
+A selected profile replaces that kind of inline policy, rather than appending
+checks or merging fields. The UI can copy existing inline settings into a reusable
+profile without discarding the original settings.
+
+Unknown profile references are rejected even for dormant models. Unused
+profiles may refer to temporarily unavailable guardrail models; active policies
+require their guardrail targets to exist. A guardrail is a call to the selected
+model, so stopping a model used by an active guardrail requires updating that
+policy first. Profile limits are 256 of each kind and 4096 model assignments.
 
 ## PII substitution
 

@@ -146,3 +146,47 @@ func TestFragmentRevisionNormalizesNilCollections(t *testing.T) {
 		t.Fatalf("FragmentRevision() = %s, %s", raw, revision)
 	}
 }
+
+func TestOperatorPolicyAssignmentsSurviveGeneratedInventoryChurn(t *testing.T) {
+	ref := "personal"
+	operator := config.Document{PIIProfiles: map[string]config.PIIPolicy{"personal": {Entities: []config.PIIEntity{config.PIIEntityEmail}}}, ModelPolicies: map[string]config.ModelPolicyAssignment{"coding": {PIIProfile: &ref}}}
+	generated := config.Document{
+		Providers:     []config.Provider{{Name: "sparkrun", Type: "openai", BaseURL: "http://127.0.0.1:8000/v1"}},
+		Deployments:   []config.Deployment{{Name: "generated", Provider: "sparkrun", Model: "upstream"}},
+		VirtualModels: []config.VirtualModel{{Name: "coding", Pools: []config.RoutingPool{{Targets: []config.WeightedTarget{{Deployment: "generated", Weight: 1}}}}}},
+	}
+	original, _, _ := FragmentRevision(generated)
+	for _, inventory := range []config.Document{generated, EmptyDocument(), generated} {
+		merged, err := Merge(map[Owner]config.Document{OwnerOperator: operator, OwnerSparkrun: inventory})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if *merged.ModelPolicies["coding"].PIIProfile != "personal" {
+			t.Fatal("assignment lost")
+		}
+		effective, err := merged.ResolveModelPolicies()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(inventory.VirtualModels) > 0 && effective.VirtualModels[0].Privacy.PII.Entities[0] != config.PIIEntityEmail {
+			t.Fatal("returned model did not inherit policy")
+		}
+		merged.PIIProfiles["personal"].Entities[0] = config.PIIEntityPhone
+		*merged.ModelPolicies["coding"].PIIProfile = "changed"
+		if operator.PIIProfiles["personal"].Entities[0] != config.PIIEntityEmail || ref != "personal" {
+			t.Fatal("merged policy aliases owner storage")
+		}
+	}
+	after, _, _ := FragmentRevision(generated)
+	if string(original) != string(after) {
+		t.Fatal("generated fragment mutated")
+	}
+	_, err := Merge(map[Owner]config.Document{OwnerSparkrun: operator})
+	if err == nil || !strings.Contains(err.Error(), "operator") {
+		t.Fatalf("allowed generated policy ownership: %v", err)
+	}
+	delete(operator.PIIProfiles, "personal")
+	if _, err = Merge(map[Owner]config.Document{OwnerOperator: operator}); err == nil {
+		t.Fatal("allowed deleting referenced dormant profile")
+	}
+}

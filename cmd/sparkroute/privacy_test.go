@@ -91,3 +91,24 @@ func TestPrivacyRuntimeNeverReplacesMissingKeyForExistingDatabase(t *testing.T) 
 		t.Fatal("created explicit operator key")
 	}
 }
+
+func TestPrivacyRuntimeEnablesConversationStorageForAssignedProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "private", "mappings.sqlite")
+	runtime := &privacyRuntime{ctx: context.Background(), path: path}
+	defer runtime.Close()
+	ref := "conversation"
+	document := config.Document{PIIProfiles: map[string]config.PIIPolicy{ref: {Scope: config.PIIScopeConversation}}, ModelPolicies: map[string]config.ModelPolicyAssignment{"generated": {PIIProfile: &ref}}}
+	if _, err := runtime.ForDocument(document); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("dormant profile created storage")
+	}
+	document.VirtualModels = []config.VirtualModel{{Name: "generated"}}
+	if _, err := runtime.ForDocument(document); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("active profile did not create conversation storage: %v", err)
+	}
+}

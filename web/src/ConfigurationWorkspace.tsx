@@ -8,6 +8,7 @@ import {
 import type { ConfigurationDocument, DiscoveredMetadataState } from "./types";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
+import { PolicyProfilesEditor } from "./PolicyProfilesEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import type { AdminConfigurationWorkspaceProps } from "./extensions";
 
@@ -26,6 +27,7 @@ export function ConfigurationWorkspace({
   bootstrap,
   token,
   virtualModelExtensions,
+  section,
 }: AdminConfigurationWorkspaceProps) {
   const canRead = Boolean(bootstrap.features.config_read);
   const canValidate = Boolean(bootstrap.features.config_validate);
@@ -44,8 +46,13 @@ export function ConfigurationWorkspace({
     "structured",
   );
   const [structuredSection, setStructuredSection] = useState<
-    "models" | "routing" | "infrastructure"
+    "models" | "routing" | "infrastructure" | "privacy" | "guardrails"
   >("models");
+  useEffect(() => {
+    if (section === "privacy" || section === "guardrails") setStructuredSection(section);
+    else if (section) setStructuredSection("models");
+  }, [section]);
+
 
   useEffect(() => {
     if (!canRead) return;
@@ -268,8 +275,9 @@ export function ConfigurationWorkspace({
                 >
                   Providers &amp; deployments
                 </button>
+                {(["privacy", "guardrails"] as const).map(page => <button key={page} type="button" aria-pressed={structuredSection === page} className={structuredSection === page ? "active" : ""} onClick={() => setStructuredSection(page)}>{page === "privacy" ? "PII Privacy" : "Guardrails"}</button>)}
               </div>
-              {structuredSection === "models" ? (
+              {structuredSection === "privacy" || structuredSection === "guardrails" ? <PolicyProfilesEditor kind={structuredSection === "privacy" ? "pii" : "guardrails"} document={parsedDocument.document} disabled={Boolean(busy)} onChange={changeStructuredDocument} /> : structuredSection === "models" ? (
                 <VirtualModelEditor
                   disabled={Boolean(busy)}
                   document={parsedDocument.document}

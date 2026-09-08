@@ -3,6 +3,8 @@ export const configurationSections = [
   { id: "deployments", label: "Model Deployments" },
   { id: "models", label: "Virtual Models / Aliases" },
   { id: "routing", label: "Model Routing" },
+  { id: "privacy", label: "PII Privacy" },
+  { id: "guardrails", label: "Guardrails" },
   { id: "advanced", label: "Advanced Options" },
 ] as const;
 

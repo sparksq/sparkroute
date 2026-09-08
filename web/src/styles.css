@@ -3317,3 +3317,24 @@ button:disabled {
 .pii-entities > span { display: block; font-weight: 700; margin-bottom: 8px; }
 .pii-entities > small { display: block; color: var(--muted); margin-top: 8px; }
 @media (max-width: 700px) { .deployment-metadata .model-field-grid { grid-template-columns: 1fr; } }
+
+/* Policy assignments stay editable independently of generated model settings. */
+.policy-profile-name { display: flex; gap: 12px; align-items: end; padding: 16px 22px; }
+.policy-profile-name label { flex: 1; min-width: 0; }
+.policy-profile-name button { flex-shrink: 0; }
+.policy-assignment-field { min-width: 0; display: grid; align-content: start; gap: 8px; }
+.policy-assignment-field .text-button { justify-self: start; text-align: left; }
+.model-policy-assignments { padding-top: 16px; }
+.policy-assignment-list { list-style: none; padding: 0 22px; margin: 16px 0; font-size: 0.76rem; }
+.policy-assignment-list li { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.policy-assignment-list li span { min-width: 0; overflow-wrap: anywhere; }
+.policy-assignment-list small { display: block; margin-top: 4px; color: var(--muted); font-size: 0.67rem; }
+.policy-assignment-list button { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .policy-profile-name, .policy-assignment-list li { align-items: stretch; flex-direction: column; }
+}
+
+.model-policy-assignments .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.policy-profiles-editor .model-form > .section-help:first-child { padding-top: 18px; }
+.policy-profiles-editor h3 { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .model-policy-assignments .model-field-grid { grid-template-columns: 1fr; } }

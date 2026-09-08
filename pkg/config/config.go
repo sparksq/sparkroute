@@ -31,8 +31,11 @@ type WatchSource interface {
 // Document is the first public configuration schema. It intentionally covers
 // only the fields exercised by the foundation data plane.
 type Document struct {
-	Observability      *Observability     `json:"observability,omitempty"`
-	CapabilityDefaults CapabilityDefaults `json:"capability_defaults,omitempty,omitzero"`
+	PIIProfiles        map[string]PIIPolicy             `json:"pii_profiles,omitempty"`
+	GuardrailProfiles  map[string]GuardrailPolicy       `json:"guardrail_profiles,omitempty"`
+	ModelPolicies      map[string]ModelPolicyAssignment `json:"model_policies,omitempty"`
+	Observability      *Observability                   `json:"observability,omitempty"`
+	CapabilityDefaults CapabilityDefaults               `json:"capability_defaults,omitempty,omitzero"`
 	// ModelRouting optionally publishes a selector namespace (for example
 	// "auto") whose choices are ordinary virtual models in this document.
 	ModelRouting  *modelrouter.RoutingPolicy `json:"model_routing,omitempty"`

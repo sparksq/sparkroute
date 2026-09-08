@@ -5,7 +5,7 @@ const phases = [{ key: "pre", label: "Request", help: "Run these checks before s
   { key: "post", label: "Response", help: "Run these checks before returning the response to the caller." }] as const;
 type Phase = typeof phases[number]["key"];
 
-export function GuardrailEditor({ model, modelNames, disabled, updateModel }: VirtualModelEditorContext & { modelNames: string[] }) {
+export function GuardrailEditor({ model, modelNames, disabled, updateModel, profile = false }: VirtualModelEditorContext & { modelNames: string[]; profile?: boolean }) {
   const policy = object(model.guardrails);
   const names = [...new Set(modelNames)].sort();
   const shapeError = phases.some(({ key }) => policy[key] !== undefined &&
@@ -61,9 +61,9 @@ export function GuardrailEditor({ model, modelNames, disabled, updateModel }: Vi
     });
   }
 
-  return <details className="model-section guardrail-settings">
+  return <details className="model-section guardrail-settings" open={profile || undefined}>
     <summary><span>Guardrails</span><small>{count ? `${entries("pre").length} request, ${entries("post").length} response` : "Not configured"}</small></summary>
-    <p className="section-help">Apply checks to this model and its request profiles to allow, block, or optionally rewrite content. Checks run in the order shown and may send content to the selected model’s provider.</p>
+    <p className="section-help">Apply checks to {profile ? "every model assigned this profile" : "this model and its request profiles"} to allow, block, or optionally rewrite content. Checks run in the order shown and may send content to the selected model’s provider.</p>
     {shapeError ? <p className="notice error" role="alert">Guardrail lists or streaming settings have an invalid shape. Use JSON mode to repair them; existing values are preserved.</p> : <fieldset disabled={disabled} className="policy-editor-fields">
       {phases.map(({ key, label, help }) => <section className="guardrail-phase" key={key} aria-label={`${label} guardrails`}>
         <div className="model-section-heading"><h4>{label} checks</h4>

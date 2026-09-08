@@ -9,7 +9,7 @@ export const piiVirtualModelExtension: VirtualModelEditorExtension = {
   validateModel: validatePIIModel,
 };
 
-export function PIIVirtualModelSection({ model, disabled, updateModel }: VirtualModelEditorContext) {
+export function PIIVirtualModelSection({ model, disabled, updateModel, profile = false }: VirtualModelEditorContext & { profile?: boolean }) {
   const privacy = objectValue(model.privacy);
   const pii = objectValue(privacy.pii);
   const files = objectValue(pii.files);
@@ -19,13 +19,13 @@ export function PIIVirtualModelSection({ model, disabled, updateModel }: Virtual
     ? stringArray(pii.entities)
     : [...defaultPIIEntities];
   return (
-    <details className="model-section pii-settings">
+    <details className="model-section pii-settings" open={profile || undefined}>
       <summary>
         <span>PII privacy</span>
         <small>{enabled ? `${entities.length} entities · ${stringValue(pii.scope) || "request"} scope` : "Disabled"}</small>
       </summary>
       <p className="section-help">
-        Replace detected personal information with opaque tokens before sending content to providers. Changes apply to this model and its request profiles. Restore known values for the caller or keep them masked. Detection is best effort and does not cover every kind of personal information.
+        Replace detected personal information with opaque tokens before sending content to providers. {profile ? "Changes apply to every model assigned this profile." : "Changes apply to this model and its request profiles."} Restore known values for the caller or keep them masked. Detection is best effort and does not cover every kind of personal information.
       </p>
       {enabled && <p className="section-help">Conversation scope uses encrypted mappings and requires caller authentication. In standalone SparkRoute, send X-SparkRoute-Thread-Id with a stable conversation ID; mappings stay isolated per caller. Request scope works without persistent mappings. File inspection selects conversation scope automatically.</p>}
       <div className="policy-fields">

@@ -19,6 +19,7 @@ import type {
 } from "./types";
 import { TraceSettingsEditor } from "./TraceSettingsEditor";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
+import { PolicyProfilesEditor } from "./PolicyProfilesEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
 import type { VirtualModelEditorExtension } from "./extensions";
@@ -306,6 +307,7 @@ export function ManagedConfigurationWorkspace({
           {operatorParsed.document ? (
             <>
               <div hidden={section !== "advanced"}><TraceSettingsEditor document={operatorParsed.document} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange}/></div>
+              {(["privacy", "guardrails"] as const).map(page => <div key={page} hidden={section !== page}><PolicyProfilesEditor kind={page === "privacy" ? "pii" : "guardrails"} document={operatorParsed.document!} readOnlyDocument={generatedDocument} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange} /></div>)}
               <div hidden={section !== "models"}>
                 <VirtualModelEditor
                   disabled={!canEdit || Boolean(busy) || recipeWizard}

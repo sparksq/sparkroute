@@ -14,6 +14,7 @@ export interface AdminConfigurationWorkspaceProps {
   bootstrap: AdminBootstrap;
   token: string;
   virtualModelExtensions?: VirtualModelEditorExtension[];
+  section?: import("./configurationSections").ConfigurationSection;
 }
 
 export interface AdminOverviewExtension {

@@ -890,3 +890,40 @@ func routingDocument() config.Document {
 		}},
 	}
 }
+
+func TestSnapshotAppliesSharedProfilesAndKeepsPreviousGenerationIsolated(t *testing.T) {
+	document := routingDocument()
+	ref := "shared"
+	document.PIIProfiles = map[string]config.PIIPolicy{ref: {Entities: []config.PIIEntity{config.PIIEntityEmail}}}
+	document.GuardrailProfiles = map[string]config.GuardrailPolicy{ref: {Pre: []config.Guardrail{{Name: "check", Model: "public", Prompt: "first"}}}}
+	document.ModelPolicies = map[string]config.ModelPolicyAssignment{"public": {PIIProfile: &ref, GuardrailProfile: &ref}}
+	previous, err := Compile(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := document.PIIProfiles[ref]
+	policy.Response = config.PIIResponseMasked
+	document.PIIProfiles[ref] = policy
+	document.GuardrailProfiles[ref].Pre[0].Prompt = "second"
+	next, err := Compile(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldModel, err := previous.ResolveModel("default", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newModel, err := next.ResolveModel("default", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oldModel.Privacy == nil || oldModel.Privacy.PII.Effective().Response != config.PIIResponseRestore || oldModel.Guardrails.Pre[0].Prompt != "first" {
+		t.Fatal("previous snapshot lost assigned policy or was mutated")
+	}
+	if newModel.Privacy == nil || newModel.Privacy.PII.Response != config.PIIResponseMasked || newModel.Guardrails.Pre[0].Prompt != "second" {
+		t.Fatal("new snapshot did not apply profile changes")
+	}
+	if document.VirtualModels[0].Privacy != nil || len(document.VirtualModels[0].Guardrails.Pre) != 0 {
+		t.Fatal("compile materialized policies in source")
+	}
+}

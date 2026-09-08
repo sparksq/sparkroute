@@ -18,6 +18,11 @@ type Provider struct {
 }
 
 func NewProvider(document config.Document, detector Detector, directory *Directory) (*Provider, error) {
+	resolved, err := document.ResolveModelPolicies()
+	if err != nil {
+		return nil, err
+	}
+	document = resolved
 	if detector == nil {
 		return nil, fmt.Errorf("PII detector is required")
 	}

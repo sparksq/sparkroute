@@ -1,5 +1,5 @@
 import { RequestProfileEditor } from "./RequestProfileEditor";
-import { GuardrailEditor } from "./GuardrailEditor";
+import { ModelPolicyAssignments } from "./ModelPolicyAssignments";
 import { capabilityOptions, capabilitySelectionSummary } from "./capabilities";
 import { useEffect, useMemo, useState } from "react";
 import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
@@ -93,7 +93,26 @@ export function VirtualModelEditor({
       }
       nextModels[index] = next;
     }
-    onChange({ ...document, virtual_models: nextModels });
+    // Keep request variants grouped and protected when their canonical parent
+    // is renamed. Per-variant assignments move with the matching public name.
+    let policies = objectValue(document.model_policies);
+    if (updated.name !== selected.name && typeof updated.name === "string" && updated.name) {
+      const renames = new Map<string, string>([[String(selected.name), updated.name]]);
+      for (let index = 0; index < nextModels.length; index++) {
+        const variant = nextModels[index]!;
+        if (index === selectedIndex || !variant.request_overrides || !stringValue(variant.name).startsWith(`${selected.name}:`)) continue;
+        const name = updated.name + stringValue(variant.name).slice(String(selected.name).length);
+        renames.set(String(variant.name), name);
+        nextModels[index] = { ...variant, name };
+      }
+      policies = { ...policies };
+      for (const [from, to] of renames) if (Object.hasOwn(policies, from)) {
+        // Do not overwrite a dormant assignment already reserved for the new
+        // name. Preserve the old assignment for explicit operator resolution.
+        if (!Object.hasOwn(policies, to)) { policies[to] = policies[from]; delete policies[from]; }
+      }
+    }
+    onChange({ ...document, virtual_models: nextModels, ...(document.model_policies !== undefined ? { model_policies: policies } : {}) });
   };
 
   const addModel = () => {
@@ -156,7 +175,7 @@ export function VirtualModelEditor({
             >
               <span>{stringValue(model.name) || `Model ${index + 1}`}</span>
               <small>{effectiveVisibility(model)}</small>
-              {index >= editableModels.length ? <small className="ownership-label">sparkrun · Read only</small> : null}
+              {index >= editableModels.length ? <small className="ownership-label">sparkrun · Policies editable</small> : null}
             </button>
           ))}
           {!visibleModels.length ? (
@@ -166,7 +185,7 @@ export function VirtualModelEditor({
       </aside>
 
       <div className={readOnlySelected ? "model-form generated-form" : "model-form"}>
-        {selected && readOnlySelected ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
+        {selected && readOnlySelected ? <p className="read-only-note">sparkrun generated · Model and routing settings are read only. Policy assignments are operator managed.</p> : null}
         {selected ? (
           <>
             <div className="model-form-heading">
@@ -387,7 +406,7 @@ export function VirtualModelEditor({
                 <PolicyFields model={selected} onChange={updateModel} />
               </details>
 
-              {extensions.map((extension) => (
+              {extensions.filter(extension => extension.id !== "privacy-pii").map((extension) => (
                 <extension.Component
                   disabled={formDisabled}
                   key={extension.id}
@@ -396,8 +415,8 @@ export function VirtualModelEditor({
                 />
               ))}
 
-              <GuardrailEditor model={selected} modelNames={models.flatMap(model => [stringValue(model.name), ...stringArray(model.aliases)])} disabled={formDisabled} updateModel={updateModel} />
             </fieldset>
+            <ModelPolicyAssignments document={document} model={selected} generated={readOnlySelected} disabled={disabled} onChange={onChange} />
           </>
         ) : (
           <div className="structured-empty">

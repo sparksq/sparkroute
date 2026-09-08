@@ -288,7 +288,7 @@ function ConsoleLayout({
     window.history.pushState({}, "", target);
     setPage(next);
   };
-  const heading = (section && (bootstrap.features.config_managed_sets || section === "advanced")
+  const heading = (section && (bootstrap.features.config_managed_sets || section === "advanced" || section === "privacy" || section === "guardrails")
     ? configurationSections.find((entry) => entry.id === section)?.label : undefined) ?? ({
     overview: "Gateway overview",
     configuration: "Configuration",
@@ -338,7 +338,7 @@ function ConsoleLayout({
             </a>
             {(
               <ul className="configuration-nav-children" aria-label="Configuration sections">
-                {configurationSections.filter((entry) => bootstrap.features.config_managed_sets || entry.id === "advanced").map((entry) => (
+                {configurationSections.filter((entry) => bootstrap.features.config_managed_sets || entry.id === "advanced" || entry.id === "privacy" || entry.id === "guardrails").map((entry) => (
                   <li key={entry.id}>
                     <a
                       aria-current={section === entry.id ? "page" : undefined}
@@ -460,6 +460,7 @@ function ConsoleLayout({
           configurationAvailable ? (
             bootstrap.features.config_managed_sets ? null : (
               <ConfigurationComponent
+                section={section}
                 bootstrap={bootstrap}
                 token={token}
                 virtualModelExtensions={virtualModelExtensions}

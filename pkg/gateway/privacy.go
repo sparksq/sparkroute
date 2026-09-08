@@ -133,6 +133,11 @@ func (o openAIOperation) piiMediaInput(
 // served by the optional downstream provider. Command/configuration surfaces
 // use it before accepting a document; NewDataPlane enforces it again.
 func ValidatePrivacyProvider(document config.Document, provider privacy.Provider) error {
+	resolved, err := document.ResolveModelPolicies()
+	if err != nil {
+		return err
+	}
+	document = resolved
 	var required []privacy.Entity
 	seen := make(map[privacy.Entity]struct{})
 	for _, model := range document.VirtualModels {

@@ -52,6 +52,7 @@ export type {
 export { AdminApp } from "./App";
 export { ModelRoutingEditor } from "./ModelRoutingEditor";
 export { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
+export { PolicyProfilesEditor } from "./PolicyProfilesEditor";
 export { VirtualModelEditor } from "./VirtualModelEditor";
 
 export function mountAdminApp(element: HTMLElement, options: AdminAppOptions) {

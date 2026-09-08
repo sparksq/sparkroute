@@ -153,6 +153,11 @@ var protectedExtraBodyFields = map[string]struct{}{
 
 // Validate rejects ambiguous or unsafe configuration before publication.
 func (d Document) Validate() error {
+	resolved, err := d.ResolveModelPolicies()
+	if err != nil {
+		return err
+	}
+	d = resolved
 	if err := d.Observability.Validate(); err != nil {
 		return fmt.Errorf("observability: %w", err)
 	}

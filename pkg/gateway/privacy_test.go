@@ -486,3 +486,18 @@ func TestPIIBuiltinDetectorRejectsUnsupportedConfiguredEntity(t *testing.T) {
 		t.Fatalf("NewDataHandler() error = %v", err)
 	}
 }
+
+func TestAssignedPIIRequiresProviderEvenWithoutInlinePrivacy(t *testing.T) {
+	ref := "personal"
+	document := config.Document{PIIProfiles: map[string]config.PIIPolicy{ref: {Entities: []config.PIIEntity{config.PIIEntityEmail}}}, ModelPolicies: map[string]config.ModelPolicyAssignment{"generated": {PIIProfile: &ref}}, VirtualModels: []config.VirtualModel{{Name: "generated"}}}
+	if err := ValidatePrivacyProvider(document, nil); err == nil {
+		t.Fatal("accepted assigned privacy policy without provider")
+	}
+	if err := ValidatePrivacyProvider(document, testPrivacyProvider{}); err != nil {
+		t.Fatal(err)
+	}
+	document.VirtualModels = nil
+	if err := ValidatePrivacyProvider(document, nil); err != nil {
+		t.Fatalf("dormant assignment requires provider: %v", err)
+	}
+}

@@ -678,7 +678,7 @@ describe("AdminApp", () => {
     fireEvent.click(await screen.findByText("Configuration"));
     expect(await screen.findByRole("heading", { name: "Providers", level: 2 })).toBeInTheDocument();
     const tree = within(screen.getByRole("list", { name: "Configuration sections" }));
-    expect(tree.getAllByRole("link")).toHaveLength(5);
+    expect(tree.getAllByRole("link").map(link => link.textContent)).toEqual(["Providers", "Model Deployments", "Virtual Models / Aliases", "Model Routing", "PII Privacy", "Guardrails", "Advanced Options"]);
     fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
     expect(window.location.pathname).toBe("/admin/configuration/models");
     fireEvent.click(await screen.findByTitle("Add virtual model"));
@@ -729,7 +729,7 @@ describe("AdminApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "Structured" }));
     expect(screen.getByLabelText("Provider name")).toBeDisabled();
     fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
-    fireEvent.click(screen.getByRole("button", { name: /new-model.*Read only/ }));
+    fireEvent.click(screen.getByRole("button", { name: /new-model.*Policies editable/ }));
     expect(screen.getByLabelText("Canonical name")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Remove model" })).toBeDisabled();
     fireEvent.click(tree.getByRole("link", { name: "Providers" }));

@@ -116,6 +116,24 @@ func Merge(sets map[Owner]config.Document) (config.Document, error) {
 	var modelRoutingOwner Owner
 	for _, owner := range ordered {
 		document := sets[owner]
+		if len(document.PIIProfiles) > 0 || len(document.GuardrailProfiles) > 0 || len(document.ModelPolicies) > 0 {
+			if owner != OwnerOperator {
+				return config.Document{}, fmt.Errorf("policy profiles and model_policies must be managed by the operator")
+			}
+			// Clone nested policy data as well as maps: runtime and owner documents
+			// must not share mutable assignments or profile slices.
+			raw, err := json.Marshal(config.Document{PIIProfiles: document.PIIProfiles, GuardrailProfiles: document.GuardrailProfiles, ModelPolicies: document.ModelPolicies})
+			if err != nil {
+				return config.Document{}, err
+			}
+			var policies config.Document
+			if err := json.Unmarshal(raw, &policies); err != nil {
+				return config.Document{}, err
+			}
+			result.PIIProfiles = policies.PIIProfiles
+			result.GuardrailProfiles = policies.GuardrailProfiles
+			result.ModelPolicies = policies.ModelPolicies
+		}
 		if document.Observability != nil {
 			if owner != OwnerOperator {
 				return config.Document{}, fmt.Errorf("observability must be managed by the operator")
