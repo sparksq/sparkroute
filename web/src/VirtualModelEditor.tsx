@@ -5,8 +5,9 @@ import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
 import { deploymentChoices } from "./deploymentTitles";
 import type { ConfigurationDocument } from "./types";
 
-// Keep affinity configuration available in JSON while its controls are hidden.
+// Keep these settings available in JSON while their controls are hidden.
 const PROMPT_CACHE_AFFINITY_VISIBLE = false;
+const REQUIRED_CAPABILITIES_VISIBLE = false;
 
 export function VirtualModelEditor({
   document,
@@ -342,7 +343,7 @@ export function VirtualModelEditor({
                 </div>
               </details>}
 
-              <details className="model-section capability-section" open>
+              {REQUIRED_CAPABILITIES_VISIBLE && <details className="model-section capability-section" open>
                 <summary>
                   <span>Required capabilities</span>
                   <small>{capabilitySelectionSummary(stringArray(selected.required_capabilities))}</small>
@@ -362,7 +363,7 @@ export function VirtualModelEditor({
                     </label>
                   ))}
                 </div>
-              </details>
+              </details>}
 
               <details className="model-section policy-section">
                 <summary>

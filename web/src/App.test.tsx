@@ -599,6 +599,7 @@ describe("AdminApp", () => {
     render(<AdminApp productName="SparkRoute" />);
     expect(await screen.findByText("Current configuration")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Model routing" }));
+    expect(await screen.findByLabelText("text-model")).toBeChecked();
     expect(screen.queryByText("Multimedia projection")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Enable by default")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Projection behavior")).not.toBeInTheDocument();
@@ -868,7 +869,7 @@ describe("AdminApp", () => {
               name: "chat",
               aliases: ["default"],
               visibility: "hidden",
-              required_capabilities: ["tools"],
+              required_capabilities: ["tools", "vision"],
               selection: { prompt_cache_affinity: { enabled: true, ttl: "7m", min_prefix_bytes: 8192, max_prefixes_per_request: 12, scope: "tenant" } },
               guardrails: {
                 pre: [{ name: "safety", model: "guard", prompt: "preserve me" }],
@@ -899,7 +900,8 @@ describe("AdminApp", () => {
     const aliases = screen.getByLabelText(/^Aliases/);
     fireEvent.change(aliases, { target: { value: "default, production" } });
     fireEvent.blur(aliases);
-    fireEvent.click(screen.getByLabelText("Vision"));
+    expect(screen.queryByText("Required capabilities")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Vision")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Selection"), { target: { value: "weighted_hash" } });
     fireEvent.change(screen.getByLabelText(/^Stable hash key/), { target: { value: "thread_id" } });
     expect(screen.queryByText("Prompt-cache route affinity")).not.toBeInTheDocument();
