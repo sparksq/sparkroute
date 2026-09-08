@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	ProtocolVersion        = 1
+	ProtocolVersion        = 2
 	MaxBridgeResponseBytes = 1 << 20
 	MaxBridgeStderrBytes   = 64 << 10
 )
@@ -31,6 +31,7 @@ type Binding struct {
 type Endpoint struct {
 	State          string                   `json:"state"`
 	ClusterID      string                   `json:"cluster_id"`
+	ClusterName    string                   `json:"cluster_name,omitempty"`
 	JobID          string                   `json:"job_id"`
 	Host           string                   `json:"host"`
 	Port           int                      `json:"port"`

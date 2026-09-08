@@ -1,5 +1,8 @@
 # Sparkrun integration readiness review
 
+Current bridge contract: [schema v2 named-cluster metadata](SPARKRUN_CLUSTER_METADATA_CONTRACT.md).
+The schema-v1 qualification below is historical; both current components require v2.
+
 Status: gateway and Sparkrun source implementations are interoperable and
 their automated contract suites pass. Release packaging and a real-cluster
 cold-start exercise remain before general availability.

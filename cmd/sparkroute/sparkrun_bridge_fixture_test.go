@@ -106,14 +106,14 @@ func runAcceptanceBridge() int {
 	}
 
 	response := acceptanceBridgeResponse{
-		SchemaVersion: 1,
+		SchemaVersion: request.SchemaVersion,
 		RequestID:     request.RequestID,
 		OK:            true,
 	}
 	switch request.Operation {
 	case "capabilities":
 		response.Result = map[string]any{
-			"protocol_version": 1,
+			"protocol_version": request.SchemaVersion,
 			"operations":       []string{"discover", "ensure_ready", "stop"},
 			"sparkrun_version": "acceptance-fixture",
 		}

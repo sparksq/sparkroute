@@ -6,7 +6,7 @@ export function deploymentTitle(deployment: Record<string, unknown>): string {
   if (!name.startsWith("sparkrun:")) return name;
   const source = deployment.endpoint_source as Record<string, unknown> | undefined;
   const clusters = Array.isArray(source?.cluster_candidates) ? source.cluster_candidates.filter((value) => typeof value === "string") : [];
-  return `sparkrun:${clusters.join(",") || (source?.type === "activatable" ? "auto" : "discovered")}:${deployment.model || name}`;
+  return `sparkrun:${clusters.join(",") || (source?.type === "activatable" ? "unassigned" : "discovered")}:${deployment.model || name}`;
 }
 
 export function deploymentChoices(...documents: (ConfigurationDocument | undefined)[]): Record<string, string> {

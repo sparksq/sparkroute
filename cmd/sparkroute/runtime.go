@@ -100,6 +100,7 @@ func buildRuntimeGeneration(
 	}
 	lifecycleTargets, _ := lifecycle.TargetsFromDocument(document)
 	var runtimeController *sparkrunruntime.Controller
+	var endpointRegistry *endpointregistry.Memory
 	var admissionCoordinator *lifecycle.AdmissionCoordinator
 	if len(lifecycleTargets) > 0 {
 		bridge, err := sparkrunruntime.NewClient(options.SparkrunCommand)
@@ -107,6 +108,7 @@ func buildRuntimeGeneration(
 			return nil, err
 		}
 		registry := endpointregistry.NewMemory()
+		endpointRegistry = registry
 		metadataPublisher, _ := requestModelRouter.(modelrouter.DiscoveredMetadataPublisher)
 		runtimeController, err = sparkrunruntime.New(sparkrunruntime.Options{
 			Bridge: bridge, Registry: registry, Targets: lifecycleTargets,
@@ -210,6 +212,9 @@ func buildRuntimeGeneration(
 			ClientCredentials:  options.ClientCredentials,
 			ProviderAuth:       options.ProviderAuth,
 			ManagedConfig:      options.ManagedConfig,
+		}
+		if endpointRegistry != nil {
+			adminOptions.Endpoints = endpointRegistry
 		}
 		adminOptions.ModelMetadata, _ = requestModelRouter.(modelrouter.DiscoveredMetadataInspector)
 		if options.MMProjection != nil {

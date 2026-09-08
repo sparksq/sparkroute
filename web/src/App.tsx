@@ -446,7 +446,7 @@ function ConsoleLayout({
 
         {configurationAvailable && bootstrap.features.config_managed_sets && configurationVisited ? (
           <div hidden={!section || section === "advanced"}>
-            <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
+            <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} runtimeTargets={status?.targets} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
           </div>
         ) : null}
         {section === "advanced" ? (

@@ -1,5 +1,8 @@
 # Sparkrun bridge model-metadata extension
 
+Current bridge contract: [schema v2 named-cluster metadata](SPARKRUN_CLUSTER_METADATA_CONTRACT.md).
+The schema-v1 qualification below is historical; both current components require v2.
+
 Status: implemented in SparkRoute; optional Sparkrun producer support may be
 added without changing gateway-bridge protocol version 1.
 

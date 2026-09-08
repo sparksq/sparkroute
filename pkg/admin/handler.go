@@ -18,6 +18,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/config"
 	"github.com/sparksq/sparkroute/pkg/config/managed"
 	"github.com/sparksq/sparkroute/pkg/credentials"
+	"github.com/sparksq/sparkroute/pkg/endpointregistry"
 	"github.com/sparksq/sparkroute/pkg/identity"
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
@@ -33,7 +34,12 @@ const (
 	RoleConfigReconcileSparkrun = "config_reconcile:sparkrun"
 )
 
+type ReadyEndpoints interface {
+	Ready(context.Context, string) ([]endpointregistry.Endpoint, error)
+}
+
 type Options struct {
+	Endpoints         ReadyEndpoints
 	Targets           routing.TargetStatusSource
 	Credentials       credentials.StatusSource
 	GatewayVersion    string
@@ -439,7 +445,7 @@ func (h *handler) serveStatus(
 	status.Targets = targetStatuses(h.options.Targets)
 	titles := make(map[string]string, len(h.document.Deployments))
 	for _, deployment := range h.document.Deployments {
-		titles[deployment.Name] = deployment.Title
+		titles[deployment.Name] = h.deploymentTitle(request.Context(), deployment)
 	}
 	for i := range status.Targets {
 		status.Targets[i].Title = titles[status.Targets[i].Deployment]
@@ -448,6 +454,35 @@ func (h *handler) serveStatus(
 	status.MMProjection = projectionStatus(h.options.MMProjection)
 	status.Privacy = privacyStatus(request.Context(), h.options.Privacy)
 	writeJSON(writer, http.StatusOK, status)
+}
+
+// Runtime placement enriches presentation only; stored configuration and IDs stay intact.
+func (h *handler) deploymentTitle(ctx context.Context, deployment config.Deployment) string {
+	if h.options.Endpoints == nil || !strings.HasPrefix(deployment.Name, "sparkrun:") || deployment.EndpointSource.Controller != "sparkrun" {
+		return deployment.Title
+	}
+	endpoints, err := h.options.Endpoints.Ready(ctx, deployment.Name)
+	if err != nil {
+		return deployment.Title
+	}
+	names := make(map[string]bool)
+	for _, endpoint := range endpoints {
+		if endpoint.Controller != "sparkrun" {
+			continue
+		}
+		if name := endpoint.Metadata["cluster_name"]; name != "" {
+			names[name] = true
+		}
+	}
+	if len(names) == 0 {
+		return deployment.Title
+	}
+	sorted := make([]string, 0, len(names))
+	for name := range names {
+		sorted = append(sorted, name)
+	}
+	sort.Strings(sorted)
+	return "sparkrun:" + strings.Join(sorted, ",") + ":" + deployment.Model
 }
 
 func privacyStatus(ctx context.Context, source privacy.StatusSource) privacy.Status {

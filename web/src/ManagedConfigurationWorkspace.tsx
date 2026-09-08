@@ -13,6 +13,7 @@ import type {
   AdminBootstrap,
   ConfigurationDocument,
   DiscoveredMetadataState,
+  GatewayStatus,
   ManagedConfigurationOwner,
   ManagedConfigurationSetMetadata,
 } from "./types";
@@ -38,11 +39,13 @@ export function ManagedConfigurationWorkspace({
   token,
   virtualModelExtensions,
   section = "providers",
+  runtimeTargets,
 }: {
   bootstrap: AdminBootstrap;
   token: string;
   virtualModelExtensions?: VirtualModelEditorExtension[];
   section?: ConfigurationSection;
+  runtimeTargets?: GatewayStatus["targets"];
 }) {
   const canRead = Boolean(bootstrap.features.config_read);
   const canWriteOperator = Boolean(bootstrap.features.config_write);
@@ -104,7 +107,13 @@ export function ManagedConfigurationWorkspace({
   const parsed = useMemo(() => parseDocument(draft), [draft]);
   const operatorDraft = drafts.operator ?? emptyDocument;
   const operatorParsed = useMemo(() => parseDocument(operatorDraft), [operatorDraft]);
-  const generatedDocument = storedDocuments.sparkrun;
+  const generatedDocument = useMemo(() => {
+    const stored = storedDocuments.sparkrun;
+    if (!stored || !Array.isArray(stored.deployments)) return stored;
+    const titles = new Map(runtimeTargets?.filter((target) => target.title).map((target) => [target.deployment, target.title]));
+    return { ...stored, deployments: stored.deployments.map((deployment) => titles.has(deployment.name)
+      ? { ...deployment, title: titles.get(deployment.name) } : deployment) };
+  }, [storedDocuments.sparkrun, runtimeTargets]);
   const metadata = sets.find((set) => set.owner === selectedOwner);
   const canEdit = canWriteOperator && Boolean(storedDocuments.operator);
   const candidateKey = `${storedRevision}\0${draft}`;
@@ -347,7 +356,7 @@ export function ManagedConfigurationWorkspace({
             spellCheck={false}
             value={draft}
           />
-          {generatedDocument ? <details className="generated-json"><summary>SparkRun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(generatedDocument, null, 2)} /></details> : null}
+          {generatedDocument ? <details className="generated-json"><summary>SparkRun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(storedDocuments.sparkrun, null, 2)} /></details> : null}
           </>
         ) : null}
       </section>

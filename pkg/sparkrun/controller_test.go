@@ -430,3 +430,29 @@ func activationTarget() lifecycle.Target {
 		},
 	}
 }
+
+func TestClusterNameIsAdvisoryAndDoesNotChangeEndpointIdentity(t *testing.T) {
+	target := activationTarget()
+	controller, err := New(Options{Bridge: &fakeBridge{}, Registry: endpointregistry.NewMemory(), Targets: []lifecycle.Target{target}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := Endpoint{State: "ready", ClusterID: "opaque-job", JobID: "opaque-job", Host: "127.0.0.1", Port: 8000, Protocol: "openai", ServedModels: []string{target.UpstreamModel}, RecipeRevision: target.Binding.RecipeRevision}
+	before, _, err := controller.endpointFromBridge(target, original, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original.ClusterName = "spark-a"
+	after, _, err := controller.endpointFromBridge(target, original, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Metadata["cluster_name"] != "spark-a" || before.ID != after.ID || before.ClusterID != after.ClusterID || before.BindingRevision != after.BindingRevision || before.FencingToken != after.FencingToken {
+		t.Fatal("display metadata changed identity or fencing")
+	}
+	original.ClusterName = "bad\nlabel"
+	invalid, _, err := controller.endpointFromBridge(target, original, 7)
+	if err != nil || invalid.Metadata["cluster_name"] != "" {
+		t.Fatal("invalid display metadata affected an otherwise valid endpoint")
+	}
+}

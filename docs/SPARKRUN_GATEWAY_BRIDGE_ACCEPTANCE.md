@@ -1,5 +1,8 @@
 # Sparkrun gateway-bridge acceptance contract
 
+Current bridge contract: [schema v2 named-cluster metadata](SPARKRUN_CLUSTER_METADATA_CONTRACT.md).
+The schema-v1 qualification below is historical; both current components require v2.
+
 This document is the interoperability handoff for SparkRoute's consumer and
 Sparkrun's producer implementations of the hidden one-shot
 `sparkrun gateway-bridge` protocol.

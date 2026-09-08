@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/sparksq/sparkroute/pkg/endpointregistry"
 	"github.com/sparksq/sparkroute/pkg/lifecycle"
@@ -593,6 +594,10 @@ func (c *Controller) endpointFromBridge(
 		RecipeRevision: discovered.RecipeRevision, FencingToken: fencingToken,
 		State: endpointregistry.StateReady, RegisteredAt: now, HeartbeatAt: now,
 		ExpiresAt: now.Add(c.endpointTTL),
+	}
+	// Advisory display metadata never changes endpoint identity or fencing.
+	if name := discovered.ClusterName; len(name) <= 1024 && strings.TrimSpace(name) != "" && strings.IndexFunc(name, unicode.IsControl) < 0 {
+		endpoint.Metadata = map[string]string{"cluster_name": name}
 	}
 	if target.Source == lifecycle.EndpointActivatable {
 		endpoint.BindingRevision = target.Binding.Revision

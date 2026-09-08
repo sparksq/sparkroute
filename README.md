@@ -141,7 +141,9 @@ the page or using Refresh reloads stored configuration.
 Operator virtual models can target deployments from either owner. Routing pickers
 show deployment display titles; references retain the stable deployment `name` ID.
 SparkRun titles use `sparkrun:{clusterName}:{model}` where cluster metadata is
-available. Equal titles are disambiguated with their IDs. Model-routing selectors
+available. Observed job clusters take precedence over configured placement
+candidates; unplaced recipe bindings use `unassigned`. Equal titles are
+disambiguated with their IDs. Model-routing selectors
 can use virtual models from both owners. These references do not copy or modify
 generated entities.
 
@@ -155,6 +157,9 @@ come from the provider. Existing advanced capabilities and explicit protocol
 overrides are preserved and remain accessible in JSON. File inputs (`file_input`)
 are distinct from a provider's Files resource API (`files`). Concurrency limits and
 passive circuit health settings are grouped under **Concurrency and circuit policy**.
+
+See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
+for schema v2 requirements and treatment of older job metadata.
 
 ## Native provider configuration
 
