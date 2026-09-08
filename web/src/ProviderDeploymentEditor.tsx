@@ -362,6 +362,7 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
     <dl className="sparkrun-deployment-summary">
       <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
       <div><dt>Native APIs</dt><dd>{[...(stringArray(deployment.native_protocols).includes("openai") ? ["OpenAI (Chat Completions)"] : []), ...(stringArray(deployment.capabilities).includes("responses") ? ["OpenAI (Responses)"] : []), ...(stringArray(deployment.native_protocols).includes("anthropic") ? ["Anthropic Messages"] : [])].join(", ") || "OpenAI (Chat Completions)"}</dd></div>
+      {capabilityOptions.some(({value}) => stringArray(deployment.capabilities).includes(value)) && <div><dt>Model capabilities</dt><dd>{capabilityOptions.filter(({value}) => stringArray(deployment.capabilities).includes(value)).map(({label}) => label).join(", ")}</dd></div>}
       <div><dt>Recipe</dt><dd><small className="recipe-source">{preview?.source_path || recipe || "Discovered workload"}</small></dd></div>
       <div><dt>Cluster</dt><dd>{sparkrunDeploymentClusters(deployment).join(", ") || "Not yet reported"}</dd></div>
       {source.type === "activatable" && <>

@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,7 +37,17 @@ type Operation struct {
 	Error       *BridgeError    `json:"error,omitempty"`
 }
 
+// RecipeSettings are defaults imported into operator configuration at creation.
+// Later operator edits remain authoritative; generated sets follow their recipe.
+type RecipeSettings struct {
+	Capabilities    []config.Capability                              `json:"capabilities,omitempty"`
+	RequestProfiles map[string]map[string]map[string]json.RawMessage `json:"request_profiles,omitempty"`
+}
+
+var recipeProfileSelector = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
+
 type RecipeDetails struct {
+	Sparkroute       RecipeSettings      `json:"sparkroute,omitempty"`
 	Metadata         map[string]any      `json:"metadata"`
 	HFModel          string              `json:"hf_model"`
 	AvailablePlugins []string            `json:"available_plugins"`
@@ -89,6 +101,30 @@ func resolveDetails(ctx context.Context, catalog Catalog, reference string, over
 	err := catalog.Catalog(ctx, "catalog_resolve", map[string]any{"reference": reference, "overrides": overrides}, &details)
 	if err != nil {
 		return details, err
+	}
+	if err := config.ValidateCapabilitySet(details.Sparkroute.Capabilities); err != nil {
+		return details, fmt.Errorf("sparkroute.capabilities: %w", err)
+	}
+	for _, capability := range details.Sparkroute.Capabilities {
+		if !slices.Contains(details.Capabilities, capability) {
+			details.Capabilities = append(details.Capabilities, capability)
+		}
+	}
+	if len(details.Sparkroute.RequestProfiles) > 64 {
+		return details, fmt.Errorf("sparkroute.request_profiles: at most 64 profiles allowed")
+	}
+	for selector, overrides := range details.Sparkroute.RequestProfiles {
+		if !recipeProfileSelector.MatchString(selector) || len(overrides) == 0 {
+			return details, fmt.Errorf("sparkroute.request_profiles: invalid selector or empty profile %q", selector)
+		}
+		for operation, parameters := range overrides {
+			if len(parameters) == 0 {
+				return details, fmt.Errorf("sparkroute.request_profiles.%s.%s: parameters cannot be empty", selector, operation)
+			}
+		}
+		if err := config.ValidateRequestOverrides(overrides); err != nil {
+			return details, fmt.Errorf("sparkroute.request_profiles.%s: %w", selector, err)
+		}
 	}
 	for _, issue := range details.Issues {
 		if issue["severity"] == "error" {
@@ -252,8 +288,40 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	if slices.Contains(details.Capabilities, config.Capability("single_vector_embedding")) {
 		required = []config.Capability{"single_vector_embedding"}
 	}
-	operator.VirtualModels = append(operator.VirtualModels, config.VirtualModel{Name: input.Name, Aliases: input.Aliases, RequiredCapabilities: required,
-		Pools: []config.RoutingPool{{Priority: 0, Targets: []config.WeightedTarget{{Deployment: deploymentName, Weight: 1}}}}})
+	base := config.VirtualModel{Name: input.Name, Aliases: slices.Clone(input.Aliases), RequiredCapabilities: required,
+		Pools: []config.RoutingPool{{Priority: 0, Targets: []config.WeightedTarget{{Deployment: deploymentName, Weight: 1}}}}}
+	additions := []config.VirtualModel{base}
+	selectors := make([]string, 0, len(details.Sparkroute.RequestProfiles))
+	for selector := range details.Sparkroute.RequestProfiles {
+		selectors = append(selectors, selector)
+	}
+	sort.Strings(selectors)
+	for _, selector := range selectors {
+		profile := base
+		profile.Name = base.Name + ":" + selector
+		profile.Aliases = make([]string, len(base.Aliases))
+		for i, alias := range base.Aliases {
+			profile.Aliases[i] = alias + ":" + selector
+		}
+		profile.RequestOverrides = details.Sparkroute.RequestProfiles[selector]
+		additions = append(additions, profile)
+	}
+	occupied := map[string]bool{}
+	for _, model := range append(slices.Clone(operator.VirtualModels), generated.VirtualModels...) {
+		occupied[model.Name] = true
+		for _, alias := range model.Aliases {
+			occupied[alias] = true
+		}
+	}
+	for _, model := range additions {
+		for _, name := range append([]string{model.Name}, model.Aliases...) {
+			if occupied[name] {
+				return operator, "", false, fmt.Errorf("recipe model or request profile conflicts with existing model or alias %q", name)
+			}
+			occupied[name] = true
+		}
+	}
+	operator.VirtualModels = append(slices.Clone(operator.VirtualModels), additions...)
 	return operator, deploymentName, reused, nil
 }
 

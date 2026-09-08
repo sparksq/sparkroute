@@ -351,21 +351,8 @@ func (d Document) Validate() error {
 				path,
 			)
 		}
-		for operation, overrides := range model.RequestOverrides {
-			for _, key := range []string{"contents", "system", "system_instruction", "systemInstruction", "instructions", "history", "conversation", "previous_response_id"} {
-				if _, exists := overrides[key]; exists {
-					return fmt.Errorf("%s.request_overrides.%s: request structure field %s cannot be overridden", path, operation, key)
-				}
-			}
-
-			switch operation {
-			case "chat_completions", "responses", "responses_compact", "messages", "messages_count_tokens", "generate_content", "stream_generate_content", "count_tokens", "converse", "converse_stream", "embeddings", "embed_content", "batch_embed_contents":
-			default:
-				return fmt.Errorf("%s.request_overrides: unsupported operation %q", path, operation)
-			}
-			if err := validateExtraBody(overrides); err != nil {
-				return fmt.Errorf("%s.request_overrides.%s: %w", path, operation, err)
-			}
+		if err := ValidateRequestOverrides(model.RequestOverrides); err != nil {
+			return fmt.Errorf("%s.request_overrides: %w", path, err)
 		}
 		if err := validateCapabilities(model.RequiredCapabilities); err != nil {
 			return fmt.Errorf("%s.required_capabilities: %w", path, err)
@@ -1399,4 +1386,25 @@ func isAuthenticationLike(lowerName string) bool {
 	return strings.HasSuffix(lowerName, "-key") ||
 		strings.HasSuffix(lowerName, "-secret") ||
 		strings.HasSuffix(lowerName, "-token")
+}
+
+// ValidateRequestOverrides applies the same rules to virtual models and recipe defaults.
+func ValidateRequestOverrides(values map[string]map[string]json.RawMessage) error {
+	for operation, overrides := range values {
+		for _, key := range []string{"contents", "system", "system_instruction", "systemInstruction", "instructions", "history", "conversation", "previous_response_id"} {
+			if _, exists := overrides[key]; exists {
+				return fmt.Errorf("%s: request structure field %s cannot be overridden", operation, key)
+			}
+		}
+
+		switch operation {
+		case "chat_completions", "responses", "responses_compact", "messages", "messages_count_tokens", "generate_content", "stream_generate_content", "count_tokens", "converse", "converse_stream", "embeddings", "embed_content", "batch_embed_contents":
+		default:
+			return fmt.Errorf("unsupported operation %q", operation)
+		}
+		if err := validateExtraBody(overrides); err != nil {
+			return fmt.Errorf("%s: %w", operation, err)
+		}
+	}
+	return nil
 }

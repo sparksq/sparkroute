@@ -8,7 +8,7 @@ const detail = { ...recipe, recipe_revision: "revision", native_protocols: ["ope
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-function setup(options: { failDraft?: boolean; issue?: boolean; emptyCatalog?: boolean } = {}) {
+function setup(options: { failDraft?: boolean; issue?: boolean; emptyCatalog?: boolean; recipeDefaults?: boolean } = {}) {
  const calls: { url: string; body: Record<string, any> }[] = [];
  vi.stubGlobal("fetch", vi.fn(async (url: string, request: RequestInit) => {
   const body = JSON.parse(String(request.body)); calls.push({ url, body });
@@ -18,7 +18,7 @@ function setup(options: { failDraft?: boolean; issue?: boolean; emptyCatalog?: b
    case "catalog_clusters": return json({ clusters: [{ name: "lab", host_count: 2, default: true }] });
    case "catalog_registries": return json({ registries: [{ name: "registry", enabled: true, cached: true }, { name: "disabled", enabled: false, cached: true }] });
    case "catalog_search": return json({ recipes: options.emptyCatalog ? [] : [recipe, { ...recipe, reference: "catalog:second", source_path: "/recipes/two/coder.yaml" }], total: options.emptyCatalog ? 0 : 2, next_offset: null, unavailable_registries: options.emptyCatalog ? ["registry"] : [] });
-   case "catalog_resolve": return json({ ...detail, reference: body.arguments.reference, issues: options.issue ? [{ severity: "error", code: "recipe_trust_required", message: "Recipe hooks require explicit trust." }] : [] });
+   case "catalog_resolve": return json({ ...detail, ...(options.recipeDefaults ? {capabilities:["vision"], sparkroute:{request_profiles:{low:{responses:{reasoning:{effort:"low"}}}}}} : {}), reference: body.arguments.reference, issues: options.issue ? [{ severity: "error", code: "recipe_trust_required", message: "Recipe hooks require explicit trust." }] : [] });
    case "catalog_import": return json(detail);
    default: throw new Error("Unexpected operation " + body.operation);
   }
@@ -102,4 +102,13 @@ it("prefills defaults.served_model_name before the HF model", async () => {
  render(<SparkrunRecipeWizard token="test-token" document={empty} revision="active" onChange={() => {}} onClose={() => {}} />);
  fireEvent.click(await screen.findByRole("button", {name:"Choose @registry/coder"}));
  expect(await screen.findByLabelText("Public model name")).toHaveValue("served-coder");
+});
+
+it("explains recipe capabilities and profiles before preparing the draft", async () => {
+ const {onChange} = setup({recipeDefaults:true});
+ fireEvent.click((await screen.findAllByRole("button", {name:"Choose @registry/coder"}))[0]!);
+ expect(await screen.findByText("Model capabilities: Vision.")).toBeVisible();
+ expect(screen.getByText(/Recipe request profiles: low/)).toHaveTextContent("Virtual Models / Aliases");
+ fireEvent.click(screen.getByRole("button", {name:"Add to draft"}));
+ await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
 });

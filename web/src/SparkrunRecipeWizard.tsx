@@ -1,3 +1,4 @@
+import { capabilityOptions } from "./capabilities";
 import { RecipePluginStatus } from "./RecipePluginStatus";
 import { RegistryManager } from "./RegistryManager";
 import { ClusterCapacity } from "./ClusterCapacity";
@@ -193,6 +194,8 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       {preview && <div className="recipe-preview"><strong>{preview.name}</strong><p>{preview.model} · {preview.runtime} · {preview.min_nodes} node{preview.min_nodes === 1 ? "" : "s"} minimum</p>
         <small className="recipe-source">{preview.source_path}</small>
         <p>HF model: {preview.hf_model || preview.model}</p><p>Recipe defaults: {JSON.stringify(preview.defaults)}</p>
+        {capabilityOptions.some(({value}) => (preview.capabilities ?? []).includes(value)) && <p>Model capabilities: {capabilityOptions.filter(({value}) => (preview.capabilities ?? []).includes(value)).map(({label}) => label).join(", ")}.</p>}
+        {Object.keys(preview.sparkroute?.request_profiles ?? {}).length > 0 && <p>Recipe request profiles: {Object.keys(preview.sparkroute?.request_profiles ?? {}).sort().join(", ")}. {initialDeployment ? "Existing profiles remain unchanged." : "Added under the public model name in Virtual Models / Aliases, where you can edit their parameters."}</p>}
         <p>Recipe extensions: {preview.required_plugins.join(", ") || "none"}.</p>
         <details><summary>Benchmark context</summary><p className="section-help">Declared recipe results depend on hardware and request shape; browsing does not run a benchmark.</p>
           {preview.metadata?.benchmarks?.length ? preview.metadata.benchmarks.map((benchmark, i) => <dl className="recipe-benchmark" key={i}>{Object.entries(benchmark).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value)}</dd></div>)}</dl>) : <p>No benchmark results declared for this recipe.</p>}

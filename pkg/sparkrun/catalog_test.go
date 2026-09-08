@@ -13,6 +13,7 @@ import (
 
 type catalogFixture struct {
 	revision string
+	settings RecipeSettings
 	calls    []string
 }
 
@@ -21,7 +22,7 @@ func (f *catalogFixture) Catalog(_ context.Context, operation string, _ map[stri
 	var value any
 	switch operation {
 	case "catalog_resolve":
-		value = RecipeDetails{Reference: "catalog:123", Name: "recipe", Revision: f.revision, Model: "test/model", Runtime: "vllm", NativeAPIOptions: []string{"chat_completions", "responses", "messages"}, NativeProtocols: []config.Protocol{config.ProtocolOpenAI}, Trusted: true}
+		value = RecipeDetails{Sparkroute: f.settings, Reference: "catalog:123", Name: "recipe", Revision: f.revision, Model: "test/model", Runtime: "vllm", NativeAPIOptions: []string{"chat_completions", "responses", "messages"}, NativeProtocols: []config.Protocol{config.ProtocolOpenAI}, Trusted: true}
 	case "catalog_clusters":
 		value = map[string]any{"clusters": []Cluster{{Name: "lab", HostCount: 2, Default: true}}}
 	default:
@@ -188,5 +189,78 @@ func TestRecipeNativeAPIChoicesPersistAndEdit(t *testing.T) {
 	input.NativeAPIs = []string{"generate_content"}
 	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, doc, empty, input); err == nil {
 		t.Fatal("accepted API outside runtime family")
+	}
+}
+
+func TestRecipeGatewayDefaultsCreateProfilesOnOneDeployment(t *testing.T) {
+	f := &catalogFixture{revision: "same-workload", settings: RecipeSettings{
+		Capabilities: []config.Capability{config.CapabilityVision},
+		RequestProfiles: map[string]map[string]map[string]json.RawMessage{
+			"low":   {"chat_completions": {"chat_template_kwargs": json.RawMessage(`{"enable_thinking":false}`)}, "responses": {"reasoning": json.RawMessage(`{"effort":"low"}`)}},
+			"xhigh": {"chat_completions": {"reasoning_effort": json.RawMessage(`"xhigh"`)}},
+		},
+	}}
+	empty := managed.EmptyDocument()
+	input := RecipeDraft{Reference: "catalog:123", RecipeRevision: f.revision, Name: "coding", Aliases: []string{"code"}, Cluster: "lab"}
+	doc, id, reused, err := PrepareRecipeDraft(context.Background(), f, empty, empty, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused || len(doc.Deployments) != 1 || len(doc.VirtualModels) != 3 {
+		t.Fatal(doc)
+	}
+	if err := doc.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Deployments[0].Capabilities) != 1 || doc.Deployments[0].Capabilities[0] != config.CapabilityVision {
+		t.Fatal("vision missing", doc)
+	}
+	for _, model := range doc.VirtualModels {
+		if model.Pools[0].Targets[0].Deployment != id {
+			t.Fatal("profile created another workload")
+		}
+	}
+	low, ok := doc.CanonicalModel("code:low")
+	if !ok || low.Name != "coding:low" || string(low.RequestOverrides["responses"]["reasoning"]) != `{"effort":"low"}` {
+		t.Fatal(low)
+	}
+	// A different public name can share generated workload settings and import its profiles.
+	input.Name, input.Aliases = "assistant", nil
+	shared, sharedID, reused, err := PrepareRecipeDraft(context.Background(), f, empty, doc, input)
+	if err != nil || !reused || sharedID != id || len(shared.Deployments) != 0 || len(shared.VirtualModels) != 3 {
+		t.Fatal(err, shared)
+	}
+	if _, err := managed.Merge(map[managed.Owner]config.Document{managed.OwnerOperator: shared, managed.OwnerSparkrun: doc}); err != nil {
+		t.Fatal(err)
+	}
+	// Applying lifecycle edits does not replace request parameters already edited by the operator.
+	doc.VirtualModels[1].RequestOverrides = map[string]map[string]json.RawMessage{"chat_completions": {"temperature": json.RawMessage(`0.9`)}}
+	input.Deployment = id
+	edited, _, _, err := PrepareRecipeDraft(context.Background(), f, doc, empty, input)
+	if err != nil || string(edited.VirtualModels[1].RequestOverrides["chat_completions"]["temperature"]) != "0.9" {
+		t.Fatal("overwrote operator profile", err)
+	}
+}
+
+func TestRecipeProfilesRejectNameCollisionsAndInvalidOverrides(t *testing.T) {
+	empty := managed.EmptyDocument()
+	input := RecipeDraft{Reference: "catalog:123", RecipeRevision: "r", Name: "coding", Cluster: "lab"}
+	f := &catalogFixture{revision: "r", settings: RecipeSettings{RequestProfiles: map[string]map[string]map[string]json.RawMessage{
+		"low": {"chat_completions": {"temperature": json.RawMessage(`0.2`)}},
+	}}}
+	for _, model := range []config.VirtualModel{{Name: "coding:low"}, {Name: "other", Aliases: []string{"coding:low"}}} {
+		generated := empty
+		generated.VirtualModels = []config.VirtualModel{model}
+		if _, _, _, err := PrepareRecipeDraft(context.Background(), f, empty, generated, input); err == nil || !strings.Contains(err.Error(), "conflicts") {
+			t.Fatal("accepted collision", err)
+		}
+	}
+	f.settings.RequestProfiles["low"]["chat_completions"] = map[string]json.RawMessage{"model": json.RawMessage(`"other"`)}
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, empty, empty, input); err == nil || !strings.Contains(err.Error(), "protocol-owned") {
+		t.Fatal("accepted protected field", err)
+	}
+	f.settings.RequestProfiles = map[string]map[string]map[string]json.RawMessage{"low:bad": {"responses": {"temperature": json.RawMessage(`0.2`)}}}
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, empty, empty, input); err == nil {
+		t.Fatal("accepted invalid selector")
 	}
 }

@@ -423,6 +423,7 @@ export interface SparkrunRecipeDetails extends SparkrunRecipe {
   native_api_options?: string[];
   native_protocols: string[];
   capabilities: string[];
+  sparkroute?: { capabilities?: string[]; request_profiles?: Record<string, Record<string, Record<string, unknown>>> };
   required_plugins: string[];
   trusted: boolean;
   metadata?: {benchmarks?: Record<string, unknown>[]};

@@ -86,3 +86,36 @@ SparkRoute ownership, and zero active request leases. ColdSnap verifies the job,
 hosts, and capture identity. Idle time starts after the final lease ends; an
 uncertain transition blocks serving until reconciled. Coordination remains
 within one local gateway and its durable bridge workers.
+
+
+## Recipe-provided capabilities and request profiles
+
+The sparkrun recipe may contain an optional top-level `sparkroute` mapping:
+
+```yaml
+sparkroute:
+  capabilities: [vision]
+  request_profiles:
+    low:
+      chat_completions:
+        temperature: 0.2
+      responses:
+        reasoning: {effort: low}
+```
+
+The recipe picker previews these defaults. Adding the public model `coding`
+imports `coding:low` (and suffixed aliases) into the same draft, pointing to the
+same deployment. The existing Request profiles table under `coding` edits these
+parameters. Recipe/lifecycle edits preserve existing operator profiles; defaults
+are imported when creating a public model, not continuously overlaid onto edits.
+
+`capabilities` describes support, not a requirement for every request. Profiles
+map selectors to ingress operations and JSON parameter objects, using the same
+protected-field rules and recursive override behavior as manually configured
+profiles. Invalid selectors, protected request structure, and existing
+model/alias collisions are rejected before the draft can be saved. Runtime API
+declarations remain separate from these optional model features.
+
+The generated sparkrun set follows the recipe of a loaded binding on sync, or
+its saved launch recipe for discovery-only jobs. Those profiles are read-only.
+Recipe settings do not alter workload identity or create additional workloads.
