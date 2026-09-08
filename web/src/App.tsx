@@ -248,7 +248,7 @@ function ConsoleLayout({
   );
   const section = configurationSection(page);
   const lastConfigurationSection = useRef(section ?? "providers");
-  if (section && section !== "advanced") lastConfigurationSection.current = section;
+  if (section) lastConfigurationSection.current = section;
   const [configurationVisited, setConfigurationVisited] = useState(Boolean(section));
   useEffect(() => {
     if (section) setConfigurationVisited(true);
@@ -445,7 +445,7 @@ function ConsoleLayout({
         </header>
 
         {configurationAvailable && bootstrap.features.config_managed_sets && configurationVisited ? (
-          <div hidden={!section || section === "advanced"}>
+          <div hidden={!section}>
             <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} runtimeTargets={status?.targets} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
           </div>
         ) : null}

@@ -36,6 +36,8 @@ type Operation struct {
 }
 
 type RecipeDetails struct {
+	Metadata         map[string]any      `json:"metadata"`
+	HFModel          string              `json:"hf_model"`
 	AvailablePlugins []string            `json:"available_plugins"`
 	Reference        string              `json:"reference"`
 	Name             string              `json:"name"`
@@ -47,6 +49,7 @@ type RecipeDetails struct {
 	MinNodes         int                 `json:"min_nodes"`
 	Defaults         map[string]any      `json:"defaults"`
 	Revision         string              `json:"recipe_revision"`
+	NativeAPIOptions []string            `json:"native_api_options"`
 	NativeProtocols  []config.Protocol   `json:"native_protocols"`
 	Capabilities     []config.Capability `json:"capabilities"`
 	RequiredPlugins  []string            `json:"required_plugins"`
@@ -62,12 +65,15 @@ type Cluster struct {
 }
 
 type RecipeDraft struct {
+	NativeAPIs         []string          `json:"native_apis"`
+	IdleAction         string            `json:"idle_action"`
 	Deployment         string            `json:"deployment,omitempty"`
 	Reference          string            `json:"reference"`
 	RecipeRevision     string            `json:"recipe_revision"`
 	Name               string            `json:"name"`
 	Aliases            []string          `json:"aliases"`
 	Cluster            string            `json:"cluster"`
+	FallbackClusters   []string          `json:"fallback_clusters"`
 	Overrides          map[string]string `json:"overrides"`
 	ActivationTimeout  config.Duration   `json:"activation_timeout"`
 	IdleTTL            config.Duration   `json:"idle_ttl"`
@@ -98,9 +104,41 @@ func resolveDetails(ctx context.Context, catalog Catalog, reference string, over
 // PrepareRecipeDraft returns a complete operator draft; it never saves or launches.
 // Reusing a workload also reuses its lifecycle policy, including generated entries.
 func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generated config.Document, input RecipeDraft) (config.Document, string, bool, error) {
+	operator.Providers = slices.Clone(operator.Providers)
+	for i, provider := range operator.Providers {
+		if provider.Name == "sparkrun:operator" && (reflect.DeepEqual(provider, config.Provider{Name: provider.Name, Type: "openai"}) || reflect.DeepEqual(provider, config.Provider{Name: provider.Name, Type: "openai_compatible"})) {
+			operator.Providers[i].Type = "sparkrun"
+		}
+	}
+
 	details, err := resolveDetails(ctx, catalog, input.Reference, input.Overrides)
 	if err != nil {
 		return operator, "", false, err
+	}
+	if input.NativeAPIs != nil {
+		if len(input.NativeAPIs) == 0 || len(input.NativeAPIs) > 8 {
+			return operator, "", false, fmt.Errorf("choose at least one native API")
+		}
+		details.NativeProtocols = nil
+		details.Capabilities = slices.DeleteFunc(details.Capabilities, func(c config.Capability) bool { return c == config.CapabilityResponses })
+		for _, api := range input.NativeAPIs {
+			if !slices.Contains(details.NativeAPIOptions, api) {
+				return operator, "", false, fmt.Errorf("native API %q is unavailable for this runtime family", api)
+			}
+			protocol := config.ProtocolOpenAI
+			if api == "messages" {
+				protocol = config.ProtocolAnthropic
+			}
+			if !slices.Contains(details.NativeProtocols, protocol) {
+				details.NativeProtocols = append(details.NativeProtocols, protocol)
+			}
+			if api == "responses" {
+				details.Capabilities = append(details.Capabilities, config.CapabilityResponses)
+			}
+		}
+		if slices.Contains(input.NativeAPIs, "responses") && !slices.Contains(input.NativeAPIs, "chat_completions") {
+			return operator, "", false, fmt.Errorf("Responses requires Chat Completions for this runtime")
+		}
 	}
 	if input.RecipeRevision == "" || input.RecipeRevision != details.Revision {
 		return operator, "", false, fmt.Errorf("recipe changed; refresh its preview before adding it")
@@ -111,8 +149,16 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	if err := catalog.Catalog(ctx, "catalog_clusters", nil, &clusters); err != nil {
 		return operator, "", false, err
 	}
-	if !slices.ContainsFunc(clusters.Clusters, func(c Cluster) bool { return c.Name == input.Cluster && c.HostCount > 0 }) {
-		return operator, "", false, fmt.Errorf("choose an available named cluster")
+	candidates := append([]string{input.Cluster}, input.FallbackClusters...)
+	seenClusters := map[string]bool{}
+	if len(candidates) > 64 {
+		return operator, "", false, fmt.Errorf("choose at most 64 clusters")
+	}
+	for _, candidate := range candidates {
+		if seenClusters[candidate] || !slices.ContainsFunc(clusters.Clusters, func(c Cluster) bool { return c.Name == candidate && c.HostCount > 0 }) {
+			return operator, "", false, fmt.Errorf("choose distinct available named clusters")
+		}
+		seenClusters[candidate] = true
 	}
 	if input.ActivationTimeout == 0 {
 		input.ActivationTimeout = config.Duration(30 * time.Minute)
@@ -131,7 +177,8 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		}
 		source := deployment.EndpointSource
 		source.Recipe, source.RecipeRevision = details.Reference, details.Revision
-		source.ClusterCandidates, source.Overrides = []string{input.Cluster}, input.Overrides
+		source.ClusterCandidates, source.Overrides = candidates, input.Overrides
+		source.IdleAction = input.IdleAction
 		source.ActivationTimeout, source.IdleTTL = input.ActivationTimeout, input.IdleTTL
 		source.MaxQueuedWaiters, source.MaxQueuedBodyBytes = input.MaxQueuedWaiters, input.MaxQueuedBodyBytes
 		source.Revision = ""
@@ -141,9 +188,13 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		// Keep stable routing references and operator policy while changing the recipe binding.
 		deployment.EndpointSource, deployment.Model = source, details.Model
 		deployment.NativeProtocols = details.NativeProtocols
+		deployment.Capabilities = slices.DeleteFunc(slices.Clone(deployment.Capabilities), func(c config.Capability) bool { return c == config.CapabilityResponses })
+		if slices.Contains(details.Capabilities, config.CapabilityResponses) {
+			deployment.Capabilities = append(deployment.Capabilities, config.CapabilityResponses)
+		}
 		previousTitle := "sparkrun:" + strings.Join(operator.Deployments[index].EndpointSource.ClusterCandidates, ",") + ":" + operator.Deployments[index].Model
 		if deployment.Title == previousTitle {
-			deployment.Title = "sparkrun:" + input.Cluster + ":" + details.Model
+			deployment.Title = "sparkrun:" + strings.Join(candidates, ",") + ":" + details.Model
 		}
 		operator.Deployments = slices.Clone(operator.Deployments)
 		operator.Deployments[index] = deployment
@@ -156,19 +207,27 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	deploymentName, reused := "", false
 	for _, deployment := range allDeployments {
 		source := deployment.EndpointSource
-		if source.Type == config.EndpointSourceActivatable && source.Controller == "sparkrun" && source.RecipeRevision == details.Revision && slices.Equal(source.ClusterCandidates, []string{input.Cluster}) {
+		if source.Type == config.EndpointSourceActivatable && source.Controller == "sparkrun" && source.RecipeRevision == details.Revision && slices.Equal(source.ClusterCandidates, candidates) {
 			deploymentName, reused = deployment.Name, true
 			break
 		}
 	}
 	if !reused {
-		digest := sha256.Sum256([]byte(details.Revision + "\x00" + input.Cluster))
+		digest := sha256.Sum256([]byte(details.Revision + "\x00" + strings.Join(candidates, "\x00")))
 		deploymentName = "sparkrun:" + hex.EncodeToString(digest[:12])
 		providerName := "sparkrun:operator"
-		provider := config.Provider{Name: providerName, Type: "openai"}
+		provider := config.Provider{Name: providerName, Type: "sparkrun"}
 		found := false
 		for _, existing := range append(slices.Clone(operator.Providers), generated.Providers...) {
 			if existing.Name == providerName {
+				if existing.Type == "openai" || existing.Type == "openai_compatible" {
+					existing.Type = "sparkrun"
+					for i := range operator.Providers {
+						if operator.Providers[i].Name == providerName {
+							operator.Providers[i] = existing
+						}
+					}
+				}
 				if !reflect.DeepEqual(existing, provider) {
 					return operator, "", false, fmt.Errorf("the reserved sparkrun provider has conflicting settings")
 				}
@@ -179,14 +238,14 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 			operator.Providers = append(operator.Providers, provider)
 		}
 		source := config.EndpointSource{Type: config.EndpointSourceActivatable, Controller: "sparkrun", Recipe: details.Reference,
-			RecipeRevision: details.Revision, ClusterCandidates: []string{input.Cluster}, Overrides: input.Overrides,
-			ActivationTimeout: input.ActivationTimeout, IdleTTL: input.IdleTTL, ColdStart: config.ColdStartWait,
+			RecipeRevision: details.Revision, ClusterCandidates: candidates, Overrides: input.Overrides,
+			ActivationTimeout: input.ActivationTimeout, IdleTTL: input.IdleTTL, IdleAction: input.IdleAction, ColdStart: config.ColdStartWait,
 			MaxQueuedWaiters: input.MaxQueuedWaiters, MaxQueuedBodyBytes: input.MaxQueuedBodyBytes}
 		raw, _ := json.Marshal(source)
 		revision := sha256.Sum256(raw)
 		source.Revision = hex.EncodeToString(revision[:12])
 		operator.Deployments = append(operator.Deployments, config.Deployment{Name: deploymentName,
-			Title: "sparkrun:" + input.Cluster + ":" + details.Model, Provider: providerName, Model: details.Model,
+			Title: "sparkrun:" + strings.Join(candidates, ",") + ":" + details.Model, Provider: providerName, Model: details.Model,
 			NativeProtocols: details.NativeProtocols, Capabilities: details.Capabilities, EndpointSource: source})
 	}
 	required := []config.Capability(nil)
@@ -219,6 +278,20 @@ func ValidateRecipeBindings(ctx context.Context, catalog Catalog, document confi
 		details, err := resolveDetails(ctx, catalog, source.Recipe, source.Overrides)
 		if err != nil {
 			return err
+		}
+		if source.IdleAction == "sleep" {
+			var available struct {
+				Plugins []PluginAvailability `json:"plugins"`
+			}
+			if err := catalog.Catalog(ctx, "catalog_plugins", nil, &available); err != nil {
+				return err
+			}
+			if !slices.ContainsFunc(available.Plugins, func(p PluginAvailability) bool { return p.Name == "coldsnap" && p.Lifecycle }) {
+				return fmt.Errorf("idle sleep requires the enabled ColdSnap plugin with its workload lifecycle API")
+			}
+			if !slices.Contains(details.RequiredPlugins, "sparkrun.plugins.coldsnap") && !slices.Contains(details.RequiredPlugins, "coldsnap") {
+				return fmt.Errorf("idle sleep requires a ColdSnap recipe")
+			}
 		}
 		if details.Revision != source.RecipeRevision || details.Model != deployment.Model {
 			return fmt.Errorf("recipe for %s changed; refresh the recipe preview", deployment.Name)

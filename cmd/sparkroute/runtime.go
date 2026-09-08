@@ -34,6 +34,8 @@ import (
 )
 
 type runtimeBuildOptions struct {
+	TraceStores             *traceStores
+	TraceReader             savedtrace.Reader
 	SparkrunWorkloads       *sparkrunruntime.Workloads
 	Context                 context.Context
 	Logger                  *slog.Logger
@@ -147,6 +149,19 @@ func buildRuntimeGeneration(
 			return nil, fmt.Errorf("construct Sparkrun lifecycle coordinator: %w", err)
 		}
 	}
+	closeObservability, err := configureGenerationObservability(document, &options)
+	if err != nil {
+		if runtimeController != nil {
+			runtimeController.Close()
+		}
+		return nil, fmt.Errorf("configure tracing: %w", err)
+	}
+	accepted := false
+	defer func() {
+		if !accepted {
+			closeObservability()
+		}
+	}()
 	dataOptions := gateway.DataOptions{
 		Models:      gateway.ModelListOptions{IncludeAliases: options.IncludeAliases},
 		Credentials: credentialRegistry, Ledger: options.Ledger, ProviderAuth: options.ProviderAuth,
@@ -195,8 +210,10 @@ func buildRuntimeGeneration(
 			options.MMProjectionCredentials,
 		),
 	}
+	accepted = true // The generation owns cleanup from this point.
+	generation.closeFn = closeObservability
 	if runtimeController != nil {
-		generation.closeFn = runtimeController.Close
+		generation.closeFn = func() { runtimeController.Close(); closeObservability() }
 		runtimeController.Start(options.Context, func(err error) {
 			options.Logger.Warn("Sparkrun endpoint reconciliation failed", slog.Any("err", err))
 		})
@@ -208,7 +225,8 @@ func buildRuntimeGeneration(
 	}
 	if options.AdminEnabled {
 		adminOptions := ossadmin.Options{
-			Targets: dataPlane.Targets, Credentials: generation.credentials,
+			TraceReader: options.TraceReader,
+			Targets:     dataPlane.Targets, Credentials: generation.credentials,
 			Privacy:        dataPlane.Privacy,
 			GatewayVersion: version.Version,
 			BuildInfo:      version.BuildInfo(),
@@ -223,6 +241,7 @@ func buildRuntimeGeneration(
 		}
 		if admissionCoordinator != nil {
 			adminOptions.Lifecycle = admissionCoordinator
+			adminOptions.SparkrunControl = runtimeController
 		}
 		if endpointRegistry != nil {
 			adminOptions.Endpoints = endpointRegistry
@@ -241,10 +260,14 @@ func buildRuntimeGeneration(
 		}
 		generation.admin = ossadmin.NewHandler(document, revision, adminOptions)
 	}
+	accepted = true
 	return generation, nil
 }
 
 func validateDocumentForIntegration(document config.Document, credentials credentialbuiltin.Options, enabled bool) error {
+	if err := validateTraceEnvironment(document.Observability); err != nil {
+		return err
+	}
 	if !enabled {
 		for _, deployment := range document.Deployments {
 			if deployment.EndpointSource.Controller == "sparkrun" {

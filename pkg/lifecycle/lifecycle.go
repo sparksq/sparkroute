@@ -12,6 +12,7 @@ import (
 )
 
 type Binding struct {
+	IdleAction         string
 	Controller         string
 	Revision           string
 	VirtualModel       string
@@ -54,13 +55,15 @@ type RequestOutcome struct {
 }
 
 type Status struct {
-	Owned     *bool
-	Phase     string
-	JobID     string
-	State     endpointregistry.State
-	Endpoint  *endpointregistry.Endpoint
-	UpdatedAt time.Time
-	Reason    string
+	PluginsInUse     []string
+	LifecycleActions []string
+	Owned            *bool
+	Phase            string
+	JobID            string
+	State            endpointregistry.State
+	Endpoint         *endpointregistry.Endpoint
+	UpdatedAt        time.Time
+	Reason           string
 }
 
 type StopReason string

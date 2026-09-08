@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchLifecycleStatus,
+  controlSparkrunWorkload,
   fetchRuntimeEndpoints,
   fetchRuntimeEvents,
 } from "./api";
@@ -122,7 +123,7 @@ export function RuntimeWorkspace({
       {error ? <p className="form-error panel-error">{error}</p> : null}
       {loading ? <section className="panel runtime-loading">Loading runtime state…</section> : null}
       {!loading && !error && view === "overview" && status ? (
-        <LifecycleOverview snapshot={status} />
+        <LifecycleOverview snapshot={status} token={token} canControl={Boolean(bootstrap.features.sparkrun_controls)} onRefresh={() => void load(undefined, false)} />
       ) : null}
       {!loading && !error && view === "endpoints" ? (
         <EndpointInventory
@@ -142,7 +143,13 @@ export function RuntimeWorkspace({
   );
 }
 
-function LifecycleOverview({ snapshot }: { snapshot: LifecycleSnapshot }) {
+function LifecycleOverview({ snapshot, token, canControl, onRefresh }: { snapshot: LifecycleSnapshot; token: string; canControl: boolean; onRefresh: () => void }) {
+  const [busyJob, setBusyJob] = useState(""); const [actionError, setActionError] = useState("");
+  async function action(deployment: string, job: string, operation: string) {
+    setBusyJob(job); setActionError("");
+    try {await controlSparkrunWorkload(token, deployment, job, operation); onRefresh();}
+    catch(e) {setActionError(e instanceof Error ? e.message : "Workload control failed.");} finally {setBusyJob("");}
+  }
   return (
     <>
       <section className="panel">
@@ -171,9 +178,10 @@ function LifecycleOverview({ snapshot }: { snapshot: LifecycleSnapshot }) {
           <div><p className="eyebrow">Bounded cold-start admission</p><h2>Activation bindings</h2></div>
           <span className="activity-summary">{snapshot.bindings.length} bindings</span>
         </div>
+        {actionError && <p className="notice error" role="alert">{actionError}</p>}
         {snapshot.bindings.length ? (
           <div className="table-wrap"><table><thead><tr>
-            <th>Deployment</th><th>Model</th><th>State</th><th>Queue</th><th>Leases</th><th>Deadline</th>
+            <th>Deployment</th><th>Model</th><th>State</th><th>Queue</th><th>Leases</th><th>Deadline</th><th>Workload controls</th>
           </tr></thead><tbody>
             {snapshot.bindings.map((binding) => <tr key={`${binding.controller}/${binding.binding_revision}`}>
               <td className="deployment-name">{binding.deployment}<small>{binding.cluster_candidates?.join(", ") || binding.controller}</small><small>{binding.job_id}</small><small>{binding.owned === true ? "Started by SparkRoute" : binding.owned === false ? "Adopted · manual stop" : ""}</small></td>
@@ -182,6 +190,7 @@ function LifecycleOverview({ snapshot }: { snapshot: LifecycleSnapshot }) {
               <td>{binding.queued_waiters} / {binding.max_queued_waiters || "∞"}<small>{formatBytes(binding.queued_body_bytes)} / {binding.max_queued_body_bytes ? formatBytes(binding.max_queued_body_bytes) : "∞"}</small></td>
               <td>{binding.active_leases}</td>
               <td>{binding.activation_deadline ? formatTime(binding.activation_deadline) : "—"}</td>
+              <td><small>Plugins in use: {binding.plugins_in_use?.join(", ") || "None reported"}</small>{canControl && binding.job_id && binding.lifecycle_actions?.map((operation) => <button key={operation} type="button" disabled={Boolean(busyJob) || (operation !== "status" && binding.active_leases > 0)} onClick={() => void action(binding.deployment, binding.job_id!, operation)}>{operation === "status" ? "Check status" : operation === "sleep" ? "Sleep" : "Wake"}</button>)}{busyJob === binding.job_id && <small role="status">Controlling workload…</small>}</td>
             </tr>)}
           </tbody></table></div>
         ) : <Empty title="No activation bindings" detail="No cold-start-capable binding has published status." />}

@@ -300,6 +300,9 @@ func TestSparkrunRuntimeBoundsColdStartAndPropagatesCancellation(t *testing.T) {
 		response := serveAcceptanceJSONNoTest(
 			generation.data, "/v1/chat/completions", largeBody,
 		)
+		if response.Code != http.StatusOK {
+			t.Logf("second activation request failed: %d %s", response.Code, response.Body.String())
+		}
 		largeDone <- requestResult{status: response.Code, body: response.Body.String()}
 	}()
 	waitAcceptance(t, 10*time.Second, func() bool {
@@ -439,6 +442,10 @@ func newAcceptanceBridgeFixture(
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// A race-instrumented child otherwise sleeps one second at os.Exit,
+	// exceeding the fixture stop deadline after its reply is already written.
+	// Preserve all race checks while removing that artificial child-exit delay.
+	t.Setenv("GORACE", os.Getenv("GORACE")+" atexit_sleep_ms=0")
 	t.Setenv(acceptanceBridgeStateEnvironment, statePath)
 	return statePath
 }

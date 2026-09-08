@@ -711,7 +711,15 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	}
 	workloads := sparkrunruntime.NewWorkloads()
 	defer workloads.Close()
+	tracePath := *traceFilesystemPath
+	if *traceStorage == "database" {
+		tracePath = *traceDatabasePath
+		if tracePath == "" {
+			tracePath = *ledgerSQLitePath
+		}
+	}
 	runtimeOptions := runtimeBuildOptions{
+		TraceStores: newTraceStores(*traceStorage, tracePath, traceStore), TraceReader: traceStore,
 		SparkrunWorkloads: workloads,
 		SparkrunEnabled:   *sparkrunEnabled,
 		Context:           ctx, Logger: logger, CredentialOptions: credentialOptions,
@@ -815,6 +823,7 @@ func standaloneTokenFileAdminAuthenticator(path string) identity.FileBearerAuthe
 		ossadmin.RoleStatusRead,
 		ossadmin.RoleConfigRead,
 		ossadmin.RoleConfigWrite,
+		ossadmin.RoleTraceReadAll,
 		ossadmin.RoleConfigReconcileSparkrun,
 		clientcredentials.RoleRead,
 		clientcredentials.RoleWrite,

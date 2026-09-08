@@ -408,6 +408,7 @@ export function fetchClientCredentialAudit(
 }
 
 export interface SparkrunRecipe {
+  tp?: number | null; pp?: number | null; quantization?: string | null; context_length?: number | null; parameters_b?: number | null;
   reference: string;
   name: string;
   model: string;
@@ -419,11 +420,13 @@ export interface SparkrunRecipe {
 }
 export interface SparkrunRecipeDetails extends SparkrunRecipe {
   recipe_revision: string;
+  native_api_options?: string[];
   native_protocols: string[];
   capabilities: string[];
   required_plugins: string[];
   trusted: boolean;
-  defaults: Record<string, unknown>;
+  metadata?: {benchmarks?: Record<string, unknown>[]};
+  hf_model?: string; defaults: Record<string, unknown>;
   issues: { severity: string; code: string; message: string }[];
 }
 export interface SparkrunOperation {
@@ -441,4 +444,8 @@ export function prepareSparkrunRecipe(token: string, document: ConfigurationDocu
   return requestJSON<{ document: ConfigurationDocument; deployment: string; reused: boolean }>("/v1/sparkrun/recipe-draft", token, {
     method: "POST", body: { document, expected_active_revision: expectedActiveRevision, recipe },
   });
+}
+
+export function controlSparkrunWorkload(token: string, deployment: string, job_id: string, action: string) {
+ return requestJSON<{state: string}>("/v1/sparkrun/workload", token, {method:"POST", body:{deployment, job_id, action}});
 }

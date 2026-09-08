@@ -91,3 +91,31 @@ remains the supported multi-replica store.
 Dataset manifest aggregation is separately capped at 65,536 distinct config
 revision/capture-session values and 64 MiB of their string data. Exceeding that
 bound also fails before archive rows are written.
+
+## Standalone UI configuration
+
+Configuration → Advanced Options saves `observability.saved_traces` and
+`observability.otlp_traces` in the operator-managed set. Omitted signals inherit
+startup flags/environment; explicit `enabled: false` overrides them. Saved trace
+settings include `storage` (`filesystem` or `database`), an absolute gateway-host
+`path`, `max_body_bytes` (default 64 MiB), `queue_capacity` (default 4096), and
+`overflow` (`block` or `drop`). Disabling capture preserves existing files.
+
+OTLP settings include the full HTTP trace `endpoint`, `service_name` (default
+`sparkroute`), `sample_ratio` (0–1, parent-based), and `header_env`: HTTP header
+names mapped to environment variable names. Header values must exist on the
+gateway host; resolved values never enter configuration or bootstrap responses.
+Sampling only affects operational spans, not saved payload capture. UI header
+settings replace startup OTLP headers, including when empty.
+
+Validate then Save applies settings without restart. New requests use the new
+configuration; old generations finish and drain their exporters. Store handles
+are shared across overlapping generations for the same path. Filesystem and
+SQLite continue enforcing private owner permissions. A storage-open failure
+keeps the previous serving generation active and appears as a stored/serving
+revision mismatch; fix the configured path/permissions and save again.
+
+The standalone `/v1/saved-traces/export` route supports JSONL and dataset ZIP
+filters and requires `trace_read_all`, separate from config/status privileges.
+The default local administrator receives that role. Export is unavailable while
+capture is disabled; existing data can still be exported through the CLI.

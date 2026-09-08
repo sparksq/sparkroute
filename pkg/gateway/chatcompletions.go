@@ -517,6 +517,19 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		)
 		return
 	}
+	if overrides := model.RequestOverrides[h.operation.String()]; len(overrides) > 0 {
+		raw, err = applyRequestOverrides(raw, overrides)
+		if err == nil && int64(len(raw)) > h.maxRequestBytes {
+			err = fmt.Errorf("augmented request body is too large")
+		}
+		if err == nil {
+			envelope, _, _, err = h.operation.decodeRequest(raw, pathModel)
+		}
+		if err != nil {
+			fail(http.StatusBadRequest, ledger.OutcomeRejected, "request_profile_error", "model request profile produced an invalid request")
+			return
+		}
+	}
 	guardrails := model.Guardrails
 	piiPolicy := config.EffectivePIIPolicy{Mode: config.PIIModeDisabled}
 	if model.Privacy != nil {

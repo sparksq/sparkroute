@@ -116,6 +116,15 @@ func Merge(sets map[Owner]config.Document) (config.Document, error) {
 	var modelRoutingOwner Owner
 	for _, owner := range ordered {
 		document := sets[owner]
+		if document.Observability != nil {
+			if owner != OwnerOperator {
+				return config.Document{}, fmt.Errorf("observability must be managed by the operator")
+			}
+			raw, _ := json.Marshal(document.Observability)
+			if err := json.Unmarshal(raw, &result.Observability); err != nil {
+				return config.Document{}, err
+			}
+		}
 		if !document.CapabilityDefaults.IsZero() {
 			if !result.CapabilityDefaults.IsZero() {
 				return config.Document{}, fmt.Errorf(

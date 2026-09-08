@@ -3243,3 +3243,26 @@ button:disabled {
 .sparkrun-deployment-content .section-help { padding: 14px 0 0; }
 .sparkrun-deployment-content .recipe-source { display: block; margin-top: 6px; color: var(--muted); }
 @media (max-width: 640px) { .recipe-embedded .model-field-grid { grid-template-columns: 1fr; } }
+
+/* Optional model-management details share the deployment editor's spacing. */
+.request-profiles { padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.request-profiles h4 { margin: 0 0 8px; }
+.profile-summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.registry-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 0; }
+.registry-row .recipe-actions { margin: 0; }
+.capacity-grid { display: grid; gap: 10px; padding: 14px 0; }
+.capacity-grid > div { display: grid; gap: 5px; }
+.capacity-grid meter { width: 100%; }
+.catalog-filters, .registry-manager { margin: 12px 0; }
+
+.trace-settings { padding: 1.25rem; }
+.trace-settings .model-section { padding: 1rem 0; }
+.trace-settings label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.trace-settings select, .trace-settings input { width: 100%; }
+.trace-header-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: .75rem; align-items: end; margin-bottom: .75rem; }
+.request-profiles button, .trace-settings button, .recipe-wizard details button { border: 1px solid var(--border, #dce4ed); border-radius: .45rem; padding: .55rem .8rem; background: white; color: #30445c; cursor: pointer; }
+@media(max-width: 700px) { .trace-header-row { grid-template-columns: 1fr; } }
+
+.trace-settings .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.trace-settings input, .trace-settings select { font-weight: 400; }
+@media(max-width: 700px) { .trace-settings .model-field-grid { grid-template-columns: 1fr; } }

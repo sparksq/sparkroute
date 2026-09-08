@@ -85,6 +85,7 @@ func runAcceptanceBridge() int {
 	state, err := updateAcceptanceBridgeState(statePath, func(state *acceptanceBridgeState) error {
 		state.ProcessCalls++
 		switch request.Operation {
+		case "workloads":
 		case "capabilities":
 			state.CapabilitiesCalls++
 		case "discover":
@@ -113,6 +114,8 @@ func runAcceptanceBridge() int {
 		OK:            true,
 	}
 	switch request.Operation {
+	case "workloads":
+		response.Result = map[string]any{"plugins": []any{}, "workloads": []any{}}
 	case "capabilities":
 		response.Result = map[string]any{
 			"protocol_version": request.SchemaVersion,

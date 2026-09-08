@@ -57,6 +57,7 @@ func TargetsFromDocument(document config.Document) ([]Target, error) {
 				ClusterCandidates:  append([]string(nil), source.ClusterCandidates...),
 				Overrides:          cloneOverrides(source.Overrides),
 				ActivationTimeout:  source.EffectiveActivationTimeout(),
+				IdleAction:         source.IdleAction,
 				IdleTTL:            source.IdleTTL.Value(),
 				MaxQueuedWaiters:   source.EffectiveMaxQueuedWaiters(),
 				MaxQueuedBodyBytes: source.EffectiveMaxQueuedBodyBytes(),

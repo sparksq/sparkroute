@@ -876,6 +876,7 @@ func (c *AdmissionCoordinator) Snapshot(ctx context.Context) (Snapshot, error) {
 		result.Bindings = append(result.Bindings, BindingStatus{
 			Controller: target.Binding.Controller, BindingRevision: target.Binding.Revision,
 			VirtualModel: target.Binding.VirtualModel, Deployment: target.Deployment,
+			PluginsInUse: append([]string(nil), observed.PluginsInUse...), LifecycleActions: append([]string(nil), observed.LifecycleActions...),
 			Phase: observed.Phase, JobID: observed.JobID, Owned: observed.Owned, ClusterCandidates: append([]string(nil), target.Binding.ClusterCandidates...),
 			State: state.state, UpdatedAt: state.updatedAt,
 			ActivationStarted:  cloneTime(state.activationStarted),

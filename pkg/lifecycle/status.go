@@ -44,6 +44,8 @@ type ControllerStatus struct {
 // BindingStatus describes one configured activation binding and its bounded
 // cold-start admission state.
 type BindingStatus struct {
+	PluginsInUse       []string               `json:"plugins_in_use,omitempty"`
+	LifecycleActions   []string               `json:"lifecycle_actions,omitempty"`
 	Owned              *bool                  `json:"owned,omitempty"`
 	Phase              string                 `json:"phase,omitempty"`
 	JobID              string                 `json:"job_id,omitempty"`
@@ -174,6 +176,23 @@ func validateControllerStatus(status *ControllerStatus) error {
 }
 
 func validateBindingStatus(status *BindingStatus) error {
+	if len(status.PluginsInUse) > 64 || len(status.LifecycleActions) > 3 {
+		return fmt.Errorf("too many workload plugin capabilities")
+	}
+	for _, name := range status.PluginsInUse {
+		if len(name) > 64 {
+			return fmt.Errorf("plugin name too long")
+		}
+		if err := validateStatusString("plugin", name, true); err != nil {
+			return err
+		}
+	}
+	for _, action := range status.LifecycleActions {
+		if action != "status" && action != "sleep" && action != "wake" {
+			return fmt.Errorf("invalid workload lifecycle action")
+		}
+	}
+
 	if err := validateReason(status.Phase); err != nil {
 		return err
 	}
@@ -294,6 +313,8 @@ func cloneSnapshot(snapshot Snapshot) Snapshot {
 			value := *result.Bindings[index].Owned
 			result.Bindings[index].Owned = &value
 		}
+		result.Bindings[index].PluginsInUse = append([]string(nil), result.Bindings[index].PluginsInUse...)
+		result.Bindings[index].LifecycleActions = append([]string(nil), result.Bindings[index].LifecycleActions...)
 		result.Bindings[index].ClusterCandidates = append([]string(nil), result.Bindings[index].ClusterCandidates...)
 		if result.Bindings[index].ActivationStarted != nil {
 			value := *result.Bindings[index].ActivationStarted

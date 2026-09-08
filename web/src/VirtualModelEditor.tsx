@@ -1,3 +1,4 @@
+import { RequestProfileEditor } from "./RequestProfileEditor";
 import { useEffect, useMemo, useState } from "react";
 import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
 import { deploymentChoices } from "./deploymentTitles";
@@ -188,6 +189,9 @@ export function VirtualModelEditor({
               </button>
             </div>
 
+            <RequestProfileEditor model={selected} names={[...reservedModelNames, ...models.flatMap((m) => [stringValue(m.name), ...stringArray(m.aliases)])]} disabled={disabled} readOnly={readOnlySelected}
+              onChange={(profile) => updateModel(() => profile)}
+              onAdd={(profile) => {onChange({...document, virtual_models: [...editableModels, profile]}); setSelectedIndex(editableModels.length);}} />
             <fieldset disabled={formDisabled}>
               <div className="model-field-grid">
                 <Field label="Canonical name">

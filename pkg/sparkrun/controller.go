@@ -36,6 +36,7 @@ type Options struct {
 }
 
 type Controller struct {
+	workloadInfo      map[string]WorkloadInfo
 	workloads         *Workloads
 	ownedWorkloads    bool
 	bridge            Bridge
@@ -236,6 +237,9 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	c.operationMu.Lock()
 	defer c.operationMu.Unlock()
 	started := c.now().UTC()
+	if err := c.inspectWorkloads(ctx); err != nil {
+		return err
+	}
 	result, err := c.bridge.Discover(ctx, nil)
 	if err != nil {
 		return err
@@ -372,6 +376,11 @@ func (c *Controller) EnsureReady(
 	c.workloads.observe(binding, *result.Endpoint, c.bridge, c.stopTimeout, false)
 	c.mu.Lock()
 	state = c.states[key]
+	state.jobID = result.Endpoint.JobID
+	if c.workloadInfo == nil {
+		c.workloadInfo = map[string]WorkloadInfo{}
+	}
+	c.workloadInfo[result.Endpoint.JobID] = WorkloadInfo{JobID: result.Endpoint.JobID, Owned: result.Endpoint.Owned, ClusterName: result.Endpoint.ClusterName, RecipeRevision: result.Endpoint.RecipeRevision, PluginsInUse: result.Endpoint.PluginsInUse, LifecycleActions: result.Endpoint.LifecycleActions, LifecycleState: "running"}
 	state.binding = cloneBinding(binding)
 	state.state = endpointregistry.StateReady
 	state.endpoint = endpointPointer(endpoint)
@@ -424,6 +433,15 @@ func (c *Controller) Status(
 		return lifecycle.Status{State: endpointregistry.StateOffline, UpdatedAt: c.now().UTC()}, nil
 	}
 	status := lifecycle.Status{State: state.state, UpdatedAt: state.updatedAt, Reason: state.reason, Phase: state.phase, JobID: state.jobID}
+	if info, ok := c.workloadInfo[state.jobID]; ok {
+		owned := info.Owned
+		status.Owned = &owned
+		status.PluginsInUse = slices.Clone(info.PluginsInUse)
+		status.LifecycleActions = slices.Clone(info.LifecycleActions)
+		if info.LifecycleState != "running" {
+			status.Phase = lifecycle.SanitizeReason(info.LifecycleState)
+		}
+	}
 	if state.endpoint != nil && state.endpoint.ExpiresAt.After(c.now()) && c.workloads.available(state.endpoint.ClusterID) {
 		status.Endpoint = endpointPointer(*state.endpoint)
 		status.JobID = state.endpoint.JobID
@@ -438,10 +456,15 @@ func (c *Controller) Status(
 	}
 	if state.endpoint != nil {
 		if phase := c.workloads.phase(state.endpoint.ClusterID); phase != "" {
-			status.State = endpointregistry.State(phase)
+			status.State = endpointregistry.StateOffline
 			status.Phase = phase
 			status.Endpoint = nil
 		}
+	}
+	if info, ok := c.workloadInfo[state.jobID]; ok && info.LifecycleState != "running" {
+		status.Phase = lifecycle.SanitizeReason(info.LifecycleState)
+		status.State = endpointregistry.StateOffline
+		status.Endpoint = nil
 	}
 	return status, nil
 }

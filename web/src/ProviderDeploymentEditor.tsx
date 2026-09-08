@@ -11,6 +11,7 @@ type AuthDraft = { regular?: JSONObject; profile?: string };
 type Selection = { kind: "provider" | "deployment"; index: number };
 
 const providerTypes: Record<string, { label: string; url: string }> = {
+  sparkrun: { label: "sparkrun", url: "" },
   openai: { label: "OpenAI (Chat)", url: "https://api.openai.com/v1" },
   openai_responses: { label: "OpenAI (Responses)", url: "https://api.openai.com/v1" },
   anthropic: { label: "Anthropic", url: "https://api.anthropic.com/v1" },
@@ -360,11 +361,12 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
   return <>
     <dl className="sparkrun-deployment-summary">
       <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
+      <div><dt>Native APIs</dt><dd>{[...(stringArray(deployment.native_protocols).includes("openai") ? ["OpenAI (Chat Completions)"] : []), ...(stringArray(deployment.capabilities).includes("responses") ? ["OpenAI (Responses)"] : []), ...(stringArray(deployment.native_protocols).includes("anthropic") ? ["Anthropic Messages"] : [])].join(", ") || "OpenAI (Chat Completions)"}</dd></div>
       <div><dt>Recipe</dt><dd>{preview?.name || (recipe ? "Pinned recipe" : "Discovered workload")}{preview?.source_path && <small className="recipe-source">{preview.source_path}</small>}</dd></div>
       <div><dt>Cluster</dt><dd>{stringArray(source.cluster_candidates).join(", ") || "Reported by sparkrun"}</dd></div>
       {source.type === "activatable" && <>
         <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 30)} minutes</dd></div>
-        <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
+        <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${source.idle_action === "sleep" ? "Sleep" : "Stop"} after ${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
       </>}
     </dl>
     {error && <p className="notice info">{error}</p>}
@@ -497,10 +499,11 @@ function ProviderForm({
             </select>
             <small>{responsesProvider(provider.type) ? "Responses is enabled for every deployment using this provider. Chat Completions requires a Chat provider."
               : displayType === "anthropic" ? "Uses the native Anthropic Messages API."
+              : displayType === "sparkrun" ? "Native APIs follow each deployment’s runtime and recipe."
               : "Sets the default upstream API for this provider’s deployments."}</small>
           </Field>
           {!subscription ? <>
-            {displayType !== "bedrock" ? <Field label="Base URL" wide>
+            {!["bedrock", "sparkrun"].includes(displayType) ? <Field label="Base URL" wide>
               <input placeholder={providerTypes[displayType]?.url || "https://api.example/v1"} spellCheck={false} value={stringValue(provider.base_url)} onChange={(event) => onChange((value) => setString(value, "base_url", event.target.value))} />
               <small>API root for your hosted or local provider.</small>
             </Field> : null}
@@ -511,7 +514,7 @@ function ProviderForm({
           </> : null}
         </div>
 
-        <details className="model-section policy-section" open>
+        {displayType !== "sparkrun" ? <details className="model-section policy-section" open>
           <summary><span>Provider authentication</span><small>{subscription ? "Codex subscription" : "Resolved only by configured credential sources"}</small></summary>
           <div className="policy-fields provider-auth-fields">
             <Field label="Authentication type">
@@ -555,7 +558,7 @@ function ProviderForm({
             ) : null}
           </div>
           {subscription ? <SubscriptionSignIn key={stringValue(provider.subscription_profile)} profile={stringValue(provider.subscription_profile)} token={subscriptionAuth?.token ?? ""} enabled={!disabled && (subscriptionAuth?.enabled ?? false)} /> : null}
-        </details>
+        </details> : <p className="section-help">sparkrun supplies workload endpoints. Configure each deployment’s native APIs in its recipe settings.</p>}
 
         <HeaderSection
           heading="Default upstream headers"
@@ -576,7 +579,9 @@ function ProviderForm({
 
 function setProviderType(value: JSONObject, type: string): JSONObject {
   const next: JSONObject = { ...value, type };
-  if (type === "openai_subscription") {
+  if (type === "sparkrun") {
+    delete next.base_url; delete next.auth; delete next.region; delete next.subscription_profile;
+  } else if (type === "openai_subscription") {
     delete next.base_url;
     delete next.auth;
     delete next.region;
@@ -1194,7 +1199,7 @@ function inspectDocument(document: ConfigurationDocument): {
     if (!validOptionalStringArray(deployment.capabilities)) return { error: `deployments[${index}].capabilities must be a string array.` };
 		if (deployment.endpoint_source !== undefined && !isObject(deployment.endpoint_source)) return { error: `deployments[${index}].endpoint_source must be an object.` };
 		if (isObject(deployment.endpoint_source)) {
-			for (const field of ["type", "controller", "revision", "recipe", "recipe_revision", "activation_timeout", "idle_ttl", "cold_start"] as const) {
+			for (const field of ["type", "controller", "revision", "recipe", "recipe_revision", "activation_timeout", "idle_ttl", "idle_action", "cold_start"] as const) {
 				if (!validOptionalString(deployment.endpoint_source[field])) return { error: `deployments[${index}].endpoint_source.${field} must be a string.` };
 			}
 			for (const field of ["max_queued_waiters", "max_queued_body_bytes"] as const) {
@@ -1295,7 +1300,7 @@ function toggleCapability(deployment: JSONObject, capability: string, enabled: b
 }
 
 function defaultProtocolForProviderType(providerType: string) {
-  if (["openai", "openai_compatible", "openai_responses", "openai_subscription"].includes(providerType)) return "openai";
+  if (["sparkrun", "openai", "openai_compatible", "openai_responses", "openai_subscription"].includes(providerType)) return "openai";
   if (["anthropic", "gemini", "bedrock"].includes(providerType)) return providerType;
   return "";
 }
@@ -1331,7 +1336,7 @@ function setEndpointSourceType(deployment: JSONObject, sourceType: string) {
 		if (sourceType === "discovered") {
 			for (const field of [
 				"revision", "recipe", "recipe_revision", "cluster_candidates", "overrides",
-				"activation_timeout", "idle_ttl", "max_queued_waiters",
+				"activation_timeout", "idle_ttl", "idle_action", "max_queued_waiters",
 				"max_queued_body_bytes", "cold_start",
 			]) delete next[field];
 		}

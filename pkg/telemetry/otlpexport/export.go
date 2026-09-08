@@ -30,6 +30,7 @@ import (
 const defaultShutdownTimeout = 5 * time.Second
 
 type Options struct {
+	SampleRatio     *float64
 	ServiceName     string
 	ServiceVersion  string
 	TraceEndpoint   string
@@ -112,6 +113,14 @@ func FromEnvironment(
 }
 
 func New(ctx context.Context, options Options) (*Runtime, error) {
+	ratio := 1.0
+	if options.SampleRatio != nil {
+		ratio = *options.SampleRatio
+		if ratio < 0 || ratio > 1 {
+			return nil, fmt.Errorf("sample ratio must be between 0 and 1")
+		}
+	}
+
 	if options.TraceEndpoint == "" && options.MetricEndpoint == "" {
 		return disabledRuntime(), nil
 	}
@@ -139,15 +148,14 @@ func New(ctx context.Context, options Options) (*Runtime, error) {
 		}
 		exporterOptions := []traceexport.Option{
 			traceexport.WithEndpointURL(options.TraceEndpoint),
-		}
-		if len(options.TraceHeaders) > 0 {
-			exporterOptions = append(exporterOptions, traceexport.WithHeaders(options.TraceHeaders))
+			traceexport.WithHeaders(options.TraceHeaders),
 		}
 		exporter, err := traceexport.New(ctx, exporterOptions...)
 		if err != nil {
 			return nil, fmt.Errorf("create OTLP trace exporter: %w", err)
 		}
 		provider := sdktrace.NewTracerProvider(
+			sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(ratio))),
 			sdktrace.WithBatcher(exporter),
 			sdktrace.WithResource(res),
 		)
@@ -162,9 +170,7 @@ func New(ctx context.Context, options Options) (*Runtime, error) {
 		}
 		exporterOptions := []metricexport.Option{
 			metricexport.WithEndpointURL(options.MetricEndpoint),
-		}
-		if len(options.MetricHeaders) > 0 {
-			exporterOptions = append(exporterOptions, metricexport.WithHeaders(options.MetricHeaders))
+			metricexport.WithHeaders(options.MetricHeaders),
 		}
 		exporter, err := metricexport.New(ctx, exporterOptions...)
 		if err != nil {

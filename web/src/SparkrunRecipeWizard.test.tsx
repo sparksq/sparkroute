@@ -36,7 +36,7 @@ it("preserves duplicate file identity and prepares coding on the explicit defaul
  expect(calls.find((call) => call.body.operation === "catalog_resolve")?.body.arguments.reference).toBe("catalog:second");
  fireEvent.change(screen.getByLabelText("Public model name"), { target: { value: "coding" } });
  fireEvent.change(screen.getByLabelText("Aliases (comma separated)"), { target: { value: "code, assistant" } });
- fireEvent.click(screen.getByLabelText("Stop the model when idle"));
+ fireEvent.click(screen.getByLabelText("Manage the model when idle"));
  fireEvent.click(screen.getByRole("button", { name: "Add to draft" }));
  await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
  const prepared = calls.find((call) => call.url.endsWith("recipe-draft"))!.body;
@@ -78,4 +78,28 @@ it("supports controller-local paths and upload from an empty registry cache", as
  fireEvent.click(screen.getByRole("button", { name: "Preview upload" }));
  await screen.findByLabelText("Public model name");
  expect(calls.find((call) => call.body.operation === "catalog_import")?.body.arguments.content).toBe("model: test/model");
+});
+
+it("prefills the HF model and preserves a custom public name when refreshing a recipe", async () => {
+ setup();
+ fireEvent.click((await screen.findAllByRole("button", {name: "Choose @registry/coder"}))[0]!);
+ expect(await screen.findByLabelText("Public model name")).toHaveValue("test/model");
+ fireEvent.change(screen.getByLabelText("Public model name"), {target: {value:"my-coding"}});
+ fireEvent.click(screen.getByRole("button", {name:"Refresh recipe preview"}));
+ await waitFor(() => expect(screen.queryByText("Resolving recipe…")).not.toBeInTheDocument());
+ expect(screen.getByLabelText("Public model name")).toHaveValue("my-coding");
+});
+
+it("prefills defaults.served_model_name before the HF model", async () => {
+ const fetch = vi.fn(async (_url: string, request: RequestInit) => {
+  const body = JSON.parse(String(request.body));
+  if (body.operation === "catalog_clusters") return json({clusters:[{name:"lab",host_count:1,default:true}]});
+  if (body.operation === "catalog_registries") return json({registries:[]});
+  if (body.operation === "catalog_search") return json({recipes:[recipe], total:1, next_offset:null, unavailable_registries:[]});
+  return json({...detail, hf_model:"hf/weights", defaults:{served_model_name:"served-coder"}});
+ });
+ vi.stubGlobal("fetch", fetch);
+ render(<SparkrunRecipeWizard token="test-token" document={empty} revision="active" onChange={() => {}} onClose={() => {}} />);
+ fireEvent.click(await screen.findByRole("button", {name:"Choose @registry/coder"}));
+ expect(await screen.findByLabelText("Public model name")).toHaveValue("served-coder");
 });

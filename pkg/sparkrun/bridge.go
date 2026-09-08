@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	ProtocolVersion        = 3
+	ProtocolVersion        = 4
 	MaxBridgeResponseBytes = 1 << 20
 	MaxBridgeStderrBytes   = 64 << 10
 )
@@ -29,19 +29,21 @@ type Binding struct {
 }
 
 type Endpoint struct {
-	Owned          bool                     `json:"owned"`
-	State          string                   `json:"state"`
-	ClusterID      string                   `json:"cluster_id"`
-	ClusterName    string                   `json:"cluster_name,omitempty"`
-	JobID          string                   `json:"job_id"`
-	Host           string                   `json:"host"`
-	Port           int                      `json:"port"`
-	Protocol       string                   `json:"protocol"`
-	ServedModels   []string                 `json:"served_models"`
-	Recipe         string                   `json:"recipe"`
-	RecipeRevision string                   `json:"recipe_revision"`
-	Runtime        string                   `json:"runtime"`
-	ModelMetadata  map[string]ModelMetadata `json:"model_metadata,omitempty"`
+	PluginsInUse     []string                 `json:"plugins_in_use,omitempty"`
+	LifecycleActions []string                 `json:"lifecycle_actions,omitempty"`
+	Owned            bool                     `json:"owned"`
+	State            string                   `json:"state"`
+	ClusterID        string                   `json:"cluster_id"`
+	ClusterName      string                   `json:"cluster_name,omitempty"`
+	JobID            string                   `json:"job_id"`
+	Host             string                   `json:"host"`
+	Port             int                      `json:"port"`
+	Protocol         string                   `json:"protocol"`
+	ServedModels     []string                 `json:"served_models"`
+	Recipe           string                   `json:"recipe"`
+	RecipeRevision   string                   `json:"recipe_revision"`
+	Runtime          string                   `json:"runtime"`
+	ModelMetadata    map[string]ModelMetadata `json:"model_metadata,omitempty"`
 }
 
 // ModelMetadata is the optional public model-card subset returned by newer

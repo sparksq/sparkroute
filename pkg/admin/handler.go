@@ -26,6 +26,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/privacy"
 	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/routing"
+	"github.com/sparksq/sparkroute/pkg/savedtrace"
 	"github.com/sparksq/sparkroute/pkg/sparkrun"
 )
 
@@ -41,6 +42,10 @@ type ReadyEndpoints interface {
 }
 
 type Options struct {
+	TraceReader     savedtrace.Reader
+	SparkrunControl interface {
+		WorkloadAction(context.Context, string, string, string) (sparkrun.WorkloadInfo, error)
+	}
 	Lifecycle         lifecycle.StatusSource
 	SparkrunCatalog   sparkrun.Catalog
 	Endpoints         ReadyEndpoints
@@ -175,11 +180,17 @@ func NewHandler(
 	mux.HandleFunc("/v1/config/validate", h.validateConfiguration)
 	mux.HandleFunc("/v1/config/simulate-routing", h.simulateRouting)
 	privileged := h.authenticated || h.insecureAdmin
+	if options.TraceReader != nil && privileged {
+		mux.HandleFunc("/v1/saved-traces/export", h.exportSavedTraces)
+	}
 	if options.SparkrunCatalog != nil && privileged {
 		mux.HandleFunc("/v1/sparkrun/catalog", h.sparkrunCatalog)
 		if options.ManagedConfig != nil {
 			mux.HandleFunc("/v1/sparkrun/recipe-draft", h.sparkrunRecipeDraft)
 		}
+	}
+	if options.SparkrunControl != nil && privileged {
+		mux.HandleFunc("/v1/sparkrun/workload", h.sparkrunWorkload)
 	}
 	if options.Lifecycle != nil && privileged {
 		mux.HandleFunc("/v1/runtime/status", h.lifecycleStatus)
@@ -215,7 +226,7 @@ func NewHandler(
 		principal := identity.Principal{
 			ID: "local-insecure-operator",
 			Roles: []string{
-				RoleStatusRead, RoleConfigRead, RoleConfigWrite,
+				RoleStatusRead, RoleConfigRead, RoleConfigWrite, RoleTraceReadAll,
 				clientcredentials.RoleRead, clientcredentials.RoleWrite,
 			},
 		}
@@ -396,6 +407,8 @@ func (h *handler) serveBootstrap(
 		bootstrap.Principal = &adminapi.Principal{
 			ID: principal.ID, Roles: append([]string(nil), principal.Roles...),
 		}
+		bootstrap.Features[adminapi.FeatureSavedTraceExport] = h.options.TraceReader != nil && hasRole(principal, RoleTraceReadAll)
+		bootstrap.Features["sparkrun_controls"] = h.options.SparkrunControl != nil && hasRole(principal, RoleConfigWrite)
 		bootstrap.Features["sparkrun"] = h.options.SparkrunCatalog != nil
 		bootstrap.Features["sparkrun_catalog"] = h.options.SparkrunCatalog != nil && hasRole(principal, RoleConfigRead)
 		bootstrap.Features[adminapi.FeatureLifecycleStatus] = h.options.Lifecycle != nil && hasRole(principal, RoleStatusRead)

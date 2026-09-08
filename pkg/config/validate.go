@@ -153,6 +153,9 @@ var protectedExtraBodyFields = map[string]struct{}{
 
 // Validate rejects ambiguous or unsafe configuration before publication.
 func (d Document) Validate() error {
+	if err := d.Observability.Validate(); err != nil {
+		return fmt.Errorf("observability: %w", err)
+	}
 	// Standalone is the base schema profile. The cluster profile resolves the
 	// same precedence using its strict default before invoking this validation.
 	d = d.ResolveCapabilityPolicies(UnknownCapabilityTry)
@@ -179,6 +182,9 @@ func (d Document) Validate() error {
 		providers[provider.Name] = struct{}{}
 		if err := validateSubscriptionProvider(provider); err != nil {
 			return fmt.Errorf("%s: %w", path, err)
+		}
+		if provider.Type == "sparkrun" && (provider.BaseURL != "" || provider.Auth.Type != "" || provider.Region != "" || provider.SubscriptionProfile != "") {
+			return fmt.Errorf("%s: sparkrun obtains endpoints and authentication from its workloads", path)
 		}
 		if strings.TrimSpace(provider.Type) == "" {
 			return fmt.Errorf("%s.type: required", path)
@@ -344,6 +350,22 @@ func (d Document) Validate() error {
 				"%s.visibility: must be public, hidden, internal, or empty",
 				path,
 			)
+		}
+		for operation, overrides := range model.RequestOverrides {
+			for _, key := range []string{"contents", "system", "system_instruction", "systemInstruction", "instructions", "history", "conversation", "previous_response_id"} {
+				if _, exists := overrides[key]; exists {
+					return fmt.Errorf("%s.request_overrides.%s: request structure field %s cannot be overridden", path, operation, key)
+				}
+			}
+
+			switch operation {
+			case "chat_completions", "responses", "responses_compact", "messages", "messages_count_tokens", "generate_content", "stream_generate_content", "count_tokens", "converse", "converse_stream", "embeddings", "embed_content", "batch_embed_contents":
+			default:
+				return fmt.Errorf("%s.request_overrides: unsupported operation %q", path, operation)
+			}
+			if err := validateExtraBody(overrides); err != nil {
+				return fmt.Errorf("%s.request_overrides.%s: %w", path, operation, err)
+			}
 		}
 		if err := validateCapabilities(model.RequiredCapabilities); err != nil {
 			return fmt.Errorf("%s.required_capabilities: %w", path, err)
@@ -536,7 +558,7 @@ func (s EndpointSource) Validate() error {
 	case EndpointSourceStatic:
 		if s.Controller != "" || s.Revision != "" || s.Recipe != "" ||
 			s.RecipeRevision != "" || len(s.ClusterCandidates) != 0 ||
-			len(s.Overrides) != 0 || s.ActivationTimeout != 0 || s.IdleTTL != 0 ||
+			len(s.Overrides) != 0 || s.ActivationTimeout != 0 || s.IdleTTL != 0 || s.IdleAction != "" ||
 			s.MaxQueuedWaiters != 0 || s.MaxQueuedBodyBytes != 0 || s.ColdStart != "" {
 			return fmt.Errorf("static source must not contain lifecycle fields")
 		}
@@ -547,7 +569,7 @@ func (s EndpointSource) Validate() error {
 		}
 		if s.Revision != "" || s.Recipe != "" || s.RecipeRevision != "" ||
 			len(s.ClusterCandidates) != 0 || len(s.Overrides) != 0 ||
-			s.ActivationTimeout != 0 || s.IdleTTL != 0 || s.MaxQueuedWaiters != 0 ||
+			s.ActivationTimeout != 0 || s.IdleTTL != 0 || s.IdleAction != "" || s.MaxQueuedWaiters != 0 ||
 			s.MaxQueuedBodyBytes != 0 || s.ColdStart != "" {
 			return fmt.Errorf("discovered source must not contain activation fields")
 		}
@@ -595,6 +617,12 @@ func (s EndpointSource) Validate() error {
 			if overrideBytes > 64<<10 {
 				return fmt.Errorf("overrides: values exceed 65536 bytes")
 			}
+		}
+		if s.IdleAction != "" && s.IdleAction != "stop" && s.IdleAction != "sleep" {
+			return fmt.Errorf("idle_action: must be stop or sleep")
+		}
+		if s.IdleAction == "sleep" && s.Controller != "sparkrun" {
+			return fmt.Errorf("idle sleep requires the sparkrun controller")
 		}
 		activationTimeout := s.ActivationTimeout.Value()
 		if activationTimeout < 0 || activationTimeout > maxConfiguredActivationTimeout {

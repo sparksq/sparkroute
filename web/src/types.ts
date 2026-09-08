@@ -372,6 +372,8 @@ export interface LifecycleControllerStatus {
 }
 
 export interface LifecycleBindingStatus {
+ plugins_in_use?: string[];
+ lifecycle_actions?: string[];
  owned?: boolean;
  phase?: string;
  job_id?: string;

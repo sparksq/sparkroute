@@ -31,6 +31,7 @@ type WatchSource interface {
 // Document is the first public configuration schema. It intentionally covers
 // only the fields exercised by the foundation data plane.
 type Document struct {
+	Observability      *Observability     `json:"observability,omitempty"`
 	CapabilityDefaults CapabilityDefaults `json:"capability_defaults,omitempty,omitzero"`
 	// ModelRouting optionally publishes a selector namespace (for example
 	// "auto") whose choices are ordinary virtual models in this document.
@@ -89,7 +90,7 @@ const (
 // a provider type. Explicit Deployment.NativeProtocols override this default.
 func ProtocolForProviderType(providerType string) Protocol {
 	switch providerType {
-	case "openai", "openai_compatible", "openai_responses", "openai_subscription":
+	case "sparkrun", "openai", "openai_compatible", "openai_responses", "openai_subscription":
 		return ProtocolOpenAI
 	case "anthropic":
 		return ProtocolAnthropic
@@ -127,6 +128,7 @@ func (d Deployment) SupportsNativeProtocol(provider Provider, protocol Protocol)
 // EndpointSource describes how a deployment obtains its serving endpoint.
 // The zero value is a static provider URL for backward compatibility.
 type EndpointSource struct {
+	IdleAction         string             `json:"idle_action,omitempty"`
 	Type               EndpointSourceType `json:"type,omitempty"`
 	Controller         string             `json:"controller,omitempty"`
 	Revision           string             `json:"revision,omitempty"`
@@ -145,7 +147,7 @@ func (s EndpointSource) IsZero() bool {
 	return s.Type == "" && s.Controller == "" && s.Revision == "" &&
 		s.Recipe == "" && s.RecipeRevision == "" &&
 		len(s.ClusterCandidates) == 0 && len(s.Overrides) == 0 &&
-		s.ActivationTimeout == 0 && s.IdleTTL == 0 &&
+		s.ActivationTimeout == 0 && s.IdleTTL == 0 && s.IdleAction == "" &&
 		s.MaxQueuedWaiters == 0 && s.MaxQueuedBodyBytes == 0 && s.ColdStart == ""
 }
 
@@ -431,17 +433,19 @@ func (d Document) CredentialReferences() []credentials.Ref {
 }
 
 type VirtualModel struct {
-	Name                 string            `json:"name"`
-	Aliases              []string          `json:"aliases,omitempty"`
-	Visibility           ModelVisibility   `json:"visibility,omitempty"`
-	RequiredCapabilities []Capability      `json:"required_capabilities,omitempty"`
-	ResponseModel        ResponseModelMode `json:"response_model,omitempty"`
-	Selection            SelectionPolicy   `json:"selection,omitempty"`
-	Limits               ModelLimits       `json:"limits,omitempty"`
-	Retry                RetryPolicy       `json:"retry,omitempty"`
-	Guardrails           GuardrailPolicy   `json:"guardrails,omitempty"`
-	Privacy              *PrivacyPolicy    `json:"privacy,omitempty"`
-	Pools                []RoutingPool     `json:"pools"`
+	// RequestOverrides applies operator-owned parameters by ingress operation before validation and translation.
+	RequestOverrides     map[string]map[string]json.RawMessage `json:"request_overrides,omitempty"`
+	Name                 string                                `json:"name"`
+	Aliases              []string                              `json:"aliases,omitempty"`
+	Visibility           ModelVisibility                       `json:"visibility,omitempty"`
+	RequiredCapabilities []Capability                          `json:"required_capabilities,omitempty"`
+	ResponseModel        ResponseModelMode                     `json:"response_model,omitempty"`
+	Selection            SelectionPolicy                       `json:"selection,omitempty"`
+	Limits               ModelLimits                           `json:"limits,omitempty"`
+	Retry                RetryPolicy                           `json:"retry,omitempty"`
+	Guardrails           GuardrailPolicy                       `json:"guardrails,omitempty"`
+	Privacy              *PrivacyPolicy                        `json:"privacy,omitempty"`
+	Pools                []RoutingPool                         `json:"pools"`
 }
 
 type ModelVisibility string

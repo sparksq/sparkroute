@@ -29,11 +29,11 @@ func (h *handler) sparkrunCatalog(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	switch input.Operation {
-	case "catalog_search", "catalog_resolve", "catalog_registries", "catalog_clusters", "operation_status":
+	case "catalog_search", "catalog_resolve", "catalog_registries", "catalog_clusters", "catalog_plugins", "operation_status":
 		if !requireRole(writer, request, RoleConfigRead) {
 			return
 		}
-	case "catalog_import", "catalog_refresh":
+	case "catalog_import", "catalog_refresh", "catalog_registry", "catalog_capacity":
 		if !requireRole(writer, request, RoleConfigWrite) {
 			return
 		}
@@ -161,4 +161,35 @@ func (h *handler) lifecycleStatus(writer http.ResponseWriter, request *http.Requ
 	}
 	writer.Header().Set("Cache-Control", "no-store")
 	writeJSON(writer, http.StatusOK, snapshot)
+}
+
+func (h *handler) sparkrunWorkload(writer http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		methodNotAllowed(writer, http.MethodPost)
+		return
+	}
+	if !requireRole(writer, request, RoleConfigWrite) || !strictManagedQuery(writer, request.URL.Query()) {
+		return
+	}
+	var input struct {
+		Deployment string `json:"deployment"`
+		JobID      string `json:"job_id"`
+		Action     string `json:"action"`
+	}
+	if !decodeRequestJSON(writer, request, &input) {
+		return
+	}
+	if input.Action != "status" && input.Action != "sleep" && input.Action != "wake" {
+		writeError(writer, http.StatusBadRequest, "invalid_action", "Choose status, sleep, or wake")
+		return
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), time.Hour)
+	defer cancel()
+	result, err := h.options.SparkrunControl.WorkloadAction(ctx, input.Deployment, input.JobID, input.Action)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "workload_action_failed", err.Error())
+		return
+	}
+	writer.Header().Set("Cache-Control", "no-store")
+	writeJSON(writer, http.StatusOK, result)
 }

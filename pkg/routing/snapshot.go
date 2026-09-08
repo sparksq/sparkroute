@@ -642,6 +642,13 @@ func cloneRawMessages(input map[string]json.RawMessage) map[string]json.RawMessa
 }
 
 func cloneVirtualModel(model config.VirtualModel) config.VirtualModel {
+	if model.RequestOverrides != nil {
+		overrides := make(map[string]map[string]json.RawMessage, len(model.RequestOverrides))
+		for operation, values := range model.RequestOverrides {
+			overrides[operation] = cloneRawMessages(values)
+		}
+		model.RequestOverrides = overrides
+	}
 	model.Aliases = append([]string(nil), model.Aliases...)
 	model.RequiredCapabilities = append(
 		[]config.Capability(nil),

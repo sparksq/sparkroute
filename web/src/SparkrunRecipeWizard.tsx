@@ -1,10 +1,13 @@
+import { RecipePluginStatus } from "./RecipePluginStatus";
+import { RegistryManager } from "./RegistryManager";
+import { ClusterCapacity } from "./ClusterCapacity";
 import { useEffect, useRef, useState } from "react";
 import { AdminAPIError, prepareSparkrunRecipe, sparkRunCatalog, type SparkrunOperation, type SparkrunRecipe, type SparkrunRecipeDetails } from "./api";
 import type { ConfigurationDocument } from "./types";
 
 type Cluster = { name: string; description: string; host_count: number; default: boolean };
 type Registry = { name: string; enabled: boolean; cached: boolean };
-type Page = { recipes: SparkrunRecipe[]; total: number; next_offset: number | null; unavailable_registries: string[] };
+type Page = { facets?: Record<string, string[]>; recipes: SparkrunRecipe[]; total: number; next_offset: number | null; unavailable_registries: string[] };
 const emptyPage: Page = { recipes: [], total: 0, next_offset: null, unavailable_registries: [] };
 
 export function SparkrunRecipeWizard({ token, document, revision, onChange, onClose, embedded = false, initialDeployment }: {
@@ -17,21 +20,26 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
   const [query, setQuery] = useState("");
   const [registry, setRegistry] = useState("");
   const [runtime, setRuntime] = useState("");
+  const [filters, setFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState<Page>(emptyPage);
   const [offset, setOffset] = useState(0);
   const [registries, setRegistries] = useState<Registry[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [cluster, setCluster] = useState(String((initialSource.cluster_candidates as string[] | undefined)?.[0] ?? ""));
+  const [fallbackClusters, setFallbackClusters] = useState<string[]>((initialSource.cluster_candidates as string[] | undefined)?.slice(1) ?? []);
   const [path, setPath] = useState("");
   const [yaml, setYaml] = useState("");
   const [name, setName] = useState("");
+  const customName = useRef(false);
   const [aliases, setAliases] = useState("");
   const [waitMinutes, setWaitMinutes] = useState(() => durationMinutes(initialSource.activation_timeout, 30));
+  const [idleAction, setIdleAction] = useState(String(initialSource.idle_action || "stop"));
   const [idle, setIdle] = useState(() => durationMinutes(initialSource.idle_ttl, 0) > 0);
   const [idleMinutes, setIdleMinutes] = useState(() => durationMinutes(initialSource.idle_ttl, 30) || 30);
   const [overrides, setOverrides] = useState(() => JSON.stringify(initialSource.overrides ?? {}, null, 2));
   const [waiters, setWaiters] = useState(Number(initialSource.max_queued_waiters ?? 0));
   const [bodyMiB, setBodyMiB] = useState(Number(initialSource.max_queued_body_bytes ?? 0) / (1024 * 1024));
+  const [nativeAPIs, setNativeAPIs] = useState<string[]>([]);
   const [preview, setPreview] = useState<SparkrunRecipeDetails>();
   const [previewOverrides, setPreviewOverrides] = useState("{}");
   const [busy, setBusy] = useState("");
@@ -54,7 +62,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       setRegistries(r.registries); setPage(p);
       if (initialDeployment) {
         const result = await sparkRunCatalog<SparkrunRecipeDetails>(token, "catalog_resolve", {reference: initialSource.recipe, overrides: initialSource.overrides ?? {}}, abort.signal);
-        setPreview(result); setPreviewOverrides(overrides); setStep("configure");
+        acceptPreview(result); setPreviewOverrides(overrides);
         if (result.recipe_revision !== initialSource.recipe_revision) setError("This recipe has changed since it was saved. Review this preview before applying the updated recipe.");
       }
     }).catch((e) => { if (!abort.signal.aborted) setError(message(e)); })
@@ -88,7 +96,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
     await action("Searching recipes", async () => {
       const result = await sparkRunCatalog<Page>(token, "catalog_search", {
         ...(query.trim() ? { query: query.trim() } : {}), ...(registry ? { registry } : {}),
-        ...(runtime ? { runtime } : {}), local_only: source === "local", offset: next, limit: 20,
+        ...(runtime ? { runtime } : {}), local_only: source === "local", offset: next, limit: 20, filters,
       });
       setPage(result); setOffset(next);
     });
@@ -100,10 +108,21 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
     }
     return value as Record<string, string>;
   }
+  function acceptPreview(result: SparkrunRecipeDetails) {
+    if (!initialDeployment && !customName.current) {
+      const served = result.defaults?.served_model_name;
+      setName(typeof served === "string" && served.trim() ? served.trim() : result.hf_model || result.model);
+    }
+    const protocols = (initialDeployment?.native_protocols ?? result.native_protocols) as string[];
+    const capabilities = (initialDeployment?.capabilities ?? result.capabilities ?? []) as string[];
+    setNativeAPIs([...(protocols.includes("openai") ? ["chat_completions"] : []), ...(capabilities.includes("responses") ? ["responses"] : []), ...(protocols.includes("anthropic") ? ["messages"] : [])]);
+    setPreview(result);
+    setStep("configure");
+  }
   async function select(reference: string) {
     await action("Resolving recipe", async () => {
       const result = await sparkRunCatalog<SparkrunRecipeDetails>(token, "catalog_resolve", { reference, overrides: launchOverrides() });
-      setPreview(result); setPreviewOverrides(overrides); setStep("configure");
+      acceptPreview(result); setPreviewOverrides(overrides);
     });
   }
   const invalidPreview = !preview || previewOverrides !== overrides || preview.issues.some((issue) => issue.severity === "error");
@@ -117,7 +136,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
     {busy && <p role="status">{busy}…</p>}
     {step === "recipe" ? <>
       <fieldset disabled={Boolean(busy)} className="recipe-fieldset">
-        <label>Recipe source<select aria-label="Recipe source" value={source} onChange={(e) => { setSource(e.target.value); setRegistry(""); setPage(emptyPage); setOffset(0); }}>
+        <label>Recipe source<select aria-label="Recipe source" value={source} onChange={(e) => { setSource(e.target.value); setRegistry(""); setFilters({}); setPage(emptyPage); setOffset(0); }}>
           <option value="registry">Configured registries</option><option value="local">Files on the control node</option><option value="upload">Upload recipe YAML</option>
         </select></label>
         {source === "upload" ? <>
@@ -130,7 +149,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
           <label>Recipe YAML<textarea rows={9} spellCheck={false} value={yaml} onChange={(e) => setYaml(e.target.value)} /></label>
           <button type="button" className="secondary-button" disabled={!yaml.trim()} onClick={() => void action("Importing recipe", async () => {
             const result = await sparkRunCatalog<SparkrunRecipeDetails>(token, "catalog_import", { content: yaml });
-            setPreview(result); setPreviewOverrides("{}"); setOverrides("{}"); setStep("configure");
+            acceptPreview(result); setPreviewOverrides("{}"); setOverrides("{}");
           })}>Preview upload</button>
         </> : <>
           {source === "local" && <><p className="section-help">Paths refer to the machine running sparkrun, which may be different from this browser. The list includes its configured recipe folder and prior imports.</p>
@@ -142,16 +161,25 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
               {registries.filter((r) => r.enabled).map((r) => <option key={r.name} value={r.name}>{r.name}{!r.cached ? " · not cached" : ""}</option>)}</select></label>}
             <label>Runtime<input value={runtime} onChange={(e) => setRuntime(e.target.value)} placeholder="Any runtime" /></label>
           </div>
+          <div className="model-section"><h4>Native APIs</h4><p className="section-help">Options follow the runtime family. Defaults use known image versions or recipe declarations; enable additional APIs only when the selected image serves them.</p>
+          <div className="capability-grid">{(preview?.native_api_options ?? ["chat_completions"]).map((api) => <label key={api}><input type="checkbox" checked={nativeAPIs.includes(api)} disabled={nativeAPIs.includes(api) && nativeAPIs.length === 1 || api === "chat_completions" && nativeAPIs.includes("responses")} onChange={(e) => setNativeAPIs(e.target.checked ? [...new Set([...nativeAPIs, ...(api === "responses" ? ["chat_completions"] : []), api])] : nativeAPIs.filter((value) => value !== api))} /><span>{({chat_completions: "OpenAI (Chat Completions)", responses: "OpenAI (Responses)", messages: "Anthropic Messages"} as Record<string,string>)[api] ?? api}</span></label>)}</div>
+        </div>
+        <details className="catalog-filters"><summary>More recipe filters{Object.keys(filters).length ? ` (${Object.keys(filters).length})` : ""}</summary>
+            <p className="section-help">Values come from recipe metadata; unknown values are not inferred from model names.</p>
+            <div className="model-field-grid">{Object.entries({min_nodes:"Minimum nodes", tp:"Tensor parallel", pp:"Pipeline parallel", quantization:"Quantization", context_length:"Context tokens", parameters_b:"Parameters (billions)"}).map(([key, label]) => <label key={key}>{label}<select aria-label={label} value={filters[key] || ""} onChange={(e) => setFilters((current) => {const next = {...current}; if (e.target.value) next[key] = e.target.value; else delete next[key]; return next;})}><option value="">Any</option>{(page.facets?.[key] ?? []).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>)}</div>
+            <button type="button" onClick={() => {setFilters({}); setQuery(""); setRegistry(""); setRuntime("");}}>Clear filters</button>
+          </details>
           <div className="recipe-actions"><button type="button" className="secondary-button" onClick={() => void search()}>Search</button>
             {source === "registry" && <button type="button" className="text-button" disabled={refresh?.state === "running"} onClick={() => void action("Starting refresh", async () => {
               setRefresh(await sparkRunCatalog<SparkrunOperation>(token, "catalog_refresh")); setRefreshMessage("");
             })}>Refresh registries</button>}</div>
+          {source === "registry" && <RegistryManager token={token} registries={registries} onChange={(values) => {setRegistries(values); setPage(emptyPage); setOffset(0);}} />}
           {refresh?.state === "running" && <p role="status">{refresh.phase}… You can keep browsing cached recipes.</p>}
           {refreshMessage && <p role="status">{refreshMessage}</p>}
           {!!page.unavailable_registries.length && <p className="notice info">Not cached: {page.unavailable_registries.join(", ")}. Refresh registries to download their recipes.</p>}
           <ul className="recipe-results" aria-label="Recipes">{page.recipes.map((recipe) => <li key={recipe.reference}>
             <div><strong>{recipe.name}</strong><span>{recipe.model} · {recipe.runtime} · {recipe.min_nodes} node{recipe.min_nodes === 1 ? "" : "s"} minimum</span>
-              <small>{recipe.description}</small><small className="recipe-source">{recipe.registry ? `@${recipe.registry} · ` : "Local · "}{recipe.source_path}</small></div>
+              <small>{recipe.description}</small><small>{[recipe.quantization, recipe.context_length ? `${recipe.context_length} context tokens` : "", recipe.parameters_b ? `${recipe.parameters_b}B parameters` : "", recipe.tp ? `TP ${recipe.tp}` : ""].filter(Boolean).join(" · ")}</small><small className="recipe-source">{recipe.registry ? `@${recipe.registry} · ` : "Local · "}{recipe.source_path}</small></div>
             <button type="button" className="secondary-button" onClick={() => void select(recipe.reference)} aria-label={`Choose ${recipe.name}`}>Choose</button>
           </li>)}</ul>
           {!page.recipes.length && !busy && <p>No recipes shown. Search the cache, refresh registries, or select a local file.</p>}
@@ -164,12 +192,17 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => setStep("recipe")}>← Choose another recipe</button>
       {preview && <div className="recipe-preview"><strong>{preview.name}</strong><p>{preview.model} · {preview.runtime} · {preview.min_nodes} node{preview.min_nodes === 1 ? "" : "s"} minimum</p>
         <small className="recipe-source">{preview.source_path}</small>
-        <p>Native protocols: {preview.native_protocols.join(", ")}. Recipe extensions: {preview.required_plugins.join(", ") || "none"}.</p>
+        <p>HF model: {preview.hf_model || preview.model}</p><p>Recipe defaults: {JSON.stringify(preview.defaults)}</p>
+        <p>Recipe extensions: {preview.required_plugins.join(", ") || "none"}.</p>
+        <details><summary>Benchmark context</summary><p className="section-help">Declared recipe results depend on hardware and request shape; browsing does not run a benchmark.</p>
+          {preview.metadata?.benchmarks?.length ? preview.metadata.benchmarks.map((benchmark, i) => <dl className="recipe-benchmark" key={i}>{Object.entries(benchmark).map(([key, value]) => <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{String(value)}</dd></div>)}</dl>) : <p>No benchmark results declared for this recipe.</p>}
+        </details>
+        <RecipePluginStatus token={token} required={preview.required_plugins} />
         {preview.issues.map((issue, i) => <p key={`${issue.code}-${i}`} className={`notice ${issue.severity === "error" ? "error" : "info"}`}>{issue.message}</p>)}
       </div>}
       <fieldset className="recipe-fieldset" disabled={Boolean(busy)}>
         <div className="model-field-grid">
-          {!initialDeployment && <><label>Public model name<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="coding" /></label>
+          {!initialDeployment && <><label>Public model name<input required value={name} onChange={(e) => { customName.current = true; setName(e.target.value); }} placeholder="coding" /></label>
           <label>Aliases (comma separated)<input value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="code, assistant" /></label></>}
           <label>Cluster<select aria-label="Cluster" required value={cluster} onChange={(e) => setCluster(e.target.value)}><option value="">Choose a cluster</option>
             {clusters.map((c) => <option key={c.name} value={c.name}>{c.name} · {c.host_count} hosts{c.default ? " · default" : ""}</option>)}</select></label>
@@ -177,10 +210,23 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
         </div>
         {!clusters.length && <p className="notice info">No named clusters are configured. Add a cluster with sparkrun on the control node, then reopen this form.</p>}
         <p className="section-help">The selected cluster is saved by name. A later change to sparkrun’s default cluster will not move this model.</p>
-        <label className="checkbox-field"><input type="checkbox" checked={idle} onChange={(e) => setIdle(e.target.checked)} />Stop the model when idle</label>
+        <ClusterCapacity token={token} cluster={cluster} />
+        <label className="checkbox-field"><input type="checkbox" checked={idle} onChange={(e) => setIdle(e.target.checked)} />Manage the model when idle</label>
+        {idle && <label>Idle action<select aria-label="Idle action" value={idleAction} onChange={(e) => setIdleAction(e.target.value)}><option value="stop">Stop workload</option><option value="sleep" disabled={!preview?.required_plugins.some((p) => p === "coldsnap" || p.endsWith(".coldsnap"))}>Sleep with ColdSnap</option></select><small>Sleep releases GPU memory and wakes on the next request; it requires a job actually started with ColdSnap.</small></label>}
         {idle && <label>Idle time (minutes)<input type="number" min={1} required value={idleMinutes} onChange={(e) => setIdleMinutes(Number(e.target.value))} /></label>}
         <p className="section-help">Idle time begins after the last active request finishes. SparkRoute only stops workloads it started; an adopted workload stays running.</p>
         <details><summary>Advanced launch settings</summary><div className="recipe-fieldset">
+          <fieldset className="recipe-fieldset"><legend>Fallback clusters</legend>
+            <p className="section-help">Try these clusters in order if the preferred cluster has insufficient capacity; a failed or uncertain launch does not start a second workload.</p>
+            {fallbackClusters.map((candidate, index) => <div className="recipe-actions" key={index}>
+              <label>Fallback {index + 1}<select aria-label={`Fallback cluster ${index + 1}`} value={candidate} onChange={(e) => setFallbackClusters((values) => values.map((value, i) => i === index ? e.target.value : value))}>
+                <option value="">Choose a cluster</option>{clusters.filter((c) => c.name !== cluster && (c.name === candidate || !fallbackClusters.includes(c.name))).map((c) => <option key={c.name} value={c.name}>{c.name} · {c.host_count} hosts</option>)}
+              </select></label>
+              <button type="button" disabled={index === 0} onClick={() => setFallbackClusters((values) => {const next = [...values]; [next[index-1], next[index]] = [next[index]!, next[index-1]!]; return next;})} aria-label={`Move fallback ${index + 1} up`}>↑</button>
+              <button type="button" onClick={() => setFallbackClusters((values) => values.filter((_, i) => i !== index))} aria-label={`Remove fallback ${index + 1}`}>Remove</button>
+            </div>)}
+            <button type="button" disabled={fallbackClusters.length >= clusters.length - 1 || fallbackClusters.includes("")} onClick={() => setFallbackClusters((values) => [...values, ""])}>Add fallback cluster</button>
+          </fieldset>
           <label>Recipe overrides (JSON string values)<textarea rows={4} spellCheck={false} value={overrides} onChange={(e) => setOverrides(e.target.value)} /></label>
           <p className="section-help">For example: {`{"tensor_parallel":"2","max_model_len":"32768"}`}. The serving port increments automatically if occupied. Refresh the preview after changing overrides.</p>
           <button type="button" className="secondary-button" onClick={() => preview && void select(preview.reference)}>Refresh recipe preview</button>
@@ -189,12 +235,12 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
         </div></details>
         {previewOverrides !== overrides && <p role="status">Refresh the recipe preview to validate these overrides.</p>}
         {!initialDeployment && <p className="section-help">If this recipe already has a deployment on the selected cluster, the model will share that deployment and its existing idle and cold-start settings.</p>}
-        <button type="button" className="primary-button" disabled={invalidPreview || (!initialDeployment && !name.trim()) || !cluster || waitMinutes < 1 || waitMinutes > 60 || (idle && idleMinutes < 1)} onClick={() => void action("Preparing model draft", async () => {
+        <button type="button" className="primary-button" disabled={invalidPreview || (!initialDeployment && !name.trim()) || !cluster || fallbackClusters.some((c) => !c || c === cluster) || waitMinutes < 1 || waitMinutes > 60 || (idle && idleMinutes < 1)} onClick={() => void action("Preparing model draft", async () => {
           const result = await prepareSparkrunRecipe(token, document, revision, {
             ...(initialDeployment ? {deployment: initialDeployment.name} : {}),
-            reference: preview!.reference, recipe_revision: preview!.recipe_revision, name: name.trim(),
-            aliases: aliases.split(",").map((v) => v.trim()).filter(Boolean), cluster, overrides: launchOverrides(),
-            activation_timeout: `${waitMinutes}m`, idle_ttl: idle ? `${idleMinutes}m` : "0s",
+            native_apis: nativeAPIs, reference: preview!.reference, recipe_revision: preview!.recipe_revision, name: name.trim(),
+            aliases: aliases.split(",").map((v) => v.trim()).filter(Boolean), cluster, fallback_clusters: fallbackClusters, overrides: launchOverrides(),
+            activation_timeout: `${waitMinutes}m`, idle_action: idleAction, idle_ttl: idle ? `${idleMinutes}m` : "0s",
             max_queued_waiters: waiters, max_queued_body_bytes: bodyMiB * 1024 * 1024,
           });
           if (mounted.current) onChange(result.document, result.reused, result.deployment);

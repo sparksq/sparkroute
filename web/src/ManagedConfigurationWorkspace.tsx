@@ -17,6 +17,7 @@ import type {
   ManagedConfigurationOwner,
   ManagedConfigurationSetMetadata,
 } from "./types";
+import { TraceSettingsEditor } from "./TraceSettingsEditor";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
@@ -304,6 +305,7 @@ export function ManagedConfigurationWorkspace({
         <div hidden={editorMode !== "structured"}>
           {operatorParsed.document ? (
             <>
+              <div hidden={section !== "advanced"}><TraceSettingsEditor document={operatorParsed.document} disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange}/></div>
               <div hidden={section !== "models"}>
                 <VirtualModelEditor
                   disabled={!canEdit || Boolean(busy) || recipeWizard}

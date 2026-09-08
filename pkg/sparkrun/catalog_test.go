@@ -21,7 +21,7 @@ func (f *catalogFixture) Catalog(_ context.Context, operation string, _ map[stri
 	var value any
 	switch operation {
 	case "catalog_resolve":
-		value = RecipeDetails{Reference: "catalog:123", Name: "recipe", Revision: f.revision, Model: "test/model", Runtime: "vllm", NativeProtocols: []config.Protocol{config.ProtocolOpenAI}, Trusted: true}
+		value = RecipeDetails{Reference: "catalog:123", Name: "recipe", Revision: f.revision, Model: "test/model", Runtime: "vllm", NativeAPIOptions: []string{"chat_completions", "responses", "messages"}, NativeProtocols: []config.Protocol{config.ProtocolOpenAI}, Trusted: true}
 	case "catalog_clusters":
 		value = map[string]any{"clusters": []Cluster{{Name: "lab", HostCount: 2, Default: true}}}
 	default:
@@ -129,5 +129,64 @@ func TestEditRecipeDeploymentPreservesRoutingIdentityAndRevisionsPolicy(t *testi
 	input.Deployment = "generated-or-deleted"
 	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, empty, document, input); err == nil {
 		t.Fatal("edited a generated deployment")
+	}
+}
+
+type fallbackCatalogFixture struct{ catalogFixture }
+
+func (f *fallbackCatalogFixture) Catalog(ctx context.Context, op string, args map[string]any, result any) error {
+	if op == "catalog_clusters" {
+		raw := []byte(`{"clusters":[{"name":"lab","host_count":2},{"name":"spare","host_count":2}]}`)
+		return json.Unmarshal(raw, result)
+	}
+	return f.catalogFixture.Catalog(ctx, op, args, result)
+}
+func TestRecipeDraftPreservesOrderedFallbackAndRejectsDuplicates(t *testing.T) {
+	f := &fallbackCatalogFixture{catalogFixture{revision: "revision"}}
+	input := RecipeDraft{Reference: "recipe", RecipeRevision: "revision", Name: "coding", Cluster: "lab", FallbackClusters: []string{"spare"}}
+	document, id, _, err := PrepareRecipeDraft(context.Background(), f, managed.EmptyDocument(), managed.EmptyDocument(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidates := document.Deployments[0].EndpointSource.ClusterCandidates
+	if len(candidates) != 2 || candidates[0] != "lab" || candidates[1] != "spare" {
+		t.Fatal(candidates)
+	}
+	input.Deployment = id
+	input.Cluster = "spare"
+	input.FallbackClusters = []string{"lab"}
+	edited, editedID, _, err := PrepareRecipeDraft(context.Background(), f, document, managed.EmptyDocument(), input)
+	if err != nil || editedID != id || edited.Deployments[0].EndpointSource.ClusterCandidates[0] != "spare" {
+		t.Fatal(edited, err)
+	}
+	input.FallbackClusters = []string{"spare"}
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, document, managed.EmptyDocument(), input); err == nil {
+		t.Fatal("duplicate candidate accepted")
+	}
+}
+
+func TestRecipeNativeAPIChoicesPersistAndEdit(t *testing.T) {
+	f := &catalogFixture{revision: "r"}
+	empty := managed.EmptyDocument()
+	input := RecipeDraft{Reference: "catalog:123", RecipeRevision: "r", Name: "coding", Cluster: "lab", NativeAPIs: []string{"chat_completions", "responses", "messages"}}
+	doc, id, _, err := PrepareRecipeDraft(context.Background(), f, empty, empty, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Providers[0].Type != "sparkrun" || len(doc.Deployments[0].NativeProtocols) != 2 || len(doc.Deployments[0].Capabilities) != 1 {
+		t.Fatal("native declarations missing", doc)
+	}
+	input.Deployment = id
+	input.NativeAPIs = []string{"chat_completions"}
+	edited, _, _, err := PrepareRecipeDraft(context.Background(), f, doc, empty, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edited.Deployments[0].Capabilities) != 0 || len(edited.Deployments[0].NativeProtocols) != 1 {
+		t.Fatal("unselected API persisted")
+	}
+	input.NativeAPIs = []string{"generate_content"}
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, doc, empty, input); err == nil {
+		t.Fatal("accepted API outside runtime family")
 	}
 }

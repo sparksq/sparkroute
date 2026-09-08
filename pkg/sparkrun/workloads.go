@@ -21,17 +21,18 @@ type Workloads struct {
 }
 
 type workload struct {
-	idleSince time.Time
-	stopping  bool
-	binding   lifecycle.Binding
-	bridge    Bridge
-	timeout   time.Duration
-	active    int
-	owned     bool
-	stopped   bool
-	cluster   string
-	timer     *time.Timer
-	epoch     uint64
+	pausedPhase string
+	idleSince   time.Time
+	stopping    bool
+	binding     lifecycle.Binding
+	bridge      Bridge
+	timeout     time.Duration
+	active      int
+	owned       bool
+	stopped     bool
+	cluster     string
+	timer       *time.Timer
+	epoch       uint64
 }
 
 func NewWorkloads() *Workloads {
@@ -181,14 +182,32 @@ func (w *Workloads) scheduleLocked(id string, job *workload) {
 		}
 		job.stopping = true
 		w.mu.Unlock()
-		_, err = job.bridge.Stop(ctx, bridgeBinding(binding), id)
+		if binding.IdleAction == "sleep" {
+			if bridge, ok := job.bridge.(WorkloadBridge); ok {
+				_, err = bridge.Lifecycle(ctx, bridgeBinding(binding), id, "sleep", job.timeout)
+			} else {
+				err = fmt.Errorf("idle sleep is unavailable")
+			}
+		} else {
+			_, err = job.bridge.Stop(ctx, bridgeBinding(binding), id)
+		}
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		job.timer = nil
 		job.stopping = false
 		if err == nil {
 			job.stopped = true
-		} // failures remain retryable on the next observation
+			if binding.IdleAction == "sleep" {
+				job.pausedPhase = "sleeping"
+			} else {
+				job.pausedPhase = "offline"
+			}
+		} else {
+			// The remote transition may have succeeded before its response was
+			// lost. Block cached endpoints until a fresh status/wake resolves it.
+			job.stopped = true
+			job.pausedPhase = "unknown"
+		}
 	})
 }
 
@@ -224,8 +243,39 @@ func (w *Workloads) phase(id string) string {
 			return "deactivating"
 		}
 		if job.stopped {
+			if job.pausedPhase != "" {
+				return job.pausedPhase
+			}
 			return "offline"
 		}
 	}
 	return ""
+}
+
+func (w *Workloads) suspend(id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if job := w.jobs[id]; job != nil {
+		job.stopping = true
+		job.stopped = true
+		job.epoch++
+		if job.timer != nil {
+			job.timer.Stop()
+			job.timer = nil
+		}
+	}
+}
+func (w *Workloads) finishAction(id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if job := w.jobs[id]; job != nil {
+		job.stopping = false
+	}
+}
+func (w *Workloads) running(id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if job := w.jobs[id]; job != nil && !job.stopping {
+		job.stopped = false
+	}
 }
