@@ -163,7 +163,7 @@ func NewHandler(
 				adminapi.FeatureClientCredentials:  false,
 				adminapi.FeatureCredentialsWrite:   false,
 				adminapi.FeatureMMProjectionProbe:  options.MMProjection != nil,
-				adminapi.FeaturePrivacyPII:         false,
+				adminapi.FeaturePrivacyPII:         options.Privacy != nil,
 			},
 			Principal: &adminapi.Principal{
 				ID:    "local-operator",

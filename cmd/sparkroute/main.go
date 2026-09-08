@@ -138,6 +138,8 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	flags := flag.NewFlagSet("sparkroute", flag.ContinueOnError)
 	flags.SetOutput(stdout)
 	configPath := flags.String("config", env("SPARKROUTE_CONFIG", ""), "path to gateway configuration")
+	piiSQLitePath := flags.String("pii-sqlite", env("SPARKROUTE_PII_SQLITE", ""), "private PII mapping SQLite path; defaults beside persistent configuration when conversation scope is used")
+	piiKeyringFile := flags.String("pii-keyring-file", env("SPARKROUTE_PII_KEYRING_FILE", ""), "private PII mapping keyring file; empty generates and retains a local key beside the mapping store")
 	configSourceMode := flags.String(
 		"config-source",
 		env("SPARKROUTE_CONFIG_SOURCE", "file"),
@@ -718,7 +720,19 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 			tracePath = *ledgerSQLitePath
 		}
 	}
+	if *piiSQLitePath == "" {
+		source := *configPath
+		if strings.EqualFold(strings.TrimSpace(*configSourceMode), "sqlite") {
+			source = *configSQLitePath
+		}
+		if source != "" && source != ":memory:" {
+			*piiSQLitePath = filepath.Join(source+".pii", "mappings.sqlite")
+		}
+	}
+	privacyRuntime := &privacyRuntime{ctx: ctx, path: *piiSQLitePath, keyPath: *piiKeyringFile}
+	defer privacyRuntime.Close()
 	runtimeOptions := runtimeBuildOptions{
+		Privacy:     privacyRuntime,
 		TraceStores: newTraceStores(*traceStorage, tracePath, traceStore), TraceReader: traceStore,
 		SparkrunWorkloads: workloads,
 		SparkrunEnabled:   *sparkrunEnabled,

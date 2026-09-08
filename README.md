@@ -301,3 +301,9 @@ replay within the existing request deadline. Logout first joins pending login
 work and removes local credentials even if remote revocation fails; the UI
 reports that failure. Pending sign-ins expire after ten minutes and are
 cancelled on gateway shutdown. Stored credentials survive restarts.
+
+PII substitution and structured guardrails are included in standalone builds.
+See [PII and guardrails](docs/PRIVACY_AND_GUARDRAILS.md) for configuration,
+conversation identity, and encrypted mapping storage. Deployment size, context,
+prices, and tags feed model routing; see the
+[metadata contract](docs/SPARKRUN_MODEL_METADATA_CONTRACT.md#deployment-configuration).

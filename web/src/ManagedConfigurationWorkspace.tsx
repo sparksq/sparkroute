@@ -320,6 +320,7 @@ export function ManagedConfigurationWorkspace({
                 <p className="section-help configuration-context">Route to configured virtual models. To use a deployment directly, first add it to a virtual model.</p>
                 {generatedDocument?.model_routing ? <p className="read-only-note">sparkrun generated · Read only</p> : null}
                 <ModelRoutingEditor
+                  additionalDocument={generatedDocument?.model_routing ? operatorParsed.document : generatedDocument}
                   canonicalModelNames={mergedCandidateModelNames}
                   disabled={!canEdit || Boolean(busy) || recipeWizard || Boolean(generatedDocument?.model_routing)}
                   discoveredMetadata={discoveredMetadata}

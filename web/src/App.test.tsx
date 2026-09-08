@@ -556,9 +556,9 @@ describe("AdminApp", () => {
     expect(await screen.findByText("Current configuration")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Model routing" }));
 
-    expect(await screen.findByText("Discovered: 65,536")).toBeInTheDocument();
+    expect(await screen.findByText("65,536")).toBeInTheDocument();
     expect(screen.getByText(/sparkrun:test-generation/)).toBeInTheDocument();
-    expect(screen.getByText("Discovered: local, vllm")).toBeInTheDocument();
+    expect(screen.getByText("local, vllm")).toBeInTheDocument();
     const optOut = screen.getByRole("checkbox", { name: "Ignore discovered strategy metadata" });
     expect(optOut).not.toBeChecked();
     fireEvent.click(optOut);

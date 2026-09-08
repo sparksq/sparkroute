@@ -58,8 +58,8 @@ type DataOptions struct {
 	// MMProjection is the optional authenticated request transformer used only
 	// when the selected model's routing policy enables multimedia projection.
 	MMProjection *mmprojection.Client
-	// Privacy is an optional downstream implementation of the OSS privacy
-	// extension contract. The OSS distribution does not ship a PII provider.
+	// Privacy is an optional implementation of the privacy
+	// extension contract. The standalone command supplies pkg/pii.
 	Privacy privacy.Provider
 	// ModelCatalogCredentials resolves only references accepted by the catalog
 	// policy. When nil, catalog planes use Credentials for compatibility.
@@ -107,6 +107,13 @@ func NewDataPlane(document config.Document, options DataOptions) (*DataPlane, er
 	snapshot, err := routing.Compile(document)
 	if err != nil {
 		return nil, err
+	}
+	if publisher, ok := options.ModelRouter.(interface {
+		ReplaceDeploymentMetadata(map[string]modelrouter.DiscoveredModelMetadata) error
+	}); ok {
+		if err := publisher.ReplaceDeploymentMetadata(document.DeploymentMetadata()); err != nil {
+			return nil, fmt.Errorf("deployment metadata: %w", err)
+		}
 	}
 	instrumentation, err := telemetry.New(options.Telemetry)
 	if err != nil {

@@ -1,3 +1,4 @@
+import { deploymentMetadata } from "./DeploymentMetadataEditor";
 import { useEffect, useMemo, useState } from "react";
 import type {
   ConfigurationDocument,
@@ -33,6 +34,7 @@ export type RoutingSimulator = (
 
 export function ModelRoutingEditor({
   canonicalModelNames,
+  additionalDocument,
   discoveredMetadata,
   disabled,
   document,
@@ -40,6 +42,7 @@ export function ModelRoutingEditor({
   simulate,
 }: {
   canonicalModelNames?: string[];
+  additionalDocument?: ConfigurationDocument;
   discoveredMetadata?: DiscoveredMetadataState;
   disabled: boolean;
   document: ConfigurationDocument;
@@ -326,6 +329,7 @@ export function ModelRoutingEditor({
             ) : null}
 
             <ModelMetadataTable
+              deploymentFields={deploymentMetadata(document, additionalDocument)}
               candidates={canonicalModels}
               discoveredMetadata={discoveredMetadata}
               metadata={metadata}
@@ -448,11 +452,13 @@ function StageRouterEditor({ canonicalModels, selector, onChange }: {
 }
 
 function ModelMetadataTable({
+  deploymentFields,
   candidates,
   discoveredMetadata,
   metadata,
   onChange,
 }: {
+  deploymentFields: Record<string, JSONObject>;
   candidates: string[];
   discoveredMetadata?: DiscoveredMetadataState;
   metadata: JSONObject;
@@ -462,8 +468,8 @@ function ModelMetadataTable({
     <section className="routing-metadata-section">
       <div className="section-title">
         <div>
-          <strong>Strategy metadata</strong>
-          <small>Shared across selectors; costs are per million tokens.</small>
+          <strong>Routing preferences</strong>
+          <small>Weights and priorities are shared across selectors. Size, context, prices, and tags are configured in Model Deployments.</small>
         </div>
         {discoveredMetadata ? (
           <span className="metadata-discovery-summary">
@@ -476,6 +482,12 @@ function ModelMetadataTable({
         {candidates.map((name) => {
           const model = objectValue(metadata[name]);
           const discovered = discoveredMetadata?.effective[name];
+          const inherited = deploymentFields[name] ?? {};
+          const effective: JSONObject = {...(model.discovery_disabled === true ? {} : discovered)};
+          for (const field of ["size_b", "context", "input_price", "output_price", "tags"]) {
+            if (field === "tags" ? stringArray(model[field]).length > 0 : typeof model[field] === "number" && model[field] !== 0) effective[field] = model[field];
+          }
+          Object.assign(effective, inherited);
           const sources = discoveredMetadata?.sources.filter((source) => source.models[name]);
           return (
             <article key={name}>
@@ -495,21 +507,13 @@ function ModelMetadataTable({
               <div>
                 <NumericMetadata label="Weight" name="weight" model={model} onChange={onChange} modelName={name} />
                 <NumericMetadata label="Priority" name="priority" model={model} onChange={onChange} modelName={name} />
-                <NumericMetadata discoveredValue={discovered?.size_b} label="Size (B)" name="size_b" model={model} onChange={onChange} modelName={name} />
-                <NumericMetadata discoveredValue={discovered?.context} label="Context" name="context" model={model} onChange={onChange} modelName={name} />
-                <NumericMetadata discoveredValue={discovered?.input_price} label="Input price" name="input_price" model={model} onChange={onChange} modelName={name} />
-                <NumericMetadata discoveredValue={discovered?.output_price} label="Output price" name="output_price" model={model} onChange={onChange} modelName={name} />
               </div>
-              <label>
-                Tags
-                <input
-                  defaultValue={stringArray(model.tags).join(", ")}
-                  key={`${name}-tags-${stringArray(model.tags).join("|")}`}
-                  onBlur={(event) => onChange(name, (current) => ({ ...current, tags: splitList(event.target.value) }))}
-                  placeholder={discovered?.tags?.length ? discovered.tags.join(", ") : "local, coding"}
-                />
-                {discovered?.tags?.length ? <small>Discovered: {discovered.tags.join(", ")}</small> : null}
-              </label>
+              <dl className="routing-inherited-metadata">
+                {([["size_b", "Size (B)"], ["context", "Context"], ["input_price", "Input price"], ["output_price", "Output price"]] as const).map(([field, title]) =>
+                  <div key={field}><dt>{title}</dt><dd>{typeof effective[field] === "number" ? (effective[field] as number).toLocaleString() : "Unknown"}</dd></div>)}
+                <div><dt>Tags</dt><dd>{stringArray(effective.tags).join(", ") || "None reported"}</dd></div>
+              </dl>
+              {Object.keys(inherited).length > 0 && <p className="metadata-provenance">From model deployments · prices per million tokens</p>}
               {discovered ? (
                 <label className="routing-checkbox metadata-discovery-toggle">
                   <input

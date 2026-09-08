@@ -59,7 +59,7 @@ func (r *RouterManager) ReplaceDiscoveredMetadata(snapshot DiscoveredMetadataSna
 	}
 	r.metadata[normalized.Source] = normalized
 	r.metadataGeneration++
-	r.runtime.Store(compileRoutingPolicy(mergeDiscoveredMetadata(r.policy, r.metadata)))
+	r.runtime.Store(compileRoutingPolicy(r.effectivePolicy(r.policy)))
 	return nil
 }
 
@@ -78,7 +78,7 @@ func (r *RouterManager) RemoveDiscoveredMetadata(source string) error {
 	}
 	delete(r.metadata, source)
 	r.metadataGeneration++
-	r.runtime.Store(compileRoutingPolicy(mergeDiscoveredMetadata(r.policy, r.metadata)))
+	r.runtime.Store(compileRoutingPolicy(r.effectivePolicy(r.policy)))
 	return nil
 }
 

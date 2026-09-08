@@ -229,6 +229,7 @@ type RouterManager struct {
 	runtime            atomic.Pointer[compiledRoutingPolicy]
 	metadata           map[string]DiscoveredMetadataSnapshot
 	metadataGeneration uint64
+	deploymentMetadata map[string]DiscoveredModelMetadata
 
 	// Selection counters and observations have independent contention domains.
 	// A slow admin policy read must not serialize request metrics or round robin.
@@ -716,7 +717,7 @@ func (r *RouterManager) Publish(p RoutingPolicy, expectedRevision uint64, path s
 func (r *RouterManager) installPolicyLocked(policy RoutingPolicy) {
 	stored := clonePolicy(policy)
 	r.policy = stored
-	r.runtime.Store(compileRoutingPolicy(mergeDiscoveredMetadata(stored, r.metadata)))
+	r.runtime.Store(compileRoutingPolicy(r.effectivePolicy(stored)))
 	r.counterMu.Lock()
 	r.counters = map[string]uint64{}
 	r.counterMu.Unlock()

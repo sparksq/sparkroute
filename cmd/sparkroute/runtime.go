@@ -22,6 +22,7 @@ import (
 	"github.com/sparksq/sparkroute/pkg/lifecycle"
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
+	"github.com/sparksq/sparkroute/pkg/pii"
 	"github.com/sparksq/sparkroute/pkg/promptcache"
 	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
@@ -34,6 +35,7 @@ import (
 )
 
 type runtimeBuildOptions struct {
+	Privacy                 *privacyRuntime
 	TraceStores             *traceStores
 	TraceReader             savedtrace.Reader
 	SparkrunWorkloads       *sparkrunruntime.Workloads
@@ -90,6 +92,10 @@ func buildRuntimeGeneration(
 ) (*runtimeGeneration, error) {
 	if err := validateDocumentForIntegration(document, options.CredentialOptions, options.SparkrunEnabled); err != nil {
 		return nil, err
+	}
+	privacyProvider, err := options.Privacy.ForDocument(document)
+	if err != nil {
+		return nil, fmt.Errorf("configure PII: %w", err)
 	}
 	requestModelRouter := options.ModelRouter
 	if requestModelRouter == nil && document.ModelRouting != nil {
@@ -176,6 +182,7 @@ func buildRuntimeGeneration(
 		Lifecycle:    admissionCoordinator,
 		ModelRouter:  requestModelRouter,
 		MMProjection: options.MMProjection,
+		Privacy:      privacyProvider,
 	}
 	// Keep disabled saved traces as a nil interface. Assigning a nil pointer to
 	// the Recorder interface would make it appear enabled and panic when the
@@ -231,7 +238,11 @@ func buildRuntimeGeneration(
 			GatewayVersion: version.Version,
 			BuildInfo:      version.BuildInfo(),
 			ValidateConfig: func(candidate config.Document) error {
-				return validateDocumentForIntegration(candidate, options.CredentialOptions, options.SparkrunEnabled)
+				if err := validateDocumentForIntegration(candidate, options.CredentialOptions, options.SparkrunEnabled); err != nil {
+					return err
+				}
+				_, err := options.Privacy.ForDocument(candidate)
+				return err
 			},
 			Authenticator:      options.AdminAuthentication,
 			AllowInsecureAdmin: options.AllowInsecureAdmin,
@@ -285,7 +296,11 @@ func validateRuntimeDocument(
 	if err := sparkrunruntime.ValidateWorkloadSharing(document); err != nil {
 		return err
 	}
-	if err := gateway.ValidatePrivacyProvider(document, nil); err != nil {
+	provider, err := pii.NewProvider(config.Document{}, pii.NewBuiltinDetector(), nil)
+	if err != nil {
+		return err
+	}
+	if err := gateway.ValidatePrivacyProvider(document, provider); err != nil {
 		return err
 	}
 	if _, err := routing.Compile(document); err != nil {

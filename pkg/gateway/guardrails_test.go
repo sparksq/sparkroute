@@ -15,6 +15,7 @@ import (
 
 	"github.com/sparksq/sparkroute/pkg/config"
 	"github.com/sparksq/sparkroute/pkg/ledger"
+	"github.com/sparksq/sparkroute/pkg/modelrouter"
 )
 
 func TestChatCompletionsModelVisibilityAccess(t *testing.T) {
@@ -1158,5 +1159,30 @@ func assertOpenAIErrorCode(
 	}
 	if failure.Error.Code != code {
 		t.Fatalf("error code = %q, want %q", failure.Error.Code, code)
+	}
+}
+
+func TestSelectorRetainsSelectedModelAfterPreGuardrail(t *testing.T) {
+	for _, verdict := range []string{`{"action":"allow"}`, `{"action":"replace","replacement":{"model":"auto","messages":[{"role":"user","content":"safe"}]}}`} {
+		t.Run(verdict, func(t *testing.T) {
+			primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { writeChatResponse(w, "upstream-model", "ok") }))
+			defer primary.Close()
+			guard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { writeChatResponse(w, "upstream-guard", verdict) }))
+			defer guard.Close()
+			document := guardrailDocument(primary.URL+"/v1", guard.URL+"/v1")
+			document.VirtualModels[0].Guardrails.Pre = []config.Guardrail{{Name: "check", Model: "safety", AllowReplacement: true}}
+			policy := modelrouter.DefaultRoutingPolicy()
+			policy.VirtualModels["auto"] = modelrouter.VirtualModel{Strategy: "smallest", Models: []string{"public"}}
+			policy.Models["public"] = modelrouter.ModelMetadata{Enabled: true}
+			document.ModelRouting = &policy
+			handler, err := NewDataHandler(document, DataOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := serveChat(t, handler, `{"model":"auto","messages":[{"role":"user","content":"input"}]}`)
+			if response.Code != http.StatusOK {
+				t.Fatalf("selector after guardrail: %d %s", response.Code, response.Body)
+			}
+		})
 	}
 }

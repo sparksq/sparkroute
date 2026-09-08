@@ -1,3 +1,4 @@
+import { piiVirtualModelExtension } from "./PIIEditor";
 import {
   type ComponentType,
   type FormEvent,
@@ -240,7 +241,7 @@ function ConsoleLayout({
   const overviewExtensions = (extensions?.overview ?? []).filter(
     (extension) => !extension.available || extension.available(extensionContext),
   );
-  const virtualModelExtensions = (extensions?.virtualModelEditor ?? []).filter(
+  const virtualModelExtensions = [piiVirtualModelExtension, ...(extensions?.virtualModelEditor ?? [])].filter(
     (extension) => !extension.available || extension.available(bootstrap),
   );
   const [page, setPage] = useState<ConsolePage>(

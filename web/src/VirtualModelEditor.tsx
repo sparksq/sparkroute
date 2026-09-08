@@ -1,4 +1,5 @@
 import { RequestProfileEditor } from "./RequestProfileEditor";
+import { GuardrailEditor } from "./GuardrailEditor";
 import { capabilityOptions, capabilitySelectionSummary } from "./capabilities";
 import { useEffect, useMemo, useState } from "react";
 import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
@@ -78,7 +79,20 @@ export function VirtualModelEditor({
   const updateModel = (transform: (model: JSONObject) => JSONObject) => {
     if (!selected || formDisabled) return;
     const nextModels = [...editableModels];
-    nextModels[selectedIndex] = transform({ ...selected });
+    const updated = transform({ ...selected });
+    nextModels[selectedIndex] = updated;
+    // Profiles are presented beneath their parent. Applying privacy or guardrail
+    // settings must cover those public names too, without changing parameters.
+    const policyFields = ["privacy", "guardrails"].filter(field => JSON.stringify(selected[field]) !== JSON.stringify(updated[field]));
+    if (policyFields.length) for (let index = 0; index < nextModels.length; index++) {
+      const profile = nextModels[index]!;
+      if (index === selectedIndex || !profile.request_overrides || !stringValue(profile.name).startsWith(`${selected.name}:`)) continue;
+      const next = {...profile};
+      for (const field of policyFields) {
+        if (updated[field] === undefined) delete next[field]; else next[field] = updated[field];
+      }
+      nextModels[index] = next;
+    }
     onChange({ ...document, virtual_models: nextModels });
   };
 
@@ -382,13 +396,7 @@ export function VirtualModelEditor({
                 />
               ))}
 
-              {selected.guardrails ? (
-                <div className="preserved-policy-note">
-                  <strong>Guardrails preserved</strong>
-                  <span>{guardrailSummary(selected.guardrails)}</span>
-                  <small>Use JSON mode for specialized guardrail policy changes.</small>
-                </div>
-              ) : null}
+              <GuardrailEditor model={selected} modelNames={models.flatMap(model => [stringValue(model.name), ...stringArray(model.aliases)])} disabled={formDisabled} updateModel={updateModel} />
             </fieldset>
           </>
         ) : (
@@ -784,13 +792,6 @@ function uniqueName(prefix: string, names: Set<string>) {
 
 function effectiveVisibility(model: JSONObject) {
   return stringValue(model.visibility) || "public";
-}
-
-function guardrailSummary(value: unknown) {
-  const policy = objectValue(value);
-  const pre = Array.isArray(policy.pre) ? policy.pre.length : 0;
-  const post = Array.isArray(policy.post) ? policy.post.length : 0;
-  return `${pre} pre, ${post} post${policy.stream ? ", streaming policy" : ""}`;
 }
 
 function humanize(value: string) {

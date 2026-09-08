@@ -106,3 +106,25 @@ be gateway-first:
 3. verify the admin discovery projection and a `smallest`, `largest`, or
    `lowest_cost` simulation;
 4. retain omission as the fallback for runtimes that cannot report metadata.
+
+## Deployment configuration
+
+Deployments accept `model_metadata` with the same five fields (`size_b`,
+`context`, `input_price`, `output_price`, and `tags`), directly as an object rather
+than the bridge's map keyed by upstream model. Configure these fields in
+**Model Deployments**; Model Routing shows an inherited summary and retains
+routing-specific enabled, weight, and priority controls.
+
+Configured deployment fields take precedence over older `model_routing.models`
+physical attributes and live discovery, including explicit zero prices. Fields
+left absent retain legacy/discovered behavior. `discovery_disabled` suppresses
+live discovery, not deployment configuration. Each virtual model and alias
+inherits a conservative reduction across every configured fallback pool. Only
+known fields participate; unknown context is not a guarantee of capacity.
+
+The sparkrun plugin imports declared recipe parameter counts and effective
+context overrides into newly created deployments. Generated deployments also
+use saved launch metadata and observed runtime context when available. Parameter
+counts are never inferred from model names or fetched from Hugging Face for this
+purpose. Locally hosted models report zero per-token charge (hardware and
+operating costs are not estimated). Operator-owned metadata remains editable.

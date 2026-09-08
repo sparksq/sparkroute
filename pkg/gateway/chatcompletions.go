@@ -708,7 +708,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 			projectionTrace.State = "fallback"
 		} else {
 			raw = projected
-			envelope, requestedModel, streaming, err = h.operation.decodeRequest(
+			envelope, _, streaming, err = h.operation.decodeRequest(
 				raw,
 				pathModel,
 			)
@@ -787,7 +787,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 			request,
 			guardrails.Pre,
 			raw,
-			requestedModel,
+			publicRequestedModel,
 			streaming,
 		)
 		switch {
@@ -809,7 +809,9 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 			return
 		}
 		raw = guardrailResult.body
-		envelope, requestedModel, streaming, err = h.operation.decodeRequest(
+		// Decode transformed content without replacing the model already chosen
+		// by routing. The wire model may still name a selector or public alias.
+		envelope, _, streaming, err = h.operation.decodeRequest(
 			raw,
 			pathModel,
 		)

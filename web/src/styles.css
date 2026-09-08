@@ -1211,7 +1211,7 @@ tbody tr:last-child td {
 
 .routing-metadata-table article > div {
   display: grid;
-  grid-template-columns: repeat(6, minmax(80px, 1fr));
+  grid-template-columns: repeat(2, minmax(80px, 1fr));
   gap: 8px;
 }
 
@@ -3287,5 +3287,33 @@ button:disabled {
 @media(max-width: 700px) { .trace-header-row { grid-template-columns: 1fr; } }
 
 .trace-settings .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.policy-editor-fields { margin: 0; padding: 0; border: 0; min-width: 0; }
+.guardrail-card { margin: 12px 22px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.guardrail-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: var(--panel); }
+.guardrail-card-heading strong { overflow-wrap: anywhere; font-size: .8rem; }
+.guardrail-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.guardrail-settings .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.guardrail-settings textarea { width: 100%; min-width: 0; resize: vertical; border: 1px solid var(--line); border-radius: 7px; padding: 10px; color: var(--ink); background: var(--panel); font: inherit; line-height: 1.5; }
+.guardrail-settings textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+.guardrail-settings .model-field-grid .checkbox-field { display: flex; align-items: center; gap: 8px; }
+.guardrail-settings input[type="checkbox"] { width: auto; }
+.guardrail-stream > .checkbox-field { margin: 20px 22px 12px; }
+@media(max-width: 700px) { .guardrail-settings .model-field-grid { grid-template-columns: 1fr; } .guardrail-card { margin: 12px; } }
 .trace-settings input, .trace-settings select { font-weight: 400; }
 @media(max-width: 700px) { .trace-settings .model-field-grid { grid-template-columns: 1fr; } }
+
+.pii-settings .policy-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pii-settings .capability-grid { padding: 10px 0; }
+@media(max-width: 700px) { .pii-settings .policy-fields { grid-template-columns: 1fr; } }
+
+.deployment-metadata fieldset { margin: 0; border: 0; padding: 14px; }
+.deployment-metadata input { width: 100%; min-width: 0; }
+.routing-inherited-metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; padding: 12px; margin: 0; }
+.routing-inherited-metadata dt { color: var(--text-muted); font-size: 12px; }
+.routing-inherited-metadata dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+
+.deployment-metadata .model-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px 22px; }
+.pii-entities { grid-column: 1 / -1; color: var(--muted); font-size: .75rem; }
+.pii-entities > span { display: block; font-weight: 700; margin-bottom: 8px; }
+.pii-entities > small { display: block; color: var(--muted); margin-top: 8px; }
+@media (max-width: 700px) { .deployment-metadata .model-field-grid { grid-template-columns: 1fr; } }

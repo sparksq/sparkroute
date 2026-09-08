@@ -163,3 +163,24 @@ func simulationDocument() config.Document {
 		},
 	}
 }
+
+func TestSimulationInheritsDeploymentSize(t *testing.T) {
+	document := simulationDocument()
+	a, b := 8.0, 70.0
+	document.Deployments[0].ModelMetadata = &modelrouter.DiscoveredModelMetadata{SizeB: &a}
+	document.Deployments[1].ModelMetadata = &modelrouter.DiscoveredModelMetadata{SizeB: &b}
+	document.ModelRouting.VirtualModels["auto"] = modelrouter.VirtualModel{Strategy: "smallest"}
+	result, err := SimulateRouting(RoutingSimulationInput{Document: document, RequestedModel: "auto"}, config.UnknownCapabilityTry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Decision.ResolvedModel != "text-model" {
+		t.Fatalf("decision: %+v", result.Decision)
+	}
+	document.Deployments[0].ModelMetadata.SizeB = &b
+	document.Deployments[1].ModelMetadata.SizeB = &a
+	result, err = SimulateRouting(RoutingSimulationInput{Document: document, RequestedModel: "auto"}, config.UnknownCapabilityTry)
+	if err != nil || result.Decision.ResolvedModel != "vision-model" {
+		t.Fatalf("updated decision: %+v, %v", result, err)
+	}
+}

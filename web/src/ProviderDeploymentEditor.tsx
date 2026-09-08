@@ -1,3 +1,4 @@
+import { DeploymentMetadataEditor } from "./DeploymentMetadataEditor";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { capabilityOptions } from "./capabilities";
@@ -311,6 +312,7 @@ export function ProviderDeploymentEditor({
           <>
             <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />
             <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
+            <DeploymentMetadataEditor deployment={selectedDeployment} disabled={formDisabled} onChange={updateDeployment} />
             {sparkrun?.enabled && !readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <button type="button" className="secondary-button" disabled={disabled} onClick={() => setEditingRecipe(true)}>Edit recipe settings</button> : null}
             <p className="section-help">Manage public names and aliases in Virtual Models / Aliases. Deployment settings are shared by all of its names.</p></div>
           </>
@@ -730,6 +732,8 @@ function DeploymentForm({
             ))}
           </div>
         </details>
+
+        <DeploymentMetadataEditor deployment={deployment} disabled={disabled} onChange={onChange} />
 
         <details className="model-section policy-section">
           <summary><span>Concurrency and circuit policy</span><small>Optional limits and failure handling</small></summary>

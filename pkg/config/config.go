@@ -58,7 +58,8 @@ type Provider struct {
 }
 
 type Deployment struct {
-	Name string `json:"name"`
+	ModelMetadata *modelrouter.DiscoveredModelMetadata `json:"model_metadata,omitempty"`
+	Name          string                               `json:"name"`
 	// Title is presentation only; Name remains the stable routing and lifecycle ID.
 	Title            string                     `json:"title,omitempty"`
 	Provider         string                     `json:"provider"`

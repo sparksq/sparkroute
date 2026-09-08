@@ -77,7 +77,7 @@ func TestRuntimeSlotDrainsRetiredGeneration(t *testing.T) {
 	}
 }
 
-func TestValidateRuntimeDocumentRejectsConcretePIIInOSSCommand(t *testing.T) {
+func TestValidateRuntimeDocumentAcceptsBuiltinPIIInOSSCommand(t *testing.T) {
 	t.Parallel()
 	document := config.Document{
 		Providers: []config.Provider{{
@@ -97,7 +97,7 @@ func TestValidateRuntimeDocumentRejectsConcretePIIInOSSCommand(t *testing.T) {
 		}},
 	}
 	err := validateRuntimeDocument(document, credentialbuiltin.Options{})
-	if err == nil || !strings.Contains(err.Error(), "requires a privacy provider") {
+	if err != nil {
 		t.Fatalf("validateRuntimeDocument() error = %v", err)
 	}
 }

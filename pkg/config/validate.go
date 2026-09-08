@@ -234,6 +234,11 @@ func (d Document) Validate() error {
 	deployments := make(map[string]Deployment, len(d.Deployments))
 	activationBindings := make(map[string]string)
 	for i, deployment := range d.Deployments {
+		if deployment.ModelMetadata != nil {
+			if err := modelrouter.ValidateModelMetadata(*deployment.ModelMetadata); err != nil {
+				return fmt.Errorf("deployments[%d].model_metadata: %w", i, err)
+			}
+		}
 		path := fmt.Sprintf("deployments[%d]", i)
 		if err := validateID(deployment.Name); err != nil {
 			return fmt.Errorf("%s.name: %w", path, err)

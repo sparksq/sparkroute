@@ -1,6 +1,6 @@
 // Package privacy defines the optional privacy-provider contract used by the
-// OSS gateway. Concrete PII detection, substitution, key management, and
-// persistence implementations are supplied by downstream distributions.
+// gateway. The standalone implementation lives in pkg/pii; downstream
+// distributions may supply additional detectors and persistence backends.
 package privacy
 
 import (
@@ -53,7 +53,7 @@ type Session interface {
 
 // Provider creates request-local or authenticated conversation-stable
 // sessions. It is the only PII implementation seam consumed by the OSS data
-// plane; OSS ships no concrete provider.
+// plane; pkg/pii supplies the standalone implementation.
 type Provider interface {
 	NewSession(context.Context, []Entity, Scope) (Session, error)
 	Supports(Entity) bool

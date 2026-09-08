@@ -155,7 +155,7 @@ func ValidatePrivacyProvider(document config.Document, provider privacy.Provider
 		return nil
 	}
 	if provider == nil {
-		return fmt.Errorf("PII configuration requires a privacy provider; the OSS distribution ships only the extension contract")
+		return fmt.Errorf("PII configuration requires a privacy provider")
 	}
 	for _, entity := range required {
 		if !provider.Supports(entity) {

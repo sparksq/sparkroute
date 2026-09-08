@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sparksq/sparkroute/pkg/config"
+	"github.com/sparksq/sparkroute/pkg/modelrouter"
 )
 
 // Catalog is available before any lifecycle target exists. Discovery uses only
@@ -47,26 +48,27 @@ type RecipeSettings struct {
 var recipeProfileSelector = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
 
 type RecipeDetails struct {
-	Sparkroute       RecipeSettings      `json:"sparkroute,omitempty"`
-	Metadata         map[string]any      `json:"metadata"`
-	HFModel          string              `json:"hf_model"`
-	AvailablePlugins []string            `json:"available_plugins"`
-	Reference        string              `json:"reference"`
-	Name             string              `json:"name"`
-	SourcePath       string              `json:"source_path"`
-	Registry         *string             `json:"registry"`
-	Model            string              `json:"model"`
-	Runtime          string              `json:"runtime"`
-	Description      string              `json:"description"`
-	MinNodes         int                 `json:"min_nodes"`
-	Defaults         map[string]any      `json:"defaults"`
-	Revision         string              `json:"recipe_revision"`
-	NativeAPIOptions []string            `json:"native_api_options"`
-	NativeProtocols  []config.Protocol   `json:"native_protocols"`
-	Capabilities     []config.Capability `json:"capabilities"`
-	RequiredPlugins  []string            `json:"required_plugins"`
-	Trusted          bool                `json:"trusted"`
-	Issues           []map[string]any    `json:"issues"`
+	ModelMetadata    *modelrouter.DiscoveredModelMetadata `json:"model_metadata,omitempty"`
+	Sparkroute       RecipeSettings                       `json:"sparkroute,omitempty"`
+	Metadata         map[string]any                       `json:"metadata"`
+	HFModel          string                               `json:"hf_model"`
+	AvailablePlugins []string                             `json:"available_plugins"`
+	Reference        string                               `json:"reference"`
+	Name             string                               `json:"name"`
+	SourcePath       string                               `json:"source_path"`
+	Registry         *string                              `json:"registry"`
+	Model            string                               `json:"model"`
+	Runtime          string                               `json:"runtime"`
+	Description      string                               `json:"description"`
+	MinNodes         int                                  `json:"min_nodes"`
+	Defaults         map[string]any                       `json:"defaults"`
+	Revision         string                               `json:"recipe_revision"`
+	NativeAPIOptions []string                             `json:"native_api_options"`
+	NativeProtocols  []config.Protocol                    `json:"native_protocols"`
+	Capabilities     []config.Capability                  `json:"capabilities"`
+	RequiredPlugins  []string                             `json:"required_plugins"`
+	Trusted          bool                                 `json:"trusted"`
+	Issues           []map[string]any                     `json:"issues"`
 }
 
 type Cluster struct {
@@ -282,7 +284,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		source.Revision = hex.EncodeToString(revision[:12])
 		operator.Deployments = append(operator.Deployments, config.Deployment{Name: deploymentName,
 			Title: "sparkrun:" + strings.Join(candidates, ",") + ":" + details.Model, Provider: providerName, Model: details.Model,
-			NativeProtocols: details.NativeProtocols, Capabilities: details.Capabilities, EndpointSource: source})
+			NativeProtocols: details.NativeProtocols, Capabilities: details.Capabilities, EndpointSource: source, ModelMetadata: details.ModelMetadata})
 	}
 	required := []config.Capability(nil)
 	if slices.Contains(details.Capabilities, config.Capability("single_vector_embedding")) {

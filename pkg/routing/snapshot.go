@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"sort"
 	"strings"
 
@@ -608,6 +609,10 @@ func cloneProvider(provider config.Provider) config.Provider {
 }
 
 func cloneDeployment(deployment config.Deployment) config.Deployment {
+	if deployment.ModelMetadata != nil {
+		metadata := modelrouter.ReduceModelMetadata(modelrouter.DiscoveredModelMetadata{}, *deployment.ModelMetadata)
+		deployment.ModelMetadata = &metadata
+	}
 	deployment.UpstreamHeaders = cloneHeaders(deployment.UpstreamHeaders)
 	deployment.ExtraBody = cloneRawMessages(deployment.ExtraBody)
 	deployment.NativeProtocols = append([]config.Protocol(nil), deployment.NativeProtocols...)

@@ -78,6 +78,9 @@ func SimulateRoutingWithMetadata(
 	if err != nil {
 		return RoutingSimulationResult{}, fmt.Errorf("compile model routing: %w", err)
 	}
+	if err := manager.ReplaceDeploymentMetadata(document.DeploymentMetadata()); err != nil {
+		return RoutingSimulationResult{}, err
+	}
 	for _, source := range metadata.Sources {
 		if err := manager.ReplaceDiscoveredMetadata(source); err != nil {
 			return RoutingSimulationResult{}, fmt.Errorf("apply discovered model metadata: %w", err)
