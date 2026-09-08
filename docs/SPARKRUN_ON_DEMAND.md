@@ -64,8 +64,12 @@ require explicit trust acknowledgement; browsing never refreshes automatically.
 
 The `sparkrun` provider delegates endpoint management to the integration. Native
 APIs are per deployment/runtime: vLLM offers Chat Completions, Responses, and
-Anthropic Messages, with conservative defaults for unidentified image versions.
+Anthropic Messages by default, including nightly/custom images. Recognized vLLM
+versions older than 0.12.0 default to Chat Completions only. Recipe
+`metadata.native_apis` can narrow or override these defaults and also constrains
+which API sparkrun can select for its launch readiness probe.
 UI selection persists the wire families plus the native Responses declaration.
+This deployment override affects gateway routing; recipe YAML controls readiness.
 
 Virtual Models / Aliases supports explicit request profiles such as `coding:xhigh`.
 Only parent models appear in the virtual-model list; their variants stay in the
