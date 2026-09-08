@@ -45,7 +45,7 @@ func TestRecipeDraftFromEmptyConfigurationAndSharedDeployment(t *testing.T) {
 	if err := document.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if document.Deployments[0].EndpointSource.ActivationTimeout.Value() != 15*time.Minute {
+	if document.Deployments[0].EndpointSource.ActivationTimeout.Value() != 30*time.Minute {
 		t.Fatal("default wait")
 	}
 	if _, ok := document.CanonicalModel("code"); !ok {

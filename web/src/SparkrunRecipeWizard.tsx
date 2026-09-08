@@ -26,7 +26,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
   const [yaml, setYaml] = useState("");
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
-  const [waitMinutes, setWaitMinutes] = useState(() => durationMinutes(initialSource.activation_timeout, 15));
+  const [waitMinutes, setWaitMinutes] = useState(() => durationMinutes(initialSource.activation_timeout, 30));
   const [idle, setIdle] = useState(() => durationMinutes(initialSource.idle_ttl, 0) > 0);
   const [idleMinutes, setIdleMinutes] = useState(() => durationMinutes(initialSource.idle_ttl, 30) || 30);
   const [overrides, setOverrides] = useState(() => JSON.stringify(initialSource.overrides ?? {}, null, 2));
@@ -173,7 +173,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
           <label>Aliases (comma separated)<input value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="code, assistant" /></label></>}
           <label>Cluster<select aria-label="Cluster" required value={cluster} onChange={(e) => setCluster(e.target.value)}><option value="">Choose a cluster</option>
             {clusters.map((c) => <option key={c.name} value={c.name}>{c.name} · {c.host_count} hosts{c.default ? " · default" : ""}</option>)}</select></label>
-          <label>Cold-start wait (minutes)<input type="number" min={1} max={60} required value={waitMinutes} onChange={(e) => setWaitMinutes(Number(e.target.value))} /></label>
+          <label>Cold-start wait (minutes)<input aria-label="Cold-start wait (minutes)" aria-describedby="cold-start-wait-help" type="number" min={1} max={60} required value={waitMinutes} onChange={(e) => setWaitMinutes(Number(e.target.value))} /><small id="cold-start-wait-help">How long a request can wait for the model to start and become ready.</small></label>
         </div>
         {!clusters.length && <p className="notice info">No named clusters are configured. Add a cluster with sparkrun on the control node, then reopen this form.</p>}
         <p className="section-help">The selected cluster is saved by name. A later change to sparkrun’s default cluster will not move this model.</p>

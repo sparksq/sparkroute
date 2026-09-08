@@ -363,7 +363,7 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
       <div><dt>Recipe</dt><dd>{preview?.name || (recipe ? "Pinned recipe" : "Discovered workload")}{preview?.source_path && <small className="recipe-source">{preview.source_path}</small>}</dd></div>
       <div><dt>Cluster</dt><dd>{stringArray(source.cluster_candidates).join(", ") || "Reported by sparkrun"}</dd></div>
       {source.type === "activatable" && <>
-        <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 15)} minutes</dd></div>
+        <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 30)} minutes</dd></div>
         <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
       </>}
     </dl>
@@ -823,7 +823,7 @@ function EndpointSourceFields({
             </select>
           </Field>
           <Field label="Activation timeout">
-            <input placeholder="15m" value={stringValue(source.activation_timeout)} onChange={(event) => onChange((value) => setNestedString(value, "endpoint_source", "activation_timeout", event.target.value))} />
+            <input placeholder="30m" value={stringValue(source.activation_timeout)} onChange={(event) => onChange((value) => setNestedString(value, "endpoint_source", "activation_timeout", event.target.value))} />
           </Field>
           <Field label="Idle TTL">
             <input placeholder="30m" value={stringValue(source.idle_ttl)} onChange={(event) => onChange((value) => setNestedString(value, "endpoint_source", "idle_ttl", event.target.value))} />

@@ -123,7 +123,7 @@ func (c *Client) EnsureReady(
 	timeout time.Duration,
 ) (EnsureResult, error) {
 	if timeout <= 0 {
-		timeout = 15 * time.Minute
+		timeout = 30 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

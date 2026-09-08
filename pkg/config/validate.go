@@ -46,7 +46,7 @@ const (
 	defaultCircuitBaseEjectionTime          = 30 * time.Second
 	defaultCircuitMaxEjectionTime           = 10 * time.Minute
 	maxConfiguredEjectionTime               = 24 * time.Hour
-	defaultActivationTimeout                = 15 * time.Minute
+	defaultActivationTimeout                = 30 * time.Minute
 	maxConfiguredActivationTimeout          = 24 * time.Hour
 	maxConfiguredIdleTTL                    = 30 * 24 * time.Hour
 	defaultMaxQueuedWaiters                 = 100

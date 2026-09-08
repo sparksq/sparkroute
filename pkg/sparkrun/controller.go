@@ -330,7 +330,7 @@ func (c *Controller) EnsureReady(
 
 	timeout := binding.ActivationTimeout
 	if timeout <= 0 {
-		timeout = 15 * time.Minute
+		timeout = 30 * time.Minute
 	}
 	result, err := c.bridge.EnsureReady(ctx, bridgeBinding(binding), timeout)
 	if err != nil {

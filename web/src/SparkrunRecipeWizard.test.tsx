@@ -40,7 +40,7 @@ it("preserves duplicate file identity and prepares coding on the explicit defaul
  fireEvent.click(screen.getByRole("button", { name: "Add to draft" }));
  await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
  const prepared = calls.find((call) => call.url.endsWith("recipe-draft"))!.body;
- expect(prepared.recipe).toMatchObject({ name: "coding", aliases: ["code", "assistant"], cluster: "lab", idle_ttl: "30m", activation_timeout: "15m" });
+ expect(prepared.recipe).toMatchObject({ name: "coding", aliases: ["code", "assistant"], cluster: "lab", idle_ttl: "30m", activation_timeout: "30m" });
  expect(calls.some((call) => call.body.operation === "ensure_ready")).toBe(false);
 });
 

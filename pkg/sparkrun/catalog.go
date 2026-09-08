@@ -115,7 +115,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		return operator, "", false, fmt.Errorf("choose an available named cluster")
 	}
 	if input.ActivationTimeout == 0 {
-		input.ActivationTimeout = config.Duration(15 * time.Minute)
+		input.ActivationTimeout = config.Duration(30 * time.Minute)
 	}
 	if input.ActivationTimeout.Value() <= 0 || input.ActivationTimeout.Value() > time.Hour || input.IdleTTL.Value() < 0 {
 		return operator, "", false, fmt.Errorf("cold-start wait must be between zero and 60 minutes; idle timeout cannot be negative")
