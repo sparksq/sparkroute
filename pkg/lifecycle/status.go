@@ -44,6 +44,10 @@ type ControllerStatus struct {
 // BindingStatus describes one configured activation binding and its bounded
 // cold-start admission state.
 type BindingStatus struct {
+	Owned              *bool                  `json:"owned,omitempty"`
+	Phase              string                 `json:"phase,omitempty"`
+	JobID              string                 `json:"job_id,omitempty"`
+	ClusterCandidates  []string               `json:"cluster_candidates,omitempty"`
 	Controller         string                 `json:"controller"`
 	BindingRevision    string                 `json:"binding_revision"`
 	VirtualModel       string                 `json:"virtual_model,omitempty"`
@@ -170,12 +174,24 @@ func validateControllerStatus(status *ControllerStatus) error {
 }
 
 func validateBindingStatus(status *BindingStatus) error {
+	if err := validateReason(status.Phase); err != nil {
+		return err
+	}
+	if len(status.ClusterCandidates) > 64 {
+		return fmt.Errorf("too many cluster candidates")
+	}
+	for _, name := range status.ClusterCandidates {
+		if err := validateStatusString("cluster", name, true); err != nil {
+			return err
+		}
+	}
 	for name, value := range map[string]string{
 		"controller":       status.Controller,
 		"binding_revision": status.BindingRevision,
 		"virtual_model":    status.VirtualModel,
 		"deployment":       status.Deployment,
 		"endpoint_id":      status.EndpointID,
+		"job_id":           status.JobID,
 	} {
 		required := name == "controller" || name == "binding_revision" || name == "deployment"
 		if err := validateStatusString(name, value, required); err != nil {
@@ -274,6 +290,11 @@ func cloneSnapshot(snapshot Snapshot) Snapshot {
 	result.Controllers = append([]ControllerStatus(nil), snapshot.Controllers...)
 	result.Bindings = append([]BindingStatus(nil), snapshot.Bindings...)
 	for index := range result.Bindings {
+		if result.Bindings[index].Owned != nil {
+			value := *result.Bindings[index].Owned
+			result.Bindings[index].Owned = &value
+		}
+		result.Bindings[index].ClusterCandidates = append([]string(nil), result.Bindings[index].ClusterCandidates...)
 		if result.Bindings[index].ActivationStarted != nil {
 			value := *result.Bindings[index].ActivationStarted
 			result.Bindings[index].ActivationStarted = &value

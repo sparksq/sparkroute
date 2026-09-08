@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	ProtocolVersion        = 2
+	ProtocolVersion        = 3
 	MaxBridgeResponseBytes = 1 << 20
 	MaxBridgeStderrBytes   = 64 << 10
 )
@@ -29,6 +29,7 @@ type Binding struct {
 }
 
 type Endpoint struct {
+	Owned          bool                     `json:"owned"`
 	State          string                   `json:"state"`
 	ClusterID      string                   `json:"cluster_id"`
 	ClusterName    string                   `json:"cluster_name,omitempty"`
@@ -96,8 +97,9 @@ func (e *BridgeError) Error() string {
 }
 
 type Client struct {
-	command string
-	nextID  atomic.Uint64
+	OnProgress func(Binding, Operation)
+	command    string
+	nextID     atomic.Uint64
 }
 
 func NewClient(command string) (*Client, error) {
@@ -120,12 +122,48 @@ func (c *Client) EnsureReady(
 	binding Binding,
 	timeout time.Duration,
 ) (EnsureResult, error) {
-	var result EnsureResult
-	err := c.invoke(ctx, bridgeRequest{
-		Operation: "ensure_ready", Binding: &binding,
-		TimeoutSeconds: timeout.Seconds(),
-	}, &result)
-	return result, err
+	if timeout <= 0 {
+		timeout = 15 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	wait := false
+	var operation Operation
+	if err := c.invoke(ctx, bridgeRequest{Operation: "ensure_ready", Binding: &binding,
+		TimeoutSeconds: timeout.Seconds(), Wait: &wait}, &operation); err != nil {
+		return EnsureResult{}, err
+	}
+	for {
+		if c.OnProgress != nil {
+			c.OnProgress(binding, operation)
+		}
+		switch operation.State {
+		case "succeeded":
+			var result EnsureResult
+			err := decodeStrict(operation.Result, &result)
+			return result, err
+		case "failed":
+			if operation.Error == nil {
+				return EnsureResult{}, fmt.Errorf("missing operation error")
+			}
+			return EnsureResult{}, operation.Error
+		case "running":
+		default:
+			return EnsureResult{}, fmt.Errorf("invalid operation state")
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return EnsureResult{}, ctx.Err()
+		case <-timer.C:
+		}
+		var next Operation
+		if err := c.Catalog(ctx, "operation_status", map[string]any{"operation_id": operation.ID}, &next); err != nil {
+			return EnsureResult{}, err
+		}
+		operation = next
+	}
 }
 
 func (c *Client) Discover(
@@ -150,12 +188,14 @@ func (c *Client) Stop(
 }
 
 type bridgeRequest struct {
-	SchemaVersion  int      `json:"schema_version"`
-	RequestID      string   `json:"request_id"`
-	Operation      string   `json:"operation"`
-	Binding        *Binding `json:"binding,omitempty"`
-	ClusterID      string   `json:"cluster_id,omitempty"`
-	TimeoutSeconds float64  `json:"timeout_seconds,omitempty"`
+	Arguments      map[string]any `json:"arguments,omitempty"`
+	Wait           *bool          `json:"wait,omitempty"`
+	SchemaVersion  int            `json:"schema_version"`
+	RequestID      string         `json:"request_id"`
+	Operation      string         `json:"operation"`
+	Binding        *Binding       `json:"binding,omitempty"`
+	ClusterID      string         `json:"cluster_id,omitempty"`
+	TimeoutSeconds float64        `json:"timeout_seconds,omitempty"`
 }
 
 type bridgeResponse struct {

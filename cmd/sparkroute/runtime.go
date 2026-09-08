@@ -34,6 +34,7 @@ import (
 )
 
 type runtimeBuildOptions struct {
+	SparkrunWorkloads       *sparkrunruntime.Workloads
 	Context                 context.Context
 	Logger                  *slog.Logger
 	CredentialOptions       credentialbuiltin.Options
@@ -70,8 +71,9 @@ type runtimeGeneration struct {
 	// sparkrun retains the replica-local controller status boundary alongside
 	// its close function; command acceptance waits for completed controller
 	// transitions rather than treating subprocess acknowledgement as completion.
-	sparkrun *sparkrunruntime.Controller
-	closeFn  func()
+	sparkrun   *sparkrunruntime.Controller
+	closeFn    func()
+	activateFn func()
 
 	active    atomic.Int64
 	retired   atomic.Bool
@@ -111,7 +113,7 @@ func buildRuntimeGeneration(
 		endpointRegistry = registry
 		metadataPublisher, _ := requestModelRouter.(modelrouter.DiscoveredMetadataPublisher)
 		runtimeController, err = sparkrunruntime.New(sparkrunruntime.Options{
-			Bridge: bridge, Registry: registry, Targets: lifecycleTargets,
+			Bridge: bridge, Registry: registry, Targets: lifecycleTargets, Workloads: options.SparkrunWorkloads,
 			MetadataPublisher: metadataPublisher,
 			MetadataSource:    "sparkrun:" + string(revision),
 			EndpointTTL:       options.SparkrunEndpointTTL,
@@ -198,6 +200,11 @@ func buildRuntimeGeneration(
 			options.Logger.Warn("Sparkrun endpoint reconciliation failed", slog.Any("err", err))
 		})
 	}
+	generation.activateFn = func() {
+		if options.SparkrunWorkloads != nil {
+			options.SparkrunWorkloads.Configure(lifecycleTargets)
+		}
+	}
 	if options.AdminEnabled {
 		adminOptions := ossadmin.Options{
 			Targets: dataPlane.Targets, Credentials: generation.credentials,
@@ -213,8 +220,14 @@ func buildRuntimeGeneration(
 			ProviderAuth:       options.ProviderAuth,
 			ManagedConfig:      options.ManagedConfig,
 		}
+		if admissionCoordinator != nil {
+			adminOptions.Lifecycle = admissionCoordinator
+		}
 		if endpointRegistry != nil {
 			adminOptions.Endpoints = endpointRegistry
+		}
+		if options.SparkrunCommand != "" {
+			adminOptions.SparkrunCatalog, _ = sparkrunruntime.NewClient(options.SparkrunCommand)
 		}
 		adminOptions.ModelMetadata, _ = requestModelRouter.(modelrouter.DiscoveredMetadataInspector)
 		if options.MMProjection != nil {
@@ -229,6 +242,9 @@ func validateRuntimeDocument(
 	document config.Document,
 	credentialOptions credentialbuiltin.Options,
 ) error {
+	if err := sparkrunruntime.ValidateWorkloadSharing(document); err != nil {
+		return err
+	}
 	if err := gateway.ValidatePrivacyProvider(document, nil); err != nil {
 		return err
 	}
@@ -281,12 +297,18 @@ type runtimeSlot struct {
 }
 
 func newRuntimeSlot(initial *runtimeGeneration) *runtimeSlot {
+	if initial.activateFn != nil {
+		initial.activateFn()
+	}
 	slot := &runtimeSlot{}
 	slot.current.Store(initial)
 	return slot
 }
 
 func (s *runtimeSlot) replace(next *runtimeGeneration) {
+	if next.activateFn != nil {
+		next.activateFn()
+	}
 	previous := s.current.Swap(next)
 	if previous != nil {
 		previous.retire()

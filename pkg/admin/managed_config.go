@@ -131,6 +131,9 @@ func (h *handler) managedSet(writer http.ResponseWriter, request *http.Request) 
 		if !ok {
 			return
 		}
+		if !h.validateSparkrunCandidate(writer, request, owner, input) {
+			return
+		}
 		principal, _ := principalFromRequest(request)
 		result, err := h.options.ManagedConfig.ReplaceSet(
 			request.Context(), owner, input.Document, managed.ReplaceOptions{
@@ -209,6 +212,9 @@ func (h *handler) validateManagedSet(
 	}
 	input, ok := decodeManagedSetMutation(writer, request)
 	if !ok {
+		return
+	}
+	if !h.validateSparkrunCandidate(writer, request, owner, input) {
 		return
 	}
 	validation, err := h.options.ManagedConfig.ValidateSet(

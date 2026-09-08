@@ -17,6 +17,7 @@ import type {
   ManagedConfigurationOwner,
   ManagedConfigurationSetMetadata,
 } from "./types";
+import { SparkRunRecipeWizard } from "./SparkRunRecipeWizard";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
@@ -62,6 +63,7 @@ export function ManagedConfigurationWorkspace({
   const editorRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<Notice>();
   const [busy, setBusy] = useState("");
+  const [recipeWizard, setRecipeWizard] = useState(false);
   const [editorMode, setEditorMode] = useState<"structured" | "json">("structured");
   const infrastructureSection = useRef<"providers" | "deployments">("providers");
   if (section === "providers" || section === "deployments") infrastructureSection.current = section;
@@ -262,6 +264,7 @@ export function ManagedConfigurationWorkspace({
         <div className="editor-toolbar">
           <div className="editor-mode-switch" aria-label="Configuration editor mode" role="group">
             <button
+              disabled={recipeWizard}
               aria-pressed={editorMode === "structured"}
               className={editorMode === "structured" ? "active" : ""}
               onClick={() => setEditorMode("structured")}
@@ -270,6 +273,7 @@ export function ManagedConfigurationWorkspace({
               Structured
             </button>
             <button
+              disabled={recipeWizard}
               aria-pressed={editorMode === "json"}
               className={editorMode === "json" ? "active" : ""}
               onClick={() => setEditorMode("json")}
@@ -280,7 +284,7 @@ export function ManagedConfigurationWorkspace({
           </div>
           <button
             className="text-button"
-            disabled={Boolean(busy) || !parsed.document || !canEdit}
+            disabled={Boolean(busy) || recipeWizard || !parsed.document || !canEdit}
             onClick={() => parsed.document && changeDraft(JSON.stringify(parsed.document, null, 2))}
             type="button"
           >
@@ -289,7 +293,7 @@ export function ManagedConfigurationWorkspace({
           {canEdit ? (
             <button
               className={validated ? "primary-button editor-action" : "secondary-button editor-action"}
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy) || recipeWizard}
               onClick={() => void (validated ? save() : validate())}
               type="button"
             >
@@ -301,9 +305,17 @@ export function ManagedConfigurationWorkspace({
         <div hidden={editorMode !== "structured"}>
           {operatorParsed.document ? (
             <>
+              {(section === "deployments" || section === "models") && canEdit && bootstrap.features.sparkrun_catalog && <>
+                {!recipeWizard && <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => setRecipeWizard(true)}>Add SparkRun recipe</button>}
+                {recipeWizard && <SparkRunRecipeWizard token={token} document={operatorParsed.document} revision={storedRevision}
+                  onClose={() => setRecipeWizard(false)} onChange={(document, reused) => {
+                    structuredChange(document); setRecipeWizard(false);
+                    setNotice({ kind: "info", text: `${reused ? "Model added using the existing deployment and its lifecycle settings." : "On-demand model added to the draft."} Validate, then Save to make it available. Saving does not launch it.` });
+                  }} />}
+              </>}
               <div hidden={section !== "models"}>
                 <VirtualModelEditor
-                  disabled={!canEdit || Boolean(busy)}
+                  disabled={!canEdit || Boolean(busy) || recipeWizard}
                   document={operatorParsed.document}
                   readOnlyDocument={generatedDocument}
                   reservedModelNames={reservedModelNames}
@@ -316,7 +328,7 @@ export function ManagedConfigurationWorkspace({
                 {generatedDocument?.model_routing ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
                 <ModelRoutingEditor
                   canonicalModelNames={mergedCandidateModelNames}
-                  disabled={!canEdit || Boolean(busy) || Boolean(generatedDocument?.model_routing)}
+                  disabled={!canEdit || Boolean(busy) || recipeWizard || Boolean(generatedDocument?.model_routing)}
                   discoveredMetadata={discoveredMetadata}
                   document={generatedDocument?.model_routing ? generatedDocument : operatorParsed.document}
                   onChange={generatedDocument?.model_routing ? () => {} : structuredChange}
@@ -334,7 +346,7 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "providers" && section !== "deployments"}>
-                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy) || recipeWizard} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
               </div>
             </>
           ) : (

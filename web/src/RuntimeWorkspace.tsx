@@ -39,8 +39,8 @@ export function RuntimeWorkspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
+  const load = useCallback(async (signal?: AbortSignal, showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError("");
     try {
       const [nextStatus, nextEndpoints, nextEvents] = await Promise.all([
@@ -60,19 +60,20 @@ export function RuntimeWorkspace({
       if (signal?.aborted) return;
       setError(caught instanceof Error ? caught.message : "Runtime status request failed");
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!signal?.aborted && showLoading) setLoading(false);
     }
   }, [endpointFilters, eventFilters, hasEndpoints, hasEvents, hasStatus, token]);
 
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
-    return () => controller.abort();
+    const timer = setInterval(() => { if (!document.hidden) void load(controller.signal, false); }, 5000);
+    return () => { controller.abort(); clearInterval(timer); };
   }, [load]);
 
-  const readyEndpoints = endpoints.endpoints.filter(
+  const readyEndpoints = hasEndpoints ? endpoints.endpoints.filter(
     (endpoint) => endpoint.state === "ready" && !endpoint.expired,
-  ).length;
+  ).length : status?.controllers.reduce((total, c) => total + c.ready_endpoints, 0) ?? 0;
   const queuedWaiters = status?.controllers.reduce(
     (total, controller) => total + controller.queued_waiters,
     0,
@@ -95,7 +96,7 @@ export function RuntimeWorkspace({
 
       <section className="metric-grid" aria-label="Runtime inventory">
         <Metric label="Controllers" value={status?.controllers.length ?? 0} />
-        <Metric label="Endpoints" value={endpoints.endpoints.length} />
+        <Metric label="Endpoints" value={hasEndpoints ? endpoints.endpoints.length : status?.controllers.reduce((total, c) => total + c.endpoints, 0) ?? 0} />
         <Metric label="Ready endpoints" value={readyEndpoints} accent={readyEndpoints > 0} />
         <Metric label="Queued waiters" value={queuedWaiters} accent={queuedWaiters === 0} />
       </section>
@@ -175,9 +176,9 @@ function LifecycleOverview({ snapshot }: { snapshot: LifecycleSnapshot }) {
             <th>Deployment</th><th>Model</th><th>State</th><th>Queue</th><th>Leases</th><th>Deadline</th>
           </tr></thead><tbody>
             {snapshot.bindings.map((binding) => <tr key={`${binding.controller}/${binding.binding_revision}`}>
-              <td className="deployment-name">{binding.deployment}<small>{binding.controller}</small></td>
+              <td className="deployment-name">{binding.deployment}<small>{binding.cluster_candidates?.join(", ") || binding.controller}</small><small>{binding.job_id}</small><small>{binding.owned === true ? "Started by SparkRoute" : binding.owned === false ? "Adopted · manual stop" : ""}</small></td>
               <td>{binding.virtual_model || "—"}</td>
-              <td><StatePill value={binding.state} good={binding.state === "ready"} /></td>
+              <td><StatePill value={binding.state} good={binding.state === "ready"} /><small>{binding.phase?.replaceAll("_", " ")}</small><small>{binding.reason?.replaceAll("_", " ")}</small></td>
               <td>{binding.queued_waiters} / {binding.max_queued_waiters || "∞"}<small>{formatBytes(binding.queued_body_bytes)} / {binding.max_queued_body_bytes ? formatBytes(binding.max_queued_body_bytes) : "∞"}</small></td>
               <td>{binding.active_leases}</td>
               <td>{binding.activation_deadline ? formatTime(binding.activation_deadline) : "—"}</td>

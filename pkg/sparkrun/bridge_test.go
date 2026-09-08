@@ -90,7 +90,7 @@ func TestClientNeverRetriesActivationFailuresOrUncorrelatedRefusals(t *testing.T
 			t.Setenv("SPARKROUTE_BRIDGE_TEST_CALLS", calls)
 			executable, _ := os.Executable()
 			client, _ := NewClient(executable)
-			_, err := client.EnsureReady(context.Background(), Binding{Recipe: "recipe"}, time.Second)
+			_, err := client.EnsureReady(context.Background(), Binding{Recipe: "recipe"}, 5*time.Second)
 			if err == nil {
 				t.Fatal("expected refusal")
 			}

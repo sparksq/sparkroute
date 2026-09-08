@@ -159,7 +159,39 @@ are distinct from a provider's Files resource API (`files`). Concurrency limits 
 passive circuit health settings are grouped under **Concurrency and circuit policy**.
 
 See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
-for schema v2 requirements and treatment of older job metadata.
+for schema v3 requirements and treatment of older job metadata.
+
+## On-demand SparkRun models
+
+Open **Configuration → Model Deployments → Add SparkRun recipe** (also available
+under Virtual Models / Aliases). Search the control node's cached registries,
+enter a control-node file path, or upload recipe YAML. Preview the selected
+recipe, enter a public name such as `coding`, add aliases, and choose a named
+cluster. Add it to the shared draft, then **Validate → Save**.
+
+Saving does not launch a model. The first request for a configured name starts
+or reuses the recipe on the selected cluster, waits for SparkRun's normal
+readiness checks, and routes to the assigned port. Aliases share one workload.
+The cluster's actual name is saved even when it was selected as the default.
+Unrecognized API model names never cause automatic recipe selection.
+
+Cold-start wait defaults to 15 minutes. Client timeouts must allow the model to
+load. Optional idle shutdown suggests 30 minutes and begins after the last
+request completes; streaming requests hold their lease until they finish.
+Only SparkRoute-owned jobs are stopped. Deleting a route does not stop its job.
+The Runtime page shows startup phase, cluster, job, failure, and ownership.
+
+Search is cache-only. **Refresh registries** explicitly updates caches and keeps
+usable results when a registry fails. Browser uploads are limited to one YAML
+file (256 KiB), do not grant trust, and do not include auxiliary build assets.
+Use a configured registry or a control-node recipe directory for those assets.
+Changed recipes require a fresh preview before saving or activation.
+
+The catalog uses the local SparkRun bridge even before the first deployment
+exists. Install the paired plugin and a SparkRun build with the public catalog
+API, then enable `gateway.sparkroute`. Without that integration, ordinary cloud
+provider configuration continues to work. Gateway and plugin require bridge
+schema v3 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).
 
 ## Native provider configuration
 

@@ -35,6 +35,8 @@ type acceptanceBridgeState struct {
 }
 
 type acceptanceBridgeRequest struct {
+	Wait           *bool                    `json:"wait,omitempty"`
+	Arguments      map[string]any           `json:"arguments,omitempty"`
 	SchemaVersion  int                      `json:"schema_version"`
 	RequestID      string                   `json:"request_id"`
 	Operation      string                   `json:"operation"`
@@ -187,6 +189,9 @@ func runAcceptanceBridge() int {
 			Code: "unsupported_operation", Message: "fixture operation is unsupported",
 		}
 	}
+	if request.Operation == "ensure_ready" && response.OK {
+		response.Result = map[string]any{"operation_id": "fixture", "state": "succeeded", "phase": "complete", "updated_at": float64(time.Now().Unix()), "result": response.Result}
+	}
 	if err := json.NewEncoder(os.Stdout).Encode(response); err != nil {
 		return 5
 	}
@@ -206,6 +211,8 @@ func acceptanceEndpoint(
 	return map[string]any{
 		"state":           "ready",
 		"cluster_id":      clusterID,
+		"cluster_name":    "local-cluster",
+		"owned":           true,
 		"job_id":          jobID,
 		"host":            state.Host,
 		"port":            state.Port,

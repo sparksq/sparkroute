@@ -372,6 +372,10 @@ export interface LifecycleControllerStatus {
 }
 
 export interface LifecycleBindingStatus {
+ owned?: boolean;
+ phase?: string;
+ job_id?: string;
+ cluster_candidates?: string[];
   controller: string;
   binding_revision: string;
   virtual_model?: string;

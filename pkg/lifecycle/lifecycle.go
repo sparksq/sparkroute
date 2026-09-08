@@ -54,6 +54,9 @@ type RequestOutcome struct {
 }
 
 type Status struct {
+	Owned     *bool
+	Phase     string
+	JobID     string
 	State     endpointregistry.State
 	Endpoint  *endpointregistry.Endpoint
 	UpdatedAt time.Time

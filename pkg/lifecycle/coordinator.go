@@ -857,9 +857,26 @@ func (c *AdmissionCoordinator) Snapshot(ctx context.Context) (Snapshot, error) {
 		aggregate.status.ActiveLeases += state.activeLeases
 		aggregate.status.QueuedWaiters += state.queuedWaiters
 		aggregate.status.QueuedBodyBytes += state.queuedBodyBytes
+		observed := Status{}
+		if controller := c.controllers[target.Controller]; controller != nil {
+			observed, _ = controller.Status(ctx, target.Binding)
+		}
+		if observed.State != "" && state.queuedWaiters == 0 {
+			state.state = observed.State
+		}
+		if state.state == "" {
+			state.state = endpointregistry.StateOffline
+		}
+		if state.updatedAt.IsZero() {
+			state.updatedAt = observedAt
+		}
+		if observed.Reason != "" {
+			state.reason = SanitizeReason(observed.Reason)
+		}
 		result.Bindings = append(result.Bindings, BindingStatus{
 			Controller: target.Binding.Controller, BindingRevision: target.Binding.Revision,
 			VirtualModel: target.Binding.VirtualModel, Deployment: target.Deployment,
+			Phase: observed.Phase, JobID: observed.JobID, Owned: observed.Owned, ClusterCandidates: append([]string(nil), target.Binding.ClusterCandidates...),
 			State: state.state, UpdatedAt: state.updatedAt,
 			ActivationStarted:  cloneTime(state.activationStarted),
 			ActivationDeadline: cloneTime(state.activationDeadline),

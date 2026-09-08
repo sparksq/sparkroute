@@ -708,8 +708,11 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		}
 		return fmt.Errorf("configure OpenTelemetry: %w", err)
 	}
+	workloads := sparkrunruntime.NewWorkloads()
+	defer workloads.Close()
 	runtimeOptions := runtimeBuildOptions{
-		Context: ctx, Logger: logger, CredentialOptions: credentialOptions,
+		SparkrunWorkloads: workloads,
+		Context:           ctx, Logger: logger, CredentialOptions: credentialOptions,
 		Ledger: usageWriter, ResponsesState: responsesState,
 		SavedTraces: traceRecorder, MaxSavedTraceBytes: *traceMaxBodyBytes,
 		PromptCache: promptCache, PromptFingerprinter: promptFingerprinter,

@@ -406,3 +406,39 @@ export function fetchClientCredentialAudit(
     signal,
   );
 }
+
+export interface SparkRunRecipe {
+  reference: string;
+  name: string;
+  model: string;
+  runtime: string;
+  description: string;
+  registry?: string | null;
+  source_path: string;
+  min_nodes: number;
+}
+export interface SparkRunRecipeDetails extends SparkRunRecipe {
+  recipe_revision: string;
+  native_protocols: string[];
+  capabilities: string[];
+  required_plugins: string[];
+  trusted: boolean;
+  defaults: Record<string, unknown>;
+  issues: { severity: string; code: string; message: string }[];
+}
+export interface SparkRunOperation {
+  operation_id: string;
+  state: "running" | "succeeded" | "failed";
+  phase: string;
+  updated_at: number;
+  result?: { updated?: Record<string, boolean>; failed?: string[] };
+  error?: { code: string; message: string; retryable: boolean };
+}
+export function sparkRunCatalog<T>(token: string, operation: string, args: Record<string, unknown> = {}, signal?: AbortSignal) {
+  return requestJSON<T>("/v1/sparkrun/catalog", token, { method: "POST", body: { operation, arguments: args } }, signal);
+}
+export function prepareSparkRunRecipe(token: string, document: ConfigurationDocument, expectedActiveRevision: string, recipe: Record<string, unknown>) {
+  return requestJSON<{ document: ConfigurationDocument; deployment: string; reused: boolean }>("/v1/sparkrun/recipe-draft", token, {
+    method: "POST", body: { document, expected_active_revision: expectedActiveRevision, recipe },
+  });
+}

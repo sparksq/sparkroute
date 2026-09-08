@@ -1,13 +1,14 @@
 # SparkRun named-cluster display metadata
 
-Bridge schema **2** adds optional `cluster_name` to endpoint replies from
+Bridge schema **3** includes optional `cluster_name` to endpoint replies from
 `discover`, `status`, and `ensure_ready`. This is the human-readable named cluster
 recorded in SparkRun job metadata under `cluster`. `cluster_id` and `job_id` remain
-the opaque workload identifiers; the new field never selects placement, authorizes
-stop, contributes to endpoint identity, or changes binding revisions/fencing.
+the opaque workload identifiers; the named cluster scopes adoption and registration against configured cluster
+candidates. Ownership still controls stop permission. Display titles do not
+change endpoint identity or binding revisions/fencing.
 
-Both components require schema **2**. This is the integration's first use, so no
-schema-1 response filtering or protocol downgrade path is retained. Install the
+Both components require schema **3**. This is the integration's first use, so no
+older-schema response filtering or protocol downgrade path is retained. Install the
 plugin and its pinned SparkRoute binary together. Replies must match the request
 ID and current schema; mismatched versions, uncorrelated replies, and activation
 failures are rejected without retrying the operation. Parse-error replies preserve

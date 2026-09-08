@@ -20,11 +20,13 @@ import (
 	"github.com/sparksq/sparkroute/pkg/credentials"
 	"github.com/sparksq/sparkroute/pkg/endpointregistry"
 	"github.com/sparksq/sparkroute/pkg/identity"
+	"github.com/sparksq/sparkroute/pkg/lifecycle"
 	"github.com/sparksq/sparkroute/pkg/mmprojection"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 	"github.com/sparksq/sparkroute/pkg/privacy"
 	"github.com/sparksq/sparkroute/pkg/providerauth"
 	"github.com/sparksq/sparkroute/pkg/routing"
+	"github.com/sparksq/sparkroute/pkg/sparkrun"
 )
 
 const (
@@ -39,6 +41,8 @@ type ReadyEndpoints interface {
 }
 
 type Options struct {
+	Lifecycle         lifecycle.StatusSource
+	SparkrunCatalog   sparkrun.Catalog
 	Endpoints         ReadyEndpoints
 	Targets           routing.TargetStatusSource
 	Credentials       credentials.StatusSource
@@ -171,6 +175,15 @@ func NewHandler(
 	mux.HandleFunc("/v1/config/validate", h.validateConfiguration)
 	mux.HandleFunc("/v1/config/simulate-routing", h.simulateRouting)
 	privileged := h.authenticated || h.insecureAdmin
+	if options.SparkrunCatalog != nil && privileged {
+		mux.HandleFunc("/v1/sparkrun/catalog", h.sparkrunCatalog)
+		if options.ManagedConfig != nil {
+			mux.HandleFunc("/v1/sparkrun/recipe-draft", h.sparkrunRecipeDraft)
+		}
+	}
+	if options.Lifecycle != nil && privileged {
+		mux.HandleFunc("/v1/runtime/status", h.lifecycleStatus)
+	}
 	if options.ProviderAuth != nil && privileged {
 		mux.HandleFunc("/v1/provider-auth/openai/", h.providerAuth)
 	}
@@ -383,6 +396,9 @@ func (h *handler) serveBootstrap(
 		bootstrap.Principal = &adminapi.Principal{
 			ID: principal.ID, Roles: append([]string(nil), principal.Roles...),
 		}
+		bootstrap.Features["sparkrun_catalog"] = h.options.SparkrunCatalog != nil && hasRole(principal, RoleConfigRead)
+		bootstrap.Features[adminapi.FeatureLifecycleStatus] = h.options.Lifecycle != nil && hasRole(principal, RoleStatusRead)
+		bootstrap.Features[adminapi.FeatureLifecycle] = bootstrap.Features[adminapi.FeatureLifecycleStatus]
 		bootstrap.Features[adminapi.FeatureStatus] = hasRole(principal, RoleStatusRead)
 		bootstrap.Features[adminapi.FeatureProviderAuth] = h.options.ProviderAuth != nil && hasRole(principal, RoleConfigWrite)
 		bootstrap.Features[adminapi.FeatureConfigValidate] =

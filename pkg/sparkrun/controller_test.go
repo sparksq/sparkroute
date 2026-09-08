@@ -65,7 +65,7 @@ func TestControllerActivatesRegistersAndUsesLocalFastPath(t *testing.T) {
 	registry := endpointregistry.NewMemory()
 	bridge := &fakeBridge{
 		ensured: EnsureResult{State: "ready", Endpoint: &Endpoint{
-			State: "ready", ClusterID: "sparkrun_aaaaaaaaaaaa_bbbbbbbb",
+			State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "sparkrun_aaaaaaaaaaaa_bbbbbbbb",
 			JobID: "sparkrun_aaaaaaaaaaaa_bbbbbbbb", Host: "10.0.0.2", Port: 8000,
 			Protocol: "openai", ServedModels: []string{"Qwen/Qwen3-32B"},
 			RecipeRevision: "abc123abc123", Runtime: "vllm",
@@ -126,7 +126,7 @@ func TestControllerRejectsBridgeEndpointIdentity(t *testing.T) {
 
 	target := activationTarget()
 	bridge := &fakeBridge{ensured: EnsureResult{State: "ready", Endpoint: &Endpoint{
-		State: "ready", ClusterID: "cluster", JobID: "job", Host: "host/path", Port: 8000,
+		State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "cluster", JobID: "job", Host: "host/path", Port: 8000,
 		Protocol: "openai", ServedModels: []string{target.UpstreamModel},
 		RecipeRevision: target.Binding.RecipeRevision,
 	}}}
@@ -158,7 +158,7 @@ func TestControllerPublishesAndWithdrawsDiscoveredModelMetadata(t *testing.T) {
 		Source: lifecycle.EndpointDiscovered, Controller: ControllerName,
 	}
 	bridge := &fakeBridge{discovered: DiscoverResult{Endpoints: []Endpoint{{
-		State: "ready", ClusterID: "cluster", JobID: "job", Host: "10.0.0.2", Port: 8000,
+		State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "cluster", JobID: "job", Host: "10.0.0.2", Port: 8000,
 		Protocol: "openai", ServedModels: []string{target.UpstreamModel}, Runtime: "vllm",
 		ModelMetadata: map[string]ModelMetadata{
 			target.UpstreamModel: {
@@ -222,7 +222,7 @@ func TestControllerIgnoresInvalidDiscoveredModelMetadata(t *testing.T) {
 	}
 	invalidContext := -1
 	bridge := &fakeBridge{discovered: DiscoverResult{Endpoints: []Endpoint{{
-		State: "ready", ClusterID: "cluster", JobID: "job", Host: "10.0.0.2", Port: 8000,
+		State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "cluster", JobID: "job", Host: "10.0.0.2", Port: 8000,
 		Protocol: "openai", ServedModels: []string{target.UpstreamModel},
 		ModelMetadata: map[string]ModelMetadata{
 			target.UpstreamModel: {Context: &invalidContext},
@@ -269,7 +269,7 @@ func TestControllerStopsAfterIdleTTL(t *testing.T) {
 	target.Binding.IdleTTL = 20 * time.Millisecond
 	bridge := &fakeBridge{
 		ensured: EnsureResult{State: "ready", Endpoint: &Endpoint{
-			State: "ready", ClusterID: "cluster-id", JobID: "job-id", Host: "127.0.0.1", Port: 8000,
+			State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "cluster-id", JobID: "job-id", Host: "127.0.0.1", Port: 8000,
 			Protocol: "openai", ServedModels: []string{target.UpstreamModel},
 			RecipeRevision: target.Binding.RecipeRevision,
 		}},
@@ -310,7 +310,7 @@ func TestControllerReconcilesDiscoveredAndPinnedEndpoints(t *testing.T) {
 	}
 	activation := activationTarget()
 	activationEndpoint := Endpoint{
-		State: "ready", ClusterID: "llm-cluster", JobID: "llm-job", Host: "spark-b", Port: 8002,
+		State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "llm-cluster", JobID: "llm-job", Host: "spark-b", Port: 8002,
 		Protocol: "openai", ServedModels: []string{activation.UpstreamModel},
 		RecipeRevision: activation.Binding.RecipeRevision,
 	}
@@ -318,7 +318,7 @@ func TestControllerReconcilesDiscoveredAndPinnedEndpoints(t *testing.T) {
 		ensured: EnsureResult{State: "ready", Endpoint: &activationEndpoint},
 		discovered: DiscoverResult{Endpoints: []Endpoint{
 			{
-				State: "ready", ClusterID: "embed-cluster", JobID: "embed-job", Host: "spark-a", Port: 8001,
+				State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "embed-cluster", JobID: "embed-job", Host: "spark-a", Port: 8001,
 				Protocol: "openai", ServedModels: []string{"embed-model"}, RecipeRevision: "other-revision",
 			},
 			activationEndpoint,
@@ -437,7 +437,7 @@ func TestClusterNameIsAdvisoryAndDoesNotChangeEndpointIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := Endpoint{State: "ready", ClusterID: "opaque-job", JobID: "opaque-job", Host: "127.0.0.1", Port: 8000, Protocol: "openai", ServedModels: []string{target.UpstreamModel}, RecipeRevision: target.Binding.RecipeRevision}
+	original := Endpoint{State: "ready", Owned: true, ClusterName: "spark-a", ClusterID: "opaque-job", JobID: "opaque-job", Host: "127.0.0.1", Port: 8000, Protocol: "openai", ServedModels: []string{target.UpstreamModel}, RecipeRevision: target.Binding.RecipeRevision}
 	before, _, err := controller.endpointFromBridge(target, original, 7)
 	if err != nil {
 		t.Fatal(err)

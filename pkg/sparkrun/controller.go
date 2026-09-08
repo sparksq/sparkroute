@@ -23,6 +23,7 @@ import (
 const ControllerName = "sparkrun"
 
 type Options struct {
+	Workloads         *Workloads
 	Bridge            Bridge
 	Registry          endpointregistry.Registry
 	Targets           []lifecycle.Target
@@ -35,6 +36,8 @@ type Options struct {
 }
 
 type Controller struct {
+	workloads         *Workloads
+	ownedWorkloads    bool
 	bridge            Bridge
 	registry          endpointregistry.Registry
 	targets           map[string]lifecycle.Target
@@ -61,6 +64,8 @@ type Controller struct {
 }
 
 type bindingState struct {
+	phase      string
+	jobID      string
 	binding    lifecycle.Binding
 	state      endpointregistry.State
 	endpoint   *endpointregistry.Endpoint
@@ -119,8 +124,13 @@ func New(options Options) (*Controller, error) {
 		}
 		targets[target.Deployment] = target
 	}
+	ownedWorkloads := options.Workloads == nil
+	if ownedWorkloads {
+		options.Workloads = NewWorkloads()
+	}
 	background, cancelTasks := context.WithCancel(context.Background())
-	return &Controller{
+	controller := &Controller{
+		workloads: options.Workloads, ownedWorkloads: ownedWorkloads,
 		bridge: options.Bridge, registry: options.Registry, targets: targets,
 		endpointTTL: options.EndpointTTL, reconcileInterval: options.ReconcileInterval,
 		stopTimeout: options.StopTimeout, now: options.Now,
@@ -131,7 +141,20 @@ func New(options Options) (*Controller, error) {
 		metadata:   make(map[string]modelrouter.DiscoveredModelMetadata),
 		tracked:    make(map[string]string),
 		background: background, cancelTasks: cancelTasks,
-	}, nil
+	}
+	if client, ok := options.Bridge.(*Client); ok {
+		client.OnProgress = func(binding Binding, operation Operation) {
+			controller.mu.Lock()
+			defer controller.mu.Unlock()
+			for _, state := range controller.states {
+				if state.binding.RecipeRevision == binding.RecipeRevision && slices.Equal(state.binding.ClusterCandidates, binding.ClusterCandidates) {
+					state.phase = lifecycle.SanitizeReason(strings.ReplaceAll(operation.Phase, " ", "_"))
+					state.jobID = operation.ClusterID
+				}
+			}
+		}
+	}
+	return controller, nil
 }
 
 func (c *Controller) CheckCapabilities(ctx context.Context) error {
@@ -201,6 +224,9 @@ func (c *Controller) Close() {
 	}
 	c.mu.Unlock()
 	c.wait.Wait()
+	if c.ownedWorkloads {
+		c.workloads.Close()
+	}
 	if c.metadataPublisher != nil {
 		_ = c.metadataPublisher.RemoveDiscoveredMetadata(c.metadataSource)
 	}
@@ -209,6 +235,7 @@ func (c *Controller) Close() {
 func (c *Controller) Reconcile(ctx context.Context) error {
 	c.operationMu.Lock()
 	defer c.operationMu.Unlock()
+	started := c.now().UTC()
 	result, err := c.bridge.Discover(ctx, nil)
 	if err != nil {
 		return err
@@ -219,8 +246,11 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	seen := make(map[string]struct{})
 	for _, target := range c.targets {
 		for _, discovered := range result.Endpoints {
-			if !matchesTarget(target, discovered) {
+			if !matchesTarget(target, discovered) || !c.workloads.available(discovered.ClusterID) {
 				continue
+			}
+			if target.Source == lifecycle.EndpointActivatable {
+				c.workloads.observe(target.Binding, discovered, c.bridge, c.stopTimeout, false)
 			}
 			fence := int64(0)
 			if target.Source == lifecycle.EndpointActivatable {
@@ -244,7 +274,7 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 			c.refreshBindingState(target, endpoint)
 		}
 	}
-	return c.removeMissing(ctx, seen)
+	return c.removeMissing(ctx, seen, started)
 }
 
 func (c *Controller) EnsureReady(
@@ -252,6 +282,11 @@ func (c *Controller) EnsureReady(
 	binding lifecycle.Binding,
 	_ lifecycle.RequestFeatures,
 ) (lifecycle.Lease, error) {
+	unlock, err := c.workloads.lock(ctx, binding)
+	if err != nil {
+		return lifecycle.Lease{}, err
+	}
+	defer unlock()
 	key := lifecycle.ActivationKey(binding)
 	now := c.now().UTC()
 	c.mu.Lock()
@@ -261,7 +296,7 @@ func (c *Controller) EnsureReady(
 	}
 	state := c.states[key]
 	if state != nil && state.endpoint != nil && state.state == endpointregistry.StateReady &&
-		state.endpoint.ExpiresAt.After(now) {
+		state.endpoint.ExpiresAt.After(now) && c.workloads.available(state.endpoint.ClusterID) {
 		lease := c.newLeaseLocked(key, state)
 		c.mu.Unlock()
 		return lease, nil
@@ -278,7 +313,7 @@ func (c *Controller) EnsureReady(
 	c.mu.Lock()
 	state = c.states[key]
 	if state != nil && state.endpoint != nil && state.state == endpointregistry.StateReady &&
-		state.endpoint.ExpiresAt.After(now) {
+		state.endpoint.ExpiresAt.After(now) && c.workloads.available(state.endpoint.ClusterID) {
 		lease := c.newLeaseLocked(key, state)
 		c.mu.Unlock()
 		return lease, nil
@@ -334,6 +369,7 @@ func (c *Controller) EnsureReady(
 		c.setFailure(key, binding, err)
 		return lifecycle.Lease{}, err
 	}
+	c.workloads.observe(binding, *result.Endpoint, c.bridge, c.stopTimeout, false)
 	c.mu.Lock()
 	state = c.states[key]
 	state.binding = cloneBinding(binding)
@@ -358,6 +394,7 @@ func (c *Controller) Release(
 		return nil
 	}
 	delete(c.leases, lease.ID)
+	c.workloads.release(lease.Endpoint.ClusterID)
 	state := c.states[key]
 	if state == nil || state.endpoint == nil || state.endpoint.ID != lease.Endpoint.ID {
 		c.mu.Unlock()
@@ -367,18 +404,7 @@ func (c *Controller) Release(
 		state.active--
 	}
 	state.updatedAt = c.now().UTC()
-	if state.active == 0 && state.binding.IdleTTL > 0 && !c.closed {
-		if state.timer != nil {
-			state.timer.Stop()
-		}
-		state.generation++
-		generation := state.generation
-		binding := cloneBinding(state.binding)
-		clusterID := state.endpoint.ClusterID
-		state.timer = time.AfterFunc(state.binding.IdleTTL, func() {
-			c.stopIdle(key, generation, binding, clusterID)
-		})
-	}
+
 	c.mu.Unlock()
 	return nil
 }
@@ -397,12 +423,25 @@ func (c *Controller) Status(
 	if state == nil {
 		return lifecycle.Status{State: endpointregistry.StateOffline, UpdatedAt: c.now().UTC()}, nil
 	}
-	status := lifecycle.Status{State: state.state, UpdatedAt: state.updatedAt, Reason: state.reason}
-	if state.endpoint != nil && state.endpoint.ExpiresAt.After(c.now()) {
+	status := lifecycle.Status{State: state.state, UpdatedAt: state.updatedAt, Reason: state.reason, Phase: state.phase, JobID: state.jobID}
+	if state.endpoint != nil && state.endpoint.ExpiresAt.After(c.now()) && c.workloads.available(state.endpoint.ClusterID) {
 		status.Endpoint = endpointPointer(*state.endpoint)
+		status.JobID = state.endpoint.JobID
+		if value, exists := state.endpoint.Metadata["owned"]; exists {
+			owned := value == "true"
+			status.Owned = &owned
+		}
+		status.Phase = "ready"
 	} else if status.State == endpointregistry.StateReady {
 		status.State = endpointregistry.StateOffline
 		status.Endpoint = nil
+	}
+	if state.endpoint != nil {
+		if phase := c.workloads.phase(state.endpoint.ClusterID); phase != "" {
+			status.State = endpointregistry.State(phase)
+			status.Phase = phase
+			status.Endpoint = nil
+		}
 	}
 	return status, nil
 }
@@ -417,8 +456,6 @@ func (c *Controller) Stop(
 	clusterID := ""
 	if state := c.states[key]; state != nil && state.endpoint != nil {
 		clusterID = state.endpoint.ClusterID
-		state.state = endpointregistry.StateDeactivating
-		state.updatedAt = c.now().UTC()
 	}
 	c.mu.Unlock()
 	return c.stop(ctx, key, binding, clusterID)
@@ -434,7 +471,7 @@ func (c *Controller) AuthorizeEndpoint(
 	c.mu.Lock()
 	approved, exists := c.approved[endpoint.ID]
 	c.mu.Unlock()
-	if !exists || !sameEndpoint(approved, endpoint) {
+	if !exists || !sameEndpoint(approved, endpoint) || !c.workloads.available(endpoint.ClusterID) {
 		return fmt.Errorf("endpoint was not approved by the sparkrun controller")
 	}
 	return nil
@@ -447,6 +484,7 @@ func (c *Controller) newLeaseLocked(key string, state *bindingState) lifecycle.L
 	}
 	state.generation++
 	state.active++
+	c.workloads.acquire(state.endpoint.ClusterID)
 	leaseID := fmt.Sprintf("sparkrun-lease-%d", c.nextLease.Add(1))
 	c.leases[leaseID] = key
 	return lifecycle.Lease{ID: leaseID, Endpoint: *state.endpoint}
@@ -480,41 +518,35 @@ func failureReason(err error) string {
 	return "controller_failure"
 }
 
-func (c *Controller) stopIdle(
-	key string,
-	generation uint64,
-	binding lifecycle.Binding,
-	clusterID string,
-) {
-	c.mu.Lock()
-	state := c.states[key]
-	if c.closed || state == nil || state.generation != generation || state.active != 0 {
-		c.mu.Unlock()
-		return
-	}
-	state.state = endpointregistry.StateDeactivating
-	state.updatedAt = c.now().UTC()
-	c.wait.Add(1)
-	c.mu.Unlock()
-	defer c.wait.Done()
-	ctx, cancel := context.WithTimeout(c.background, c.stopTimeout)
-	defer cancel()
-	_ = c.stop(ctx, key, binding, clusterID)
-}
-
 func (c *Controller) stop(
 	ctx context.Context,
 	key string,
 	binding lifecycle.Binding,
 	clusterID string,
 ) error {
-	c.operationMu.Lock()
-	defer c.operationMu.Unlock()
-	_, err := c.bridge.Stop(ctx, bridgeBinding(binding), clusterID)
+	unlock, err := c.workloads.lock(ctx, binding)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if clusterID == "" {
+		return fmt.Errorf("no tracked SparkRun workload to stop")
+	}
+	if err := c.workloads.canStop(clusterID); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	if state := c.states[key]; state != nil {
+		state.state = endpointregistry.StateDeactivating
+		state.updatedAt = c.now().UTC()
+	}
+	c.mu.Unlock()
+	_, err = c.bridge.Stop(ctx, bridgeBinding(binding), clusterID)
 	if err != nil {
 		c.setFailure(key, binding, err)
 		return err
 	}
+	c.workloads.stopped(clusterID)
 	endpointIDs := c.unapproveTarget(binding.Deployment)
 	for _, endpointID := range endpointIDs {
 		if removeErr := c.registry.Remove(ctx, endpointID); removeErr != nil {
@@ -599,9 +631,13 @@ func (c *Controller) endpointFromBridge(
 	if name := discovered.ClusterName; len(name) <= 1024 && strings.TrimSpace(name) != "" && strings.IndexFunc(name, unicode.IsControl) < 0 {
 		endpoint.Metadata = map[string]string{"cluster_name": name}
 	}
+	if endpoint.Metadata == nil {
+		endpoint.Metadata = map[string]string{}
+	}
+	endpoint.Metadata["owned"] = strconv.FormatBool(discovered.Owned)
 	if target.Source == lifecycle.EndpointActivatable {
 		endpoint.BindingRevision = target.Binding.Revision
-		if discovered.RecipeRevision != target.Binding.RecipeRevision || fencingToken <= 0 {
+		if !matchesTarget(target, discovered) || fencingToken <= 0 {
 			return endpointregistry.Endpoint{}, nil, fmt.Errorf("sparkrun endpoint recipe revision or fencing token is invalid")
 		}
 	}
@@ -776,11 +812,11 @@ func (c *Controller) refreshBindingState(target lifecycle.Target, endpoint endpo
 	c.mu.Unlock()
 }
 
-func (c *Controller) removeMissing(ctx context.Context, seen map[string]struct{}) error {
+func (c *Controller) removeMissing(ctx context.Context, seen map[string]struct{}, started time.Time) error {
 	c.mu.Lock()
 	missing := make([]string, 0)
 	for endpointID := range c.tracked {
-		if _, exists := seen[endpointID]; !exists {
+		if _, exists := seen[endpointID]; !exists && !c.approved[endpointID].HeartbeatAt.After(started) {
 			missing = append(missing, endpointID)
 			delete(c.tracked, endpointID)
 			delete(c.approved, endpointID)
@@ -825,7 +861,7 @@ func matchesTarget(target lifecycle.Target, endpoint Endpoint) bool {
 		return false
 	}
 	if target.Source == lifecycle.EndpointActivatable {
-		return endpoint.RecipeRevision == target.Binding.RecipeRevision
+		return endpoint.RecipeRevision == target.Binding.RecipeRevision && (len(target.Binding.ClusterCandidates) == 0 || slices.Contains(target.Binding.ClusterCandidates, endpoint.ClusterName))
 	}
 	return target.Source == lifecycle.EndpointDiscovered
 }
