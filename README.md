@@ -126,17 +126,27 @@ and [`docs/TRACE_DATASET_EXPORT.md`](docs/TRACE_DATASET_EXPORT.md).
 ## Configuration in the console
 
 The Configuration sidebar contains **Providers**, **Model Deployments**,
-**Virtual Models / Aliases**, and **Model Routing** for the operator-managed set.
-These sections share a draft; navigating between them or other console pages
-preserves edits. Saving validates and replaces the whole operator set, and the
-stored/serving indicator follows runtime application. JSON edits apply to the
-whole selected set. Reloading the page or using Refresh reloads stored configuration.
+**Virtual Models / Aliases**, **Model Routing**, and **Advanced Options**. Each
+configuration list includes operator and SparkRun-generated entries. Generated
+entries are grayed out and read-only; selecting one shows its configuration.
 
-**SparkRun Generated** is a separate read-only view. Operator virtual models can
-target deployments from either owner; generated targets are labeled in the picker.
-Model-routing selectors can use virtual models from both owners. These references
-do not copy or modify generated entities. Names and references are validated
-against the merged configuration when saving.
+The editable sections share one operator draft, preserved across console navigation.
+Click **Validate** to check it against the combined configuration. Successful
+validation changes the button to **Save**; further edits require validation again.
+Saving replaces only the operator set, checks for conflicting revisions, and the
+stored/serving indicator follows runtime application. JSON mode edits only the
+operator set and offers a read-only disclosure of the generated JSON. Reloading
+the page or using Refresh reloads stored configuration.
+
+Operator virtual models can target deployments from either owner. Routing pickers
+show deployment display titles; references retain the stable deployment `name` ID.
+SparkRun titles use `sparkrun:{clusterName}:{model}` where cluster metadata is
+available. Equal titles are disambiguated with their IDs. Model-routing selectors
+can use virtual models from both owners. These references do not copy or modify
+generated entities.
+
+**Advanced Options** contains MMBridge projection status and diagnostics, previously
+shown on Overview. It is separate from the shared configuration draft.
 
 Deployment capability controls show only optional **Vision** and **Files (file
 inputs)** declarations. An unchecked option leaves support unspecified, so the

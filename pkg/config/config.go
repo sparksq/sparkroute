@@ -57,7 +57,9 @@ type Provider struct {
 }
 
 type Deployment struct {
-	Name             string                     `json:"name"`
+	Name string `json:"name"`
+	// Title is presentation only; Name remains the stable routing and lifecycle ID.
+	Title            string                     `json:"title,omitempty"`
 	Provider         string                     `json:"provider"`
 	Model            string                     `json:"model"`
 	NativeProtocols  []Protocol                 `json:"native_protocols,omitempty"`

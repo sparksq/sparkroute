@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { standardCapabilities } from "./VirtualModelEditor";
+import { deploymentChoices, deploymentTitle } from "./deploymentTitles";
 import { SubscriptionSignIn } from "./SubscriptionSignIn";
 
 type JSONObject = Record<string, unknown>;
@@ -47,6 +48,7 @@ export function ProviderDeploymentEditor({
   subscriptionAuth,
   section = "all",
   simplifiedCapabilities = false,
+  readOnlyDocument,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
@@ -54,11 +56,17 @@ export function ProviderDeploymentEditor({
   subscriptionAuth?: { token: string; enabled: boolean };
   section?: "all" | "providers" | "deployments";
   simplifiedCapabilities?: boolean;
+  readOnlyDocument?: ConfigurationDocument;
 }) {
   const shape = useMemo(() => inspectDocument(document), [document]);
-  const providers = shape.providers ?? [];
-  const deployments = shape.deployments ?? [];
-  const virtualModels = shape.virtualModels ?? [];
+  const generatedShape = useMemo(() => inspectDocument(readOnlyDocument ?? { providers: [], deployments: [], virtual_models: [] }), [readOnlyDocument]);
+  const editableProviders = shape.providers ?? [];
+  const editableDeployments = shape.deployments ?? [];
+  const editableModels = shape.virtualModels ?? [];
+  const providers = [...editableProviders, ...(generatedShape.providers ?? [])];
+  const deployments = [...editableDeployments, ...(generatedShape.deployments ?? [])];
+  const virtualModels = [...editableModels, ...(generatedShape.virtualModels ?? [])];
+  const titles = deploymentChoices(document, readOnlyDocument);
   const [selectionState, setSelectionState] = useState<{ kind: Selection["kind"]; provider: number; deployment: number }>(() => ({
     kind: section === "deployments" ? "deployment" : section === "providers" || providers.length ? "provider" : "deployment",
     provider: 0,
@@ -69,6 +77,8 @@ export function ProviderDeploymentEditor({
   const setSelection = (next: Selection) => setSelectionState((current) => ({
     ...current, kind: next.kind, [next.kind]: next.index,
   }));
+  const readOnlySelected = selection.index >= (selection.kind === "provider" ? editableProviders.length : editableDeployments.length);
+  const formDisabled = disabled || readOnlySelected;
   const [confirmRemove, setConfirmRemove] = useState(false);
   const authDrafts = useRef(new Map<string, AuthDraft>());
 
@@ -103,8 +113,8 @@ export function ProviderDeploymentEditor({
   const selectedDeployment = selection.kind === "deployment" ? deployments[selection.index] : undefined;
 
   const updateProvider = (transform: (provider: JSONObject) => JSONObject) => {
-    if (!selectedProvider) return;
-    const nextProviders = [...providers];
+    if (!selectedProvider || formDisabled) return;
+    const nextProviders = [...editableProviders];
     const nextProvider = transform({ ...selectedProvider });
     nextProviders[selection.index] = nextProvider;
     const oldName = stringValue(selectedProvider.name);
@@ -113,7 +123,7 @@ export function ProviderDeploymentEditor({
       authDrafts.current.set(nextName, authDrafts.current.get(oldName)!);
       authDrafts.current.delete(oldName);
     }
-    const nextDeployments = deployments.map((deployment) => {
+    const nextDeployments = editableDeployments.map((deployment) => {
       if (stringValue(deployment.provider) !== oldName) return deployment;
       const renamed = { ...deployment, provider: nextName };
       return selectedProvider.type !== nextProvider.type
@@ -123,8 +133,8 @@ export function ProviderDeploymentEditor({
   };
 
   const updateDeployment = (transform: (deployment: JSONObject) => JSONObject) => {
-    if (!selectedDeployment) return;
-    const nextDeployments = [...deployments];
+    if (!selectedDeployment || formDisabled) return;
+    const nextDeployments = [...editableDeployments];
     let nextDeployment = transform({ ...selectedDeployment });
     if (nextDeployment.provider !== selectedDeployment.provider) {
       const provider = providers.find((value) => value.name === nextDeployment.provider);
@@ -138,8 +148,8 @@ export function ProviderDeploymentEditor({
       ...document,
       deployments: nextDeployments,
       virtual_models: oldName === nextName
-        ? virtualModels
-        : renameDeploymentTargets(virtualModels, oldName, nextName),
+        ? editableModels
+        : renameDeploymentTargets(editableModels, oldName, nextName),
     });
   };
 
@@ -150,8 +160,8 @@ export function ProviderDeploymentEditor({
       type: "openai",
       base_url: providerTypes.openai!.url,
     };
-    onChange({ ...document, providers: [...providers, next] });
-    setSelection({ kind: "provider", index: providers.length });
+    onChange({ ...document, providers: [...editableProviders, next] });
+    setSelection({ kind: "provider", index: editableProviders.length });
   };
 
   const addDeployment = () => {
@@ -165,11 +175,12 @@ export function ProviderDeploymentEditor({
       provider: provider.name,
       model: "upstream-model",
     }, provider);
-    onChange({ ...document, deployments: [...deployments, next] });
-    setSelection({ kind: "deployment", index: deployments.length });
+    onChange({ ...document, deployments: [...editableDeployments, next] });
+    setSelection({ kind: "deployment", index: editableDeployments.length });
   };
 
   const removeSelected = () => {
+    if (formDisabled) return;
     if (!confirmRemove) {
       setConfirmRemove(true);
       return;
@@ -178,12 +189,12 @@ export function ProviderDeploymentEditor({
       authDrafts.current.delete(stringValue(selectedProvider.name));
       onChange({
         ...document,
-        providers: providers.filter((_, index) => index !== selection.index),
+        providers: editableProviders.filter((_, index) => index !== selection.index),
       });
     } else if (selectedDeployment) {
       onChange({
         ...document,
-        deployments: deployments.filter((_, index) => index !== selection.index),
+        deployments: editableDeployments.filter((_, index) => index !== selection.index),
       });
     }
     setConfirmRemove(false);
@@ -206,9 +217,10 @@ export function ProviderDeploymentEditor({
           count={providers.length}
           disabled={disabled}
           heading="Providers"
-          items={providers.map((provider) => ({
+          items={providers.map((provider, index) => ({
             name: stringValue(provider.name),
             detail: providerTypeLabel(provider.type) || "No type",
+            readOnly: index >= editableProviders.length,
           }))}
           onAdd={addProvider}
           onSelect={(index) => setSelection({ kind: "provider", index })}
@@ -219,8 +231,9 @@ export function ProviderDeploymentEditor({
           count={deployments.length}
           disabled={disabled || !providers.length}
           heading="Deployments"
-          items={deployments.map((deployment) => ({
-            name: stringValue(deployment.name),
+          items={deployments.map((deployment, index) => ({
+            name: titles[stringValue(deployment.name)] ?? stringValue(deployment.name),
+            readOnly: index >= editableDeployments.length,
             detail: stringValue(deployment.provider) || "No provider",
           }))}
           onAdd={addDeployment}
@@ -228,14 +241,15 @@ export function ProviderDeploymentEditor({
         /> : null}
       </aside>
 
-      <div className="model-form infrastructure-form">
+      <div className={readOnlySelected ? "model-form infrastructure-form generated-form" : "model-form infrastructure-form"}>
+        {readOnlySelected && (selectedProvider || selectedDeployment) ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
         {selectedProvider ? (
           <ProviderForm
             key={selection.index}
             authDrafts={authDrafts.current}
             deployments={deployments.filter((deployment) => deployment.provider === selectedProvider.name)}
             confirmRemove={confirmRemove}
-            disabled={disabled}
+            disabled={formDisabled}
             deploymentCount={providerUseCount}
             onCancelRemove={() => setConfirmRemove(false)}
             onChange={updateProvider}
@@ -249,7 +263,7 @@ export function ProviderDeploymentEditor({
             simplifiedCapabilities={simplifiedCapabilities}
             confirmRemove={confirmRemove}
             deployment={selectedDeployment}
-            disabled={disabled}
+            disabled={formDisabled}
             onCancelRemove={() => setConfirmRemove(false)}
             onChange={updateDeployment}
             onRemove={removeSelected}
@@ -286,7 +300,7 @@ function EntityList({
 }: {
   heading: string;
   count: number;
-  items: Array<{ name: string; detail: string }>;
+  items: Array<{ name: string; detail: string; readOnly?: boolean }>;
   active: number;
   disabled: boolean;
   addLabel: string;
@@ -312,13 +326,14 @@ function EntityList({
         {items.map((item, index) => (
           <button
             aria-current={index === active ? "true" : undefined}
-            className={index === active ? "active" : ""}
+            className={[index === active ? "active" : "", item.readOnly ? "generated-entry" : ""].filter(Boolean).join(" ")}
             key={`${item.name}-${index}`}
             onClick={() => onSelect(index)}
             type="button"
           >
             <span>{item.name || `${heading.slice(0, -1)} ${index + 1}`}</span>
             <small>{item.detail}</small>
+            {item.readOnly ? <small className="ownership-label">SparkRun · Read only</small> : null}
           </button>
         ))}
         {!items.length ? <p>No {heading.toLowerCase()} configured.</p> : null}
@@ -546,12 +561,15 @@ function DeploymentForm({
         onBlur={onCancelRemove}
         onRemove={onRemove}
         removeTitle={removeBlocked ? `Used by ${routeCount} virtual-model target${routeCount === 1 ? "" : "s"}` : "Remove deployment"}
-        title={stringValue(deployment.name) || "Unnamed deployment"}
+        title={deploymentTitle(deployment) || "Unnamed deployment"}
       />
       <fieldset disabled={disabled}>
         <div className="model-field-grid infrastructure-field-grid">
-          <Field label="Deployment name">
+          <Field label={deployment.title ? "Deployment ID" : "Deployment name"}>
             <input value={stringValue(deployment.name)} onChange={(event) => onChange((value) => setString(value, "name", event.target.value, true))} />
+          </Field>
+          <Field label="Display title">
+            <input placeholder="Optional; defaults to the deployment ID" value={stringValue(deployment.title)} onChange={(event) => onChange((value) => setString(value, "title", event.target.value))} />
           </Field>
           <Field label="Provider">
             <select aria-label="Provider" value={stringValue(deployment.provider)} onChange={(event) => onChange((value) => setString(value, "provider", event.target.value, true))}>
@@ -878,11 +896,13 @@ function JSONDefaultsSection({ heading, identity, value, onChange }: {
   onChange: (value: JSONObject) => void;
 }) {
   const serialized = JSON.stringify(value, null, 2);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(serialized);
   const [error, setError] = useState("");
   useEffect(() => {
     setDraft(serialized);
     setError("");
+    inputRef.current?.setCustomValidity("");
   }, [identity, serialized]);
   const commit = () => {
     try {
@@ -903,9 +923,23 @@ function JSONDefaultsSection({ heading, identity, value, onChange }: {
       <div className="extra-body-editor">
         <textarea
           aria-label={`${heading} JSON`}
+          aria-invalid={Boolean(error)}
+          ref={inputRef}
           maxLength={4 * 1024 * 1024}
           onBlur={commit}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            const text = event.target.value;
+            setDraft(text);
+            try {
+              if (!isObject(JSON.parse(text.trim() || "{}"))) throw new Error("Value must be a JSON object.");
+              event.currentTarget.setCustomValidity("");
+              setError("");
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Invalid JSON object.";
+              event.currentTarget.setCustomValidity(message);
+              setError(message);
+            }
+          }}
           spellCheck={false}
           value={draft}
         />

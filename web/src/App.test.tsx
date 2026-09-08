@@ -153,7 +153,7 @@ describe("AdminApp", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse({
         ...bootstrap,
-        features: { status: true, mm_projection_probe: true },
+        features: { status: true, config_read: true, mm_projection_probe: true },
       }))
       .mockResolvedValueOnce(jsonResponse({ ...status, mm_projection: projectionStatus }))
       .mockResolvedValueOnce(jsonResponse({
@@ -169,6 +169,9 @@ describe("AdminApp", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<AdminApp productName="SparkRoute" />);
+    await screen.findByRole("link", { name: "Advanced Options" });
+    expect(screen.queryByText("MMBridge projection")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Advanced Options" }));
     const projectionPanel = (await screen.findByText("MMBridge projection")).closest("section");
     expect(projectionPanel).not.toBeNull();
     expect(within(projectionPanel!).getByText("Unknown")).toBeInTheDocument();
@@ -625,7 +628,7 @@ describe("AdminApp", () => {
     const empty = { providers: [], deployments: [], virtual_models: [] };
     const generated = {
       providers: [{ name: "sparkrun", type: "openai_compatible", base_url: "http://127.0.0.1:8000/v1" }],
-      deployments: [{ name: "generated-target", provider: "sparkrun", model: "upstream" }],
+      deployments: [{ name: "generated-target", title: "sparkrun:spark-a:upstream", provider: "sparkrun", model: "upstream" }],
       virtual_models: [{ name: "new-model", aliases: ["new-model-2"], pools: [{ targets: [{ deployment: "generated-target", weight: 1 }] }] }],
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -678,13 +681,14 @@ describe("AdminApp", () => {
     fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
     expect(window.location.pathname).toBe("/admin/configuration/models");
     fireEvent.click(await screen.findByTitle("Add virtual model"));
-    expect(screen.getByRole("option", { name: "generated-target · SparkRun generated" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "sparkrun:spark-a:upstream" })).toBeInTheDocument();
     expect(screen.getByLabelText("Canonical name")).toHaveValue("new-model-3");
     fireEvent.change(screen.getByLabelText("Canonical name"), { target: { value: "assistant" } });
     fireEvent.change(screen.getByRole("textbox", { name: /Aliases/ }), { target: { value: "chat, coding" } });
     fireEvent.blur(screen.getByRole("textbox", { name: /Aliases/ }));
     fireEvent.click(tree.getByRole("link", { name: "Model Deployments" }));
-    expect(screen.getByRole("button", { name: "Add deployment" })).toBeDisabled();
+    expect(screen.getByLabelText("Deployment ID")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
     fireEvent.click(tree.getByRole("link", { name: "Model Routing" }));
     fireEvent.click(screen.getByRole("button", { name: "Enable model routing" }));
     expect(screen.getByLabelText("new-model", { selector: "input" })).toBeChecked();
@@ -705,7 +709,13 @@ describe("AdminApp", () => {
     expect(candidate.deployments).toEqual([]);
     expect(candidate.virtual_models).toHaveLength(1);
     expect(candidate.virtual_models[0]).toMatchObject({ name: "assistant", aliases: ["chat", "coding"], pools: [{ targets: [{ deployment: "generated-target", weight: 100 }] }] });
-    fireEvent.click(screen.getByRole("button", { name: "Validate and replace operator set" }));
+    expect(screen.queryByLabelText("Change reason")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    await screen.findByRole("button", { name: "Save" });
+    fireEvent.change(screen.getByLabelText("operator configuration JSON"), { target: { value: JSON.stringify(candidate) } });
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
 	expect(await screen.findByText(/Stored the current configuration/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([path, options]) =>
       String(path) === "/v1/config/managed-sets/operator" && options?.method === "PUT",
@@ -714,10 +724,37 @@ describe("AdminApp", () => {
     const saveCall = fetchMock.mock.calls.find(([path, options]) => path === "/v1/config/managed-sets/operator" && options?.method === "PUT");
     expect(JSON.parse(String(saveCall?.[1]?.body)).document).toEqual(candidate);
     expect(fetchMock.mock.calls.some(([path, options]) => path === "/v1/config/managed-sets/sparkrun" && options?.method === "PUT")).toBe(false);
-    fireEvent.click(screen.getByRole("link", { name: "SparkRun Generated" }));
-    expect(screen.getByRole("heading", { name: "SparkRun Generated", level: 2 })).toBeInTheDocument();
-    expect(screen.getByText(/owned by SparkRun/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Validate and replace operator set" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "SparkRun Generated" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Structured" }));
+    expect(screen.getByLabelText("Provider name")).toBeDisabled();
+    fireEvent.click(tree.getByRole("link", { name: "Virtual Models / Aliases" }));
+    fireEvent.click(screen.getByRole("button", { name: /new-model.*Read only/ }));
+    expect(screen.getByLabelText("Canonical name")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove model" })).toBeDisabled();
+    fireEvent.click(tree.getByRole("link", { name: "Providers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add provider" }));
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByRole("button", { name: "Save" })).toBeEnabled();
+    // Native input events must retain their value when clearing validation.
+    fireEvent.input(screen.getByLabelText("Provider name"), { target: { value: "renamed-provider" } });
+    expect(screen.getByLabelText("Provider name")).toHaveValue("renamed-provider");
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByRole("button", { name: "Save" })).toBeEnabled();
+    fireEvent.click(screen.getByText("Provider extra body defaults"));
+    fireEvent.input(screen.getByLabelText("Provider extra body defaults JSON"), { target: { value: "{broken" } });
+    expect(screen.getByLabelText("Provider extra body defaults JSON")).toHaveValue("{broken");
+    fireEvent.blur(screen.getByLabelText("Provider extra body defaults JSON"));
+    const validations = () => fetchMock.mock.calls.filter(([path]) => String(path).endsWith("/operator/validate")).length;
+    const beforeInvalid = validations();
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    expect(validations()).toBe(beforeInvalid);
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Correct the invalid field/)).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Provider extra body defaults JSON"), { target: { value: '{"temperature":0.2}' } });
+    fireEvent.blur(screen.getByLabelText("Provider extra body defaults JSON"));
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByRole("button", { name: "Save" })).toBeEnabled();
   });
 
   it("simulates an operator routing draft against Sparkrun-owned models", async () => {

@@ -232,6 +232,9 @@ func (d Document) Validate() error {
 		if err := validateID(deployment.Name); err != nil {
 			return fmt.Errorf("%s.name: %w", path, err)
 		}
+		if len(deployment.Title) > 4096 || strings.IndexFunc(deployment.Title, unicode.IsControl) >= 0 {
+			return fmt.Errorf("%s.title: must be at most 4096 bytes without control characters", path)
+		}
 		if _, exists := deployments[deployment.Name]; exists {
 			return fmt.Errorf("%s.name: duplicate deployment %q", path, deployment.Name)
 		}

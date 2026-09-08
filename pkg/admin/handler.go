@@ -66,6 +66,7 @@ type Status struct {
 
 type TargetStatus struct {
 	Deployment          string                `json:"deployment"`
+	Title               string                `json:"title,omitempty"`
 	CircuitState        routing.CircuitState  `json:"circuit_state"`
 	AdmissionAvailable  bool                  `json:"admission_available"`
 	ActiveRequests      int                   `json:"active_requests"`
@@ -436,6 +437,13 @@ func (h *handler) serveStatus(
 	}
 	status := h.status
 	status.Targets = targetStatuses(h.options.Targets)
+	titles := make(map[string]string, len(h.document.Deployments))
+	for _, deployment := range h.document.Deployments {
+		titles[deployment.Name] = deployment.Title
+	}
+	for i := range status.Targets {
+		status.Targets[i].Title = titles[status.Targets[i].Deployment]
+	}
 	status.Credentials = credentialStatus(h.options.Credentials)
 	status.MMProjection = projectionStatus(h.options.MMProjection)
 	status.Privacy = privacyStatus(request.Context(), h.options.Privacy)

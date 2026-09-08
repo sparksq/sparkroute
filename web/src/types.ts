@@ -18,6 +18,7 @@ export interface AdminBootstrap {
 
 export interface TargetStatus {
   deployment: string;
+  title?: string;
   circuit_state: "closed" | "open" | "half_open" | string;
   admission_available: boolean;
   active_requests: number;

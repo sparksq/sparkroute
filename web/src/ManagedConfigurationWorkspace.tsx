@@ -47,7 +47,7 @@ export function ManagedConfigurationWorkspace({
   const canRead = Boolean(bootstrap.features.config_read);
   const canWriteOperator = Boolean(bootstrap.features.config_write);
   const hasDiscoveredMetadata = Boolean(bootstrap.features.model_routing_discovered_metadata);
-  const selectedOwner: ManagedConfigurationOwner = section === "sparkrun" ? "sparkrun" : "operator";
+  const selectedOwner: ManagedConfigurationOwner = "operator";
   const [sets, setSets] = useState<ManagedConfigurationSetMetadata[]>([]);
   const [drafts, setDrafts] = useState<Partial<Record<ManagedConfigurationOwner, string>>>({});
   const [storedDocuments, setStoredDocuments] = useState<Partial<Record<ManagedConfigurationOwner, ConfigurationDocument>>>({});
@@ -55,7 +55,8 @@ export function ManagedConfigurationWorkspace({
   const [runtimeRevision, setRuntimeRevision] = useState(bootstrap.config_revision);
   const [activeDocument, setActiveDocument] = useState<ConfigurationDocument>();
   const [discoveredMetadata, setDiscoveredMetadata] = useState<DiscoveredMetadataState>();
-  const [reason, setReason] = useState("");
+  const [validatedCandidate, setValidatedCandidate] = useState<string>();
+  const editorRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<Notice>();
   const [busy, setBusy] = useState("");
   const [editorMode, setEditorMode] = useState<"structured" | "json">("structured");
@@ -88,6 +89,7 @@ export function ManagedConfigurationWorkspace({
         setDiscoveredMetadata(discovered);
       }
     } catch (error) {
+      setValidatedCandidate(undefined);
       setNotice(errorNotice(error));
     } finally {
       setBusy("");
@@ -103,10 +105,10 @@ export function ManagedConfigurationWorkspace({
   const operatorDraft = drafts.operator ?? emptyDocument;
   const operatorParsed = useMemo(() => parseDocument(operatorDraft), [operatorDraft]);
   const generatedDocument = storedDocuments.sparkrun;
-  const generatedDeployments = useMemo(() => documentEntityNames(generatedDocument, "deployments")
-    .map((name) => ({ name, source: "SparkRun generated" })), [generatedDocument]);
   const metadata = sets.find((set) => set.owner === selectedOwner);
-  const canEdit = selectedOwner === "operator" && canWriteOperator;
+  const canEdit = canWriteOperator && Boolean(storedDocuments.operator);
+  const candidateKey = `${storedRevision}\0${draft}`;
+  const validated = validatedCandidate === candidateKey;
   const mergedCandidateModelNames = useMemo(() => {
     const names = new Set(documentEntityNames(operatorParsed.document, "virtual_models"));
     documentEntityNames(generatedDocument, "virtual_models").forEach((name) => names.add(name));
@@ -136,11 +138,26 @@ export function ManagedConfigurationWorkspace({
   }, [canRead, storedRevision, runtimeRevision, token]);
 
   const changeDraft = (value: string) => {
+    setValidatedCandidate(undefined);
     setDrafts((current) => ({ ...current, [selectedOwner]: value }));
     setNotice(undefined);
   };
 
+  const fieldsValid = () => {
+    const invalid = [...(editorRef.current?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input,textarea,select") ?? [])]
+      .find((field) => !field.checkValidity());
+    if (invalid) {
+      setValidatedCandidate(undefined);
+      setNotice({ kind: "error", text: "Correct the invalid field before validating or saving. Check JSON defaults in other sections too." });
+      invalid.reportValidity();
+      return false;
+    }
+    return true;
+  };
+
   const validate = async () => {
+    setValidatedCandidate(undefined);
+    if (!fieldsValid()) return;
     if (!parsed.document) {
       setNotice({ kind: "error", text: parsed.error ?? "Configuration is invalid JSON." });
       return;
@@ -153,11 +170,13 @@ export function ManagedConfigurationWorkspace({
         parsed.document,
         storedRevision,
       );
+      setValidatedCandidate(candidateKey);
       setNotice({
         kind: "success",
-        text: `The merged candidate is valid at ${compactRevision(result.candidate_revision)}.`,
+        text: `Configuration is valid. Save to apply these changes (${compactRevision(result.candidate_revision)}).`,
       });
     } catch (error) {
+      setValidatedCandidate(undefined);
       setNotice(errorNotice(error));
     } finally {
       setBusy("");
@@ -165,24 +184,19 @@ export function ManagedConfigurationWorkspace({
   };
 
   const save = async () => {
+    if (!validated || !fieldsValid()) return;
     if (!parsed.document || !canEdit) {
       setNotice({ kind: "error", text: parsed.error ?? "This managed set is read-only." });
       return;
     }
     setBusy("save");
     try {
-      await validateManagedConfigurationSet(
-        token,
-        selectedOwner,
-        parsed.document,
-        storedRevision,
-      );
       const result = await replaceManagedConfigurationSet(
         token,
         selectedOwner,
         parsed.document,
         storedRevision,
-        reason.trim(),
+        "",
       );
       setStoredRevision(result.current.revision);
       setSets((current) => current.map((set) => (
@@ -195,8 +209,9 @@ export function ManagedConfigurationWorkspace({
           ? "Stored the current configuration. Runtime application follows automatically."
           : "The operator set already matched the submitted document.",
       });
-      setReason("");
+      setValidatedCandidate(undefined);
     } catch (error) {
+      setValidatedCandidate(undefined);
       setNotice(errorNotice(error));
     } finally {
       setBusy("");
@@ -204,19 +219,18 @@ export function ManagedConfigurationWorkspace({
   };
 
   const structuredChange = (document: ConfigurationDocument) => {
+    setValidatedCandidate(undefined);
     setDrafts((current) => ({ ...current, operator: JSON.stringify(document, null, 2) }));
-    setNotice({ kind: "info", text: "Draft changed. Validate the merged candidate before saving." });
+    setNotice({ kind: "info", text: "Draft changed. Validate before saving." });
   };
 
   return (
-    <div className="config-workspace">
+    <div className="config-workspace" ref={editorRef} onChangeCapture={() => setValidatedCandidate(undefined)}>
       <section className="managed-config-overview" aria-label="Managed configuration ownership">
         <div className="managed-owner-card">
-          <span>{selectedOwner === "operator" ? "Operator managed" : "SparkRun generated · Read only"}</span>
-          <strong>{selectedOwner === "operator" ? (dirty ? "Unsaved changes" : "Saved configuration") : "Managed by SparkRun"}</strong>
-          <small>{selectedOwner === "operator"
-            ? "Providers, deployments, aliases and routing share one draft. Save applies all four sections."
-            : "Use these deployments and models as targets in operator-managed aliases and routing."}</small>
+          <span>Configuration</span>
+          <strong>{dirty ? "Unsaved changes" : "Saved configuration"}</strong>
+          <small>All sections share one draft. SparkRun entries are read-only; your changes are saved together.</small>
         </div>
         <div className="managed-runtime-card">
           <span>Stored / serving</span>
@@ -229,7 +243,7 @@ export function ManagedConfigurationWorkspace({
       <section className="panel editor-panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">{selectedOwner} managed set</p>
+            <p className="eyebrow">Gateway configuration</p>
             <h2>{configurationSections.find((entry) => entry.id === section)?.label}</h2>
           </div>
           <span className="activity-summary">
@@ -265,24 +279,24 @@ export function ManagedConfigurationWorkspace({
           </button>
           {canEdit ? (
             <button
-              className="secondary-button editor-action"
+              className={validated ? "primary-button editor-action" : "secondary-button editor-action"}
               disabled={Boolean(busy)}
-              onClick={() => void validate()}
+              onClick={() => void (validated ? save() : validate())}
               type="button"
             >
-              {busy === "validate" ? "Validating…" : "Validate merged candidate"}
+              {busy === "save" ? "Saving…" : busy === "validate" ? "Validating…" : validated ? "Save" : "Validate"}
             </button>
           ) : null}
         </div>
-        <div hidden={editorMode !== "structured" || selectedOwner !== "operator"}>
+        {notice ? <div className={`notice ${notice.kind}`} role="status">{notice.text}</div> : null}
+        <div hidden={editorMode !== "structured"}>
           {operatorParsed.document ? (
             <>
               <div hidden={section !== "models"}>
-                {generatedDeployments.length ? <p className="section-help configuration-context">Targets include SparkRun-generated deployments. Saving a virtual model does not change their generated configuration.</p> : null}
                 <VirtualModelEditor
-                  disabled={!canWriteOperator || Boolean(busy)}
+                  disabled={!canEdit || Boolean(busy)}
                   document={operatorParsed.document}
-                  referencedDeployments={generatedDeployments}
+                  readOnlyDocument={generatedDocument}
                   reservedModelNames={reservedModelNames}
                   extensions={virtualModelExtensions}
                   onChange={structuredChange}
@@ -290,13 +304,14 @@ export function ManagedConfigurationWorkspace({
               </div>
               <div hidden={section !== "routing"}>
                 <p className="section-help configuration-context">Route to operator-managed or SparkRun-generated virtual models. To use a deployment directly, first add it to a virtual model.</p>
+                {generatedDocument?.model_routing ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
                 <ModelRoutingEditor
                   canonicalModelNames={mergedCandidateModelNames}
-                  disabled={!canWriteOperator || Boolean(busy)}
+                  disabled={!canEdit || Boolean(busy) || Boolean(generatedDocument?.model_routing)}
                   discoveredMetadata={discoveredMetadata}
-                  document={operatorParsed.document}
-                  onChange={structuredChange}
-                  simulate={bootstrap.features.config_routing_simulation
+                  document={generatedDocument?.model_routing ? generatedDocument : operatorParsed.document}
+                  onChange={generatedDocument?.model_routing ? () => {} : structuredChange}
+                  simulate={bootstrap.features.config_routing_simulation && !generatedDocument?.model_routing
                     ? (document, requestedModel, routingText, requiredCapabilities) => simulateManagedModelRouting(
                       token,
                       "operator",
@@ -310,7 +325,7 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "providers" && section !== "deployments"}>
-                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canWriteOperator || Boolean(busy)} document={operatorParsed.document} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+                <ProviderDeploymentEditor section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
               </div>
             </>
           ) : (
@@ -320,13 +335,9 @@ export function ManagedConfigurationWorkspace({
             </div>
           )}
         </div>
-        {editorMode === "structured" && selectedOwner === "sparkrun" ? (
-          generatedDocument ? <>
-            <ProviderDeploymentEditor simplifiedCapabilities disabled document={generatedDocument} onChange={() => {}} />
-            <VirtualModelEditor disabled document={generatedDocument} onChange={() => {}} />
-          </> : <p className="read-only-note">No SparkRun-generated configuration is available to this identity.</p>
-        ) : null}
         {editorMode === "json" ? (
+          <>
+          <p className="section-help configuration-context">Edit your configuration here. SparkRun-generated entries are included when validating and saving.</p>
           <textarea
             aria-invalid={Boolean(parsed.error)}
             aria-label={`${selectedOwner} configuration JSON`}
@@ -336,30 +347,9 @@ export function ManagedConfigurationWorkspace({
             spellCheck={false}
             value={draft}
           />
+          {generatedDocument ? <details className="generated-json"><summary>SparkRun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(generatedDocument, null, 2)} /></details> : null}
+          </>
         ) : null}
-        {notice ? <div className={`notice ${notice.kind}`} role="status">{notice.text}</div> : null}
-        {canEdit ? (
-          <div className="publish-bar">
-            <label>
-              Change reason
-              <input
-                maxLength={4096}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Why is the operator-owned set changing?"
-                value={reason}
-              />
-            </label>
-            <button className="primary-button" disabled={Boolean(busy)} onClick={() => void save()} type="button">
-              {busy === "save" ? "Saving…" : "Validate and replace operator set"}
-            </button>
-          </div>
-        ) : (
-          <p className="read-only-note">
-            {selectedOwner === "sparkrun"
-              ? "This generated set is owned by SparkRun and cannot be edited in the console."
-              : "This identity can inspect the operator set but cannot replace it."}
-          </p>
-        )}
       </section>
 
     </div>

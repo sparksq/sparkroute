@@ -3152,3 +3152,49 @@ button:disabled {
     grid-column: 1 / -1;
   }
 }
+
+.model-list-items > button.generated-entry {
+  background: #edf0f3;
+  color: #697482;
+}
+
+.model-list-items > button.generated-entry.active {
+  outline: 1px solid #a5afbb;
+  background: #e3e8ed;
+}
+
+.model-list-items > button.generated-entry span,
+.generated-form h3 {
+  color: #697482;
+}
+
+.model-list-items > button .ownership-label {
+  color: #657082;
+  font-size: 0.65rem;
+}
+
+.generated-form {
+  background: #f7f8fa;
+}
+
+.generated-form input:disabled,
+.generated-form select:disabled,
+.generated-form textarea:disabled {
+  color: #748092;
+  background: #eef1f4;
+}
+
+.generated-json > summary {
+  padding: 16px 22px;
+  color: #697482;
+  cursor: pointer;
+}
+
+.model-list-items > button span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.editor-panel > .notice {
+  margin-bottom: 16px;
+}

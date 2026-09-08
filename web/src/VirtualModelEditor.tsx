@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { JSONObject, VirtualModelEditorExtension } from "./extensions";
+import { deploymentChoices } from "./deploymentTitles";
 import type { ConfigurationDocument } from "./types";
 
 export const standardCapabilities = [
@@ -41,6 +42,7 @@ export function VirtualModelEditor({
   onChange,
   referencedDeployments = [],
   reservedModelNames = [],
+  readOnlyDocument,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
@@ -48,13 +50,18 @@ export function VirtualModelEditor({
   onChange: (document: ConfigurationDocument) => void;
   referencedDeployments?: Array<{ name: string; source: string }>;
   reservedModelNames?: string[];
+  readOnlyDocument?: ConfigurationDocument;
 }) {
   const shape = useMemo(() => inspectDocument(document, extensions), [document, extensions]);
-  const deployments = [...new Set([...(shape.deployments ?? []), ...referencedDeployments.map((deployment) => deployment.name)])];
-  const deploymentSources = Object.fromEntries(referencedDeployments.map((deployment) => [deployment.name, deployment.source]));
+  const generatedShape = useMemo(() => inspectDocument(readOnlyDocument ?? { deployments: [], virtual_models: [] }, extensions), [readOnlyDocument, extensions]);
+  const deployments = [...new Set([...(shape.deployments ?? []), ...(generatedShape.deployments ?? []), ...referencedDeployments.map((deployment) => deployment.name)])];
+  const titles = deploymentChoices(document, readOnlyDocument);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const models = shape.models ?? [];
+  const editableModels = shape.models ?? [];
+  const models = [...editableModels, ...(generatedShape.models ?? [])];
+  const readOnlySelected = selectedIndex >= editableModels.length;
+  const formDisabled = disabled || readOnlySelected;
   const selected = models[selectedIndex];
   const aliases = selected ? stringArray(selected.aliases) : [];
   const extensionCapabilities = selected
@@ -86,8 +93,8 @@ export function VirtualModelEditor({
   }
 
   const updateModel = (transform: (model: JSONObject) => JSONObject) => {
-    if (!selected) return;
-    const nextModels = [...models];
+    if (!selected || formDisabled) return;
+    const nextModels = [...editableModels];
     nextModels[selectedIndex] = transform({ ...selected });
     onChange({ ...document, virtual_models: nextModels });
   };
@@ -107,16 +114,17 @@ export function VirtualModelEditor({
         targets: [{ deployment: firstDeployment, weight: 100 }],
       }],
     };
-    onChange({ ...document, virtual_models: [...models, next] });
-    setSelectedIndex(models.length);
+    onChange({ ...document, virtual_models: [...editableModels, next] });
+    setSelectedIndex(editableModels.length);
   };
 
   const removeModel = () => {
+    if (formDisabled) return;
     if (!selected || !confirmRemove) {
       setConfirmRemove(true);
       return;
     }
-    const nextModels = models.filter((_, index) => index !== selectedIndex);
+    const nextModels = editableModels.filter((_, index) => index !== selectedIndex);
     onChange({ ...document, virtual_models: nextModels });
     setSelectedIndex(Math.max(0, selectedIndex - 1));
     setConfirmRemove(false);
@@ -144,13 +152,14 @@ export function VirtualModelEditor({
           {models.map((model, index) => (
             <button
               aria-current={index === selectedIndex ? "true" : undefined}
-              className={index === selectedIndex ? "active" : ""}
+              className={[index === selectedIndex ? "active" : "", index >= editableModels.length ? "generated-entry" : ""].filter(Boolean).join(" ")}
               key={`${stringValue(model.name)}-${index}`}
               onClick={() => setSelectedIndex(index)}
               type="button"
             >
               <span>{stringValue(model.name) || `Model ${index + 1}`}</span>
               <small>{effectiveVisibility(model)}</small>
+              {index >= editableModels.length ? <small className="ownership-label">SparkRun · Read only</small> : null}
             </button>
           ))}
           {!models.length ? (
@@ -159,7 +168,8 @@ export function VirtualModelEditor({
         </div>
       </aside>
 
-      <div className="model-form">
+      <div className={readOnlySelected ? "model-form generated-form" : "model-form"}>
+        {selected && readOnlySelected ? <p className="read-only-note">SparkRun generated · Read only</p> : null}
         {selected ? (
           <>
             <div className="model-form-heading">
@@ -169,7 +179,7 @@ export function VirtualModelEditor({
               </div>
               <button
                 className={confirmRemove ? "danger-button confirm" : "danger-button"}
-                disabled={disabled}
+                disabled={formDisabled}
                 onBlur={() => setConfirmRemove(false)}
                 onClick={removeModel}
                 type="button"
@@ -178,7 +188,7 @@ export function VirtualModelEditor({
               </button>
             </div>
 
-            <fieldset disabled={disabled}>
+            <fieldset disabled={formDisabled}>
               <div className="model-field-grid">
                 <Field label="Canonical name">
                   <input
@@ -262,7 +272,7 @@ export function VirtualModelEditor({
                 </div>
                 <RoutingPools
                   deployments={deployments}
-                  deploymentSources={deploymentSources}
+                  deploymentTitles={titles}
                   model={selected}
                   onChange={updateModel}
                 />
@@ -367,7 +377,7 @@ export function VirtualModelEditor({
 
               {extensions.map((extension) => (
                 <extension.Component
-                  disabled={disabled}
+                  disabled={formDisabled}
                   key={extension.id}
                   model={selected}
                   updateModel={updateModel}
@@ -397,12 +407,12 @@ export function VirtualModelEditor({
 function RoutingPools({
   model,
   deployments,
-  deploymentSources,
+  deploymentTitles,
   onChange,
 }: {
   model: JSONObject;
   deployments: string[];
-  deploymentSources: Record<string, string>;
+  deploymentTitles: Record<string, string>;
   onChange: (transform: (model: JSONObject) => JSONObject) => void;
 }) {
   const pools = objectArray(model.pools);
@@ -448,7 +458,7 @@ function RoutingPools({
                           <option value={stringValue(target.deployment)}>{stringValue(target.deployment)} (unknown)</option>
                         ) : null}
                         {deployments.map((deployment) => (
-                          <option disabled={used.has(deployment)} key={deployment} value={deployment}>{deployment}{deploymentSources[deployment] ? ` · ${deploymentSources[deployment]}` : ""}</option>
+                          <option disabled={used.has(deployment)} key={deployment} value={deployment}>{deploymentTitles[deployment] ?? deployment}</option>
                         ))}
                       </select>
                     </Field>

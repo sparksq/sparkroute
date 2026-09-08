@@ -248,7 +248,7 @@ function ConsoleLayout({
   );
   const section = configurationSection(page);
   const lastConfigurationSection = useRef(section ?? "providers");
-  if (section) lastConfigurationSection.current = section;
+  if (section && section !== "advanced") lastConfigurationSection.current = section;
   const [configurationVisited, setConfigurationVisited] = useState(Boolean(section));
   useEffect(() => {
     if (section) setConfigurationVisited(true);
@@ -287,7 +287,7 @@ function ConsoleLayout({
     window.history.pushState({}, "", target);
     setPage(next);
   };
-  const heading = (section && bootstrap.features.config_managed_sets
+  const heading = (section && (bootstrap.features.config_managed_sets || section === "advanced")
     ? configurationSections.find((entry) => entry.id === section)?.label : undefined) ?? ({
     overview: "Gateway overview",
     configuration: "Configuration",
@@ -335,10 +335,10 @@ function ConsoleLayout({
               <span className="nav-glyph">C</span>
               Configuration
             </a>
-            {bootstrap.features.config_managed_sets ? (
+            {(
               <ul className="configuration-nav-children" aria-label="Configuration sections">
-                {configurationSections.map((entry) => (
-                  <li key={entry.id} className={entry.id === "sparkrun" ? "generated-nav" : undefined}>
+                {configurationSections.filter((entry) => bootstrap.features.config_managed_sets || entry.id === "advanced").map((entry) => (
+                  <li key={entry.id}>
                     <a
                       aria-current={section === entry.id ? "page" : undefined}
                       className={section === entry.id ? "nav-item active" : "nav-item"}
@@ -348,7 +348,7 @@ function ConsoleLayout({
                   </li>
                 ))}
               </ul>
-            ) : null}
+            )}
           </div> : null}
           {credentialsAvailable ? (
             <a
@@ -445,11 +445,17 @@ function ConsoleLayout({
         </header>
 
         {configurationAvailable && bootstrap.features.config_managed_sets && configurationVisited ? (
-          <div hidden={!section}>
+          <div hidden={!section || section === "advanced"}>
             <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
           </div>
         ) : null}
-        {section ? (
+        {section === "advanced" ? (
+          status ? <MMProjectionStatusPanel
+            canProbe={Boolean(bootstrap.features.mm_projection_probe)}
+            initialStatus={status.mm_projection ?? { configured: false, state: "disabled", models: 0, consecutive_failures: 0, circuit_open: false }}
+            token={token}
+          /> : <PermissionNotice />
+        ) : section ? (
           configurationAvailable ? (
             bootstrap.features.config_managed_sets ? null : (
               <ConfigurationComponent
@@ -473,9 +479,7 @@ function ConsoleLayout({
           <>
             {status ? (
               <StatusOverview
-                canProbeProjection={Boolean(bootstrap.features.mm_projection_probe)}
                 status={status}
-                token={token}
               />
             ) : <PermissionNotice />}
             {overviewExtensions.map((extension) => (
@@ -504,10 +508,8 @@ function pageFromPath(
   return "overview";
 }
 
-function StatusOverview({ status, canProbeProjection, token }: {
+function StatusOverview({ status }: {
   status: GatewayStatus;
-  canProbeProjection: boolean;
-  token: string;
 }) {
   const [deploymentFilter, setDeploymentFilter] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
@@ -524,7 +526,7 @@ function StatusOverview({ status, canProbeProjection, token }: {
   const filteredTargets = useMemo(() => {
     const query = deploymentFilter.trim().toLowerCase();
     return status.targets.filter((target) => {
-      if (query && !target.deployment.toLowerCase().includes(query)) return false;
+      if (query && !`${target.deployment} ${target.title ?? ""}`.toLowerCase().includes(query)) return false;
       if (availabilityFilter === "admitting" && !target.admission_available) return false;
       if (availabilityFilter === "unavailable" && target.admission_available) return false;
       if (circuitFilter !== "all" && target.circuit_state !== circuitFilter) return false;
@@ -549,18 +551,6 @@ function StatusOverview({ status, canProbeProjection, token }: {
           value={`${available}/${status.targets.length}`}
         />
       </section>
-
-      <MMProjectionStatusPanel
-        canProbe={canProbeProjection}
-        initialStatus={status.mm_projection ?? {
-          configured: false,
-          state: "disabled",
-          models: 0,
-          consecutive_failures: 0,
-          circuit_open: false,
-        }}
-        token={token}
-      />
 
       <section className="panel target-panel">
         <div className="panel-heading">
@@ -740,10 +730,11 @@ function TargetRow({
         <button
           aria-expanded={selected}
           className="target-link"
+          title={target.deployment}
           onClick={onSelect}
           type="button"
         >
-          {target.deployment}
+          {target.title || target.deployment}
         </button>
       </td>
       <td>
@@ -780,11 +771,12 @@ function TargetHealthDetail({
       <div className="target-detail-heading">
         <div>
           <p className="eyebrow">Replica-local health drill-down</p>
-          <h3>{target.deployment}</h3>
+          <h3>{target.title || target.deployment}</h3>
         </div>
         <button className="text-button" onClick={onClose} type="button">Close</button>
       </div>
       <dl className="target-detail-grid">
+        {target.title ? <TargetFact label="Deployment ID" value={target.deployment} /> : null}
         <TargetFact label="Admission" value={target.admission_available ? "Admitting" : "Unavailable"} />
         <TargetFact label="Circuit" value={humanize(target.circuit_state)} />
         <TargetFact label="Concurrency" value={concurrency} />
