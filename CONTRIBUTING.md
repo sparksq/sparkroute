@@ -4,11 +4,30 @@ SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
 SPDX-License-Identifier: AGPL-3.0-only
 -->
 
-# Contributing
+# Contributing to SparkRoute
 
 Open an issue or pull request in [sparksq/sparkroute](https://github.com/sparksq/sparkroute).
 Describe the behavior you want to change and include a focused reproduction or
 validation result. See [SECURITY.md](SECURITY.md) for vulnerability reports.
+
+## Contributor License Agreement
+
+Before a contribution can be merged, its contributor must accept the
+[SparkRoute Contributor License Agreement](CLA.md) through a contribution process
+designated by the Project Owners, Scitrera LLC and Fox Engine Ltd. You retain
+ownership of your contributions; the CLA grants the rights described in the
+agreement, including rights for open-source, commercial, and proprietary licensing.
+
+The repository does not yet designate a particular electronic CLA acceptance
+service. Until one is documented, coordinate acceptance with the Project Owners.
+General discussion, feature requests, bug reports, and ideas that are not intended
+as submissions of copyrightable material do not require CLA acceptance.
+
+Submit only work you authored or are authorized to contribute under the applicable
+file licenses and the CLA, including any necessary employer authorization.
+Identify third-party material and its source and license when submitting it.
+
+## Development and validation
 
 Use the Go toolchain in `versions.yaml` and Node 24. Before submitting code, run:
 
@@ -30,6 +49,6 @@ after `npm ci`, review license changes, and rebuild the console. Check file
 licensing with `uvx --from reuse==6.2.0 reuse lint`. See
 [release qualification](docs/RELEASES.md) for the complete release checks.
 
-Contributions are distributed under the applicable file licenses and the
-project's AGPL-3.0-only distribution license. Submit only work you have the
-right to contribute under those terms.
+Contributions incorporated into the publicly available project remain available
+under the applicable Project License as described in the CLA. The CLA also grants
+the Project Owners the licensing rights described in that agreement.

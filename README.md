@@ -346,4 +346,8 @@ and the BSD-3-Clause license on two repository helper scripts are preserved.
 [Third-party notices](THIRD_PARTY_NOTICES.md) describe provenance;
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) retains dependency license texts.
 Source headers and [REUSE.toml](REUSE.toml) identify file-level licensing.
-See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md).
+
+Contributions are governed by [Contributing](CONTRIBUTING.md) and the
+[SparkRoute Contributor License Agreement](CLA.md). CLA acceptance is required
+before contributions can be merged. See [Security](SECURITY.md) for vulnerability
+reports.
