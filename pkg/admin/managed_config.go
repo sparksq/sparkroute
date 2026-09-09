@@ -19,6 +19,7 @@ type managedSetMutation struct {
 }
 
 type managedSetRoutingSimulation struct {
+	StageScenario          string              `json:"stage_scenario,omitempty"`
 	Document               config.Document     `json:"document"`
 	ExpectedActiveRevision *config.Version     `json:"expected_active_revision"`
 	RequestedModel         string              `json:"requested_model"`
@@ -200,6 +201,7 @@ func (h *handler) simulateManagedSetRouting(
 		RequestedModel:       input.RequestedModel,
 		RoutingText:          input.RoutingText,
 		RequiredCapabilities: input.RequiredCapabilities,
+		StageScenario:        input.StageScenario,
 	}, config.UnknownCapabilityTry, discoveredMetadataState(h.options.ModelMetadata))
 	if err != nil {
 		writeError(writer, http.StatusBadRequest, "routing_simulation_failed", err.Error())

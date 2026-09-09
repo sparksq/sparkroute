@@ -143,6 +143,7 @@ export interface RoutingCandidateTrace {
 }
 
 export interface RoutingDecision {
+	stage?: { tier: string; decision_source: string; score: number; confidence: number; dimensions: { severity: number; spinning: number; exploring: number; production_intensity: number } };
   requested_model: string;
   resolved_model: string;
   virtual_model?: string;
@@ -164,6 +165,8 @@ export interface RoutingSimulationResult {
   required_capabilities?: string[];
   state_mode: "stateless" | string;
 }
+
+export type RoutingStageScenario = "no_tools" | "exploring" | "error_recovery" | "productive" | "tests_passed" | "critical_error" | "compacted";
 
 export interface DiscoveredModelMetadata {
   size_b?: number;

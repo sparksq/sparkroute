@@ -297,6 +297,7 @@ export function ConfigurationWorkspace({
                           requestedModel,
                           routingText,
                           requiredCapabilities,
+                          stageScenario,
                         ) =>
                           simulateModelRouting(
                             token,
@@ -304,6 +305,7 @@ export function ConfigurationWorkspace({
                             requestedModel,
                             routingText,
                             requiredCapabilities,
+                            stageScenario,
                           )
                       : undefined
                   }

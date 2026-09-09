@@ -6,6 +6,7 @@ package modelrouter
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 )
@@ -51,6 +52,28 @@ func TestNormalizeResponsesToolHistory(t *testing.T) {
 	events := normalized.StageHistory.Events
 	if len(events) != 1 || events[0].Category != StageToolEdit || !events[0].TestsPassed {
 		t.Fatalf("events = %#v", events)
+	}
+}
+
+func TestStageSignalsRecognizePythonWritesWithoutTreatingSearchesAsWrites(t *testing.T) {
+	for _, example := range []struct {
+		command  string
+		category StageToolCategory
+	}{
+		{"python3 - <<'PY'\np.write_text(source)\nPY", StageToolWrite},
+		{"/usr/bin/python3 -c 'p.write_bytes(data)'", StageToolWrite},
+		{"rg '.write_text(' src", StageToolRead},
+		{"grep -R 'python p.write_text(' src", StageToolRead},
+		{"python3 -c 'print(42)'", StageToolOther},
+	} {
+		body, _ := json.Marshal(map[string]any{"messages": []any{
+			map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{"id": "call", "function": map[string]any{"name": "exec_command", "arguments": map[string]any{"cmd": example.command}}}}},
+			map[string]any{"role": "tool", "tool_call_id": "call", "content": "ok"},
+		}})
+		normalized, err := NormalizeRoutingRequest(body)
+		if err != nil || len(normalized.StageHistory.Events) != 1 || normalized.StageHistory.Events[0].Category != example.category {
+			t.Fatalf("%q = %#v, %v", example.command, normalized.StageHistory, err)
+		}
 	}
 }
 
@@ -116,6 +139,42 @@ func TestValidateStageRouterPolicy(t *testing.T) {
 	policy.VirtualModels["auto"] = VirtualModel{Strategy: "stage_router", Models: []string{"strong", "weak"}}
 	if err := ValidateRoutingPolicy(policy); err == nil || !strings.Contains(err.Error(), "requires stage_router settings") {
 		t.Fatalf("ValidateRoutingPolicy() error = %v", err)
+	}
+}
+
+func TestStageRouterCompactionOverridesMissingToolHistory(t *testing.T) {
+	router := stageTestRouter(t, StagePickerEfficientFirst, 1)
+	decision, err := router.Select("auto", NormalizedRequest{StageHistory: StageHistory{Compacted: true}}, []string{"strong", "weak"}, false)
+	if err != nil || decision.ResolvedModel != "strong" || decision.Stage.DecisionSource != "override" {
+		t.Fatalf("compacted context without tool events = %#v, %v", decision, err)
+	}
+}
+
+func TestStageRouterClosedThresholdKeepsDefaultAtBoundary(t *testing.T) {
+	for _, picker := range []StagePicker{StagePickerEfficientFirst, StagePickerCapableFirst} {
+		for _, threshold := range []float64{0, math.Tanh(0.5)} {
+			history := StageHistory{Events: []StageEvent{{Category: StageToolOther}}}
+			if threshold > 0 {
+				history.TurnDepth = 10
+				if picker == StagePickerEfficientFirst {
+					history.Events[0].Category = StageToolRead
+				} else {
+					history.Events[0].Category = StageToolEdit
+				}
+			}
+			router := stageTestRouter(t, picker, threshold)
+			decision, err := router.Select("auto", NormalizedRequest{StageHistory: history}, []string{"strong", "weak"}, false)
+			if err != nil || decision.Stage.Tier != stageDefaultTier(picker) || decision.Stage.DecisionSource != "fall_open" {
+				t.Fatalf("picker=%s threshold=%g boundary = %#v, %v", picker, threshold, decision, err)
+			}
+			if threshold > 0 {
+				router = stageTestRouter(t, picker, math.Nextafter(threshold, 0))
+				decision, err = router.Select("auto", NormalizedRequest{StageHistory: history}, []string{"strong", "weak"}, false)
+				if err != nil || decision.Stage.Tier == stageDefaultTier(picker) || decision.Stage.DecisionSource != "dimensions" {
+					t.Fatalf("above threshold did not switch: %#v, %v", decision, err)
+				}
+			}
+		}
 	}
 }
 

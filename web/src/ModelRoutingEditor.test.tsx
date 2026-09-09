@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
-import { ModelRoutingEditor } from "./ModelRoutingEditor";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { ModelRoutingEditor, type RoutingSimulator } from "./ModelRoutingEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { reconcileRoutingMetadata } from "./modelRoutingReferences";
 import type { ConfigurationDocument } from "./types";
@@ -21,10 +21,10 @@ const base = {
   },
   observability: { saved_traces: { enabled: false } },
 };
-function Editor({ initial = base, showModels = false, disabled = false }: { initial?: ConfigurationDocument; showModels?: boolean; disabled?: boolean }) {
+function Editor({ initial = base, showModels = false, disabled = false, simulate }: { initial?: ConfigurationDocument; showModels?: boolean; disabled?: boolean; simulate?: RoutingSimulator }) {
   const [document, setDocument] = useState<ConfigurationDocument>(initial);
   return <>{showModels ? <VirtualModelEditor document={document} disabled={disabled} onChange={setDocument} /> : null}
-    <ModelRoutingEditor document={document} disabled={disabled} onChange={setDocument} />
+    <ModelRoutingEditor document={document} disabled={disabled} onChange={setDocument} simulate={simulate} />
     <output aria-label="Draft">{JSON.stringify(document)}</output></>;
 }
 const draft = () => JSON.parse(screen.getByLabelText("Draft").textContent!);
@@ -106,4 +106,70 @@ it("repairs duplicate stage roles from a JSON draft without inventing a second m
   expect(draft().model_routing.virtual_models.auto.models).toEqual(["remaining"]);
   expect(draft().model_routing.virtual_models.auto).not.toHaveProperty("stage_router");
   expect(draft().model_routing.models).not.toHaveProperty("new-model");
+});
+
+it("asks for explicit stage roles instead of guessing capability from alphabetical order", () => {
+  const initial = { ...base, model_routing: { ...base.model_routing, virtual_models: { auto: { strategy: "balanced", models: ["remaining", "new-model"] } } } };
+  render(<Editor initial={initial} />);
+  fireEvent.change(screen.getByLabelText("Routing strategy"), { target: { value: "stage_router" } });
+  expect(screen.getByLabelText("Capable model")).toHaveValue("");
+  expect(screen.getByLabelText("Efficient model")).toHaveValue("");
+  fireEvent.change(screen.getByLabelText("Efficient model"), { target: { value: "new-model" } });
+  expect(screen.getByLabelText("Capable model")).toHaveValue("");
+  fireEvent.change(screen.getByLabelText("Capable model"), { target: { value: "remaining" } });
+  expect(draft().model_routing.virtual_models.auto.models).toEqual(["remaining", "new-model"]);
+});
+
+it("explains sensitivity and preserves custom settings when changing the default role", () => {
+  const initial = structuredClone(base) as ConfigurationDocument;
+  const policy = initial.model_routing as any;
+  policy.virtual_models.auto.stage_router.confidence_threshold = 0.63;
+  policy.virtual_models.auto.stage_router.recent_turn_window = 7;
+  render(<Editor initial={initial} />);
+  expect(screen.getByLabelText("Switching sensitivity")).toHaveValue("custom");
+  fireEvent.change(screen.getByLabelText("Default model choice"), { target: { value: "capable_first" } });
+  expect(screen.getByText(/successful edits alone do not switch/)).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Switching sensitivity"), { target: { value: "0.3" } });
+  expect(draft().model_routing.virtual_models.auto.stage_router).toMatchObject({ confidence_threshold: 0.3, recent_turn_window: 7, picker: "capable_first", capable_model: "remaining", efficient_model: "new-model" });
+  expect(draft().model_routing.virtual_models.auto.kwargs).toEqual(base.model_routing.virtual_models.auto.kwargs);
+  expect(screen.getByText(/Without tool history/)).toHaveTextContent("remaining");
+});
+
+it("shows disabled stage roles without silently enabling them for other selectors", () => {
+  const initial = structuredClone(base);
+  initial.model_routing.models.remaining.enabled = false;
+  render(<Editor initial={initial} />);
+  expect(screen.getByText(/disabled in Shared model settings/)).toHaveTextContent("remaining");
+  expect(draft().model_routing.models.remaining.enabled).toBe(false);
+});
+
+it("reorders keyword overrides and keeps text focus while editing rule names", () => {
+  const initial = structuredClone(base);
+  initial.model_routing.keyword_rules.push({ name: "second", keywords: ["docs"], virtual_model: "auto" });
+  render(<Editor initial={initial} />);
+  fireEvent.click(screen.getByRole("button", { name: "Move rule second up" }));
+  expect(draft().model_routing.keyword_rules.map((rule: any) => rule.name)).toEqual(["second", "rule"]);
+  const input = screen.getAllByLabelText("Name")[0]!;
+  input.focus();
+  fireEvent.change(input, { target: { value: "Renamed" } });
+  expect(input).toHaveFocus();
+  expect(draft().model_routing.keyword_rules[0].keywords).toEqual(["docs"]);
+});
+
+it("sends a tool-activity scenario and drops a stale preview when its input changes", async () => {
+  let resolve!: (value: any) => void;
+  const simulate = vi.fn<RoutingSimulator>(() => new Promise(done => { resolve = done; }));
+  render(<Editor simulate={simulate} />);
+  fireEvent.change(screen.getByLabelText(/Example agent activity/), { target: { value: "error_recovery" } });
+  fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
+  expect(simulate.mock.calls[0]?.[4]).toBe("error_recovery");
+  fireEvent.change(screen.getByLabelText("Switching sensitivity"), { target: { value: "0.7" } });
+  await act(async () => { resolve({ decision: { resolved_model: "old-result", candidates: [] }, available_models: [] }); });
+  expect(screen.queryByRole("region", { name: "Routing simulation result" })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Simulate" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
+  await act(async () => { resolve({ decision: { resolved_model: "remaining", strategy: "stage_router", reason: "selected", candidates: [], stage: { tier: "capable", decision_source: "dimensions", confidence: 0.76, dimensions: {} } }, available_models: ["remaining"] }); });
+  expect(await screen.findByRole("region", { name: "Routing simulation result" })).toHaveTextContent("Tool signals exceeded the switching threshold");
+  fireEvent.change(screen.getByLabelText(/Example agent activity/), { target: { value: "no_tools" } });
+  expect(screen.queryByRole("region", { name: "Routing simulation result" })).not.toBeInTheDocument();
 });

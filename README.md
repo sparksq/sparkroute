@@ -152,6 +152,12 @@ disambiguated with their IDs. Model-routing selectors
 can use virtual models from both owners. These references do not copy or modify
 generated entities.
 
+The model-routing editor groups strategies by purpose and explains their inputs.
+Agent-stage routing asks for explicit capable/efficient roles, a default model
+choice, and switching sensitivity. Its stateless preview includes sample tool
+activity and explains the selected role. See [Model routing](docs/MODEL_ROUTING.md)
+for configuration guidance, threshold behavior, and preview examples.
+
 **Advanced Options** includes tracing and a structured **MMBridge projection**
 connection editor in the shared Validate → Save draft. Enable or disable the
 connection, set the bridge `/v1` base URL and bearer-token credential reference,

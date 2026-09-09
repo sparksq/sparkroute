@@ -482,10 +482,13 @@ describe("AdminApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "Model routing" }));
     fireEvent.change(screen.getByLabelText("Routing strategy"), { target: { value: "stage_router" } });
     fireEvent.change(screen.getByLabelText("Capable model"), { target: { value: "vision-model" } });
-    fireEvent.change(screen.getByLabelText("Ambiguous-signal default"), { target: { value: "capable_first" } });
+    fireEvent.change(screen.getByLabelText("Efficient model"), { target: { value: "text-model" } });
+    fireEvent.change(screen.getByLabelText("Default model choice"), { target: { value: "capable_first" } });
+    fireEvent.click(screen.getByText("Advanced stage tuning"));
     fireEvent.change(screen.getByLabelText("Stage confidence threshold"), { target: { value: "0.7" } });
     fireEvent.change(screen.getByLabelText("Stage recent turn window"), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText("Latest user routing text"), { target: { value: "inspect this image" } });
+    fireEvent.change(screen.getByLabelText(/Example agent activity/), { target: { value: "error_recovery" } });
     fireEvent.click(screen.getByText("Required capabilities"));
     fireEvent.click(screen.getByLabelText("Vision"));
     fireEvent.click(screen.getByRole("button", { name: "Simulate" }));
@@ -503,6 +506,7 @@ describe("AdminApp", () => {
     expect(simulationCall?.[1]?.body).toContain('"efficient_model":"text-model"');
     expect(simulationCall?.[1]?.body).toContain('"picker":"capable_first"');
     expect(simulationCall?.[1]?.body).toContain('"confidence_threshold":0.7');
+    expect(simulationCall?.[1]?.body).toContain('"stage_scenario":"error_recovery"');
     expect(simulationCall?.[1]?.body).toContain('"recent_turn_window":5');
     expect(simulationCall?.[1]?.body).toContain('"required_capabilities":["vision"]');
     expect(simulationCall?.[1]?.body).toContain('"routing_text":"inspect this image"');

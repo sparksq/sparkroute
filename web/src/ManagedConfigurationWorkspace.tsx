@@ -355,7 +355,7 @@ export function ManagedConfigurationWorkspace({
                   document={generatedDocument?.model_routing ? generatedDocument : operatorParsed.document}
                   onChange={generatedDocument?.model_routing ? () => {} : structuredChange}
                   simulate={bootstrap.features.config_routing_simulation && !generatedDocument?.model_routing
-                    ? (document, requestedModel, routingText, requiredCapabilities) => simulateManagedModelRouting(
+                    ? (document, requestedModel, routingText, requiredCapabilities, stageScenario) => simulateManagedModelRouting(
                       token,
                       "operator",
                       document,
@@ -363,6 +363,7 @@ export function ManagedConfigurationWorkspace({
                       requestedModel,
                       routingText,
                       requiredCapabilities,
+                      stageScenario,
                     )
                     : undefined}
                 />

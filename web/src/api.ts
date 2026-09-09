@@ -6,6 +6,7 @@ import type {
   ConfigurationValidation,
   DiscoveredMetadataState,
   RoutingSimulationResult,
+  RoutingStageScenario,
   AttemptFilters,
   AttemptPage,
 	GatewayStatus,
@@ -159,6 +160,7 @@ export function simulateModelRouting(
   requestedModel: string,
   routingText: string,
   requiredCapabilities: string[],
+  stageScenario?: RoutingStageScenario,
 ) {
   return requestJSON<RoutingSimulationResult>(
     "/v1/config/simulate-routing",
@@ -170,6 +172,7 @@ export function simulateModelRouting(
         requested_model: requestedModel,
         routing_text: routingText,
         required_capabilities: requiredCapabilities,
+        stage_scenario: stageScenario,
       },
     },
   );
@@ -221,6 +224,7 @@ export function simulateManagedModelRouting(
   requestedModel: string,
   routingText: string,
   requiredCapabilities: string[],
+  stageScenario?: RoutingStageScenario,
 ) {
   return requestJSON<RoutingSimulationResult>(
     `/v1/config/managed-sets/${owner}/simulate-routing`,
@@ -233,6 +237,7 @@ export function simulateManagedModelRouting(
         requested_model: requestedModel,
         routing_text: routingText,
         required_capabilities: requiredCapabilities,
+        stage_scenario: stageScenario,
       },
     },
   );

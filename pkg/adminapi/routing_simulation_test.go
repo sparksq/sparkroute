@@ -30,6 +30,40 @@ func TestSimulateRoutingUsesCapabilityCandidatesAndKeywordRules(t *testing.T) {
 	}
 }
 
+func TestSimulateRoutingExercisesStageScenariosThroughNativeScorer(t *testing.T) {
+	document := simulationDocument()
+	document.ModelRouting.KeywordRules = nil
+	selector := document.ModelRouting.VirtualModels["auto"]
+	selector.Strategy = "stage_router"
+	selector.StageRouter = &modelrouter.StageRouterPolicy{CapableModel: "vision-model", EfficientModel: "text-model", Picker: modelrouter.StagePickerEfficientFirst}
+	document.ModelRouting.VirtualModels["auto"] = selector
+	for _, example := range []struct{ scenario, model, source string }{
+		{"no_tools", "text-model", "fall_open"}, {"exploring", "text-model", "fall_open"},
+		{"error_recovery", "vision-model", "dimensions"}, {"productive", "text-model", "fall_open"},
+		{"tests_passed", "text-model", "tests_passed"}, {"critical_error", "vision-model", "override"},
+		{"compacted", "vision-model", "override"},
+	} {
+		result, err := SimulateRouting(RoutingSimulationInput{Document: document, RequestedModel: "auto", StageScenario: example.scenario}, config.UnknownCapabilityReject)
+		if err != nil || result.Decision.ResolvedModel != example.model || result.Decision.Stage.DecisionSource != example.source {
+			t.Fatalf("%s = %#v, %v", example.scenario, result, err)
+		}
+	}
+	if _, err := SimulateRouting(RoutingSimulationInput{Document: document, StageScenario: "unknown"}, config.UnknownCapabilityReject); err == nil {
+		t.Fatal("unknown scenario accepted")
+	}
+	result, err := SimulateRouting(RoutingSimulationInput{Document: document, RequestedModel: "auto", StageScenario: "tests_passed", RequiredCapabilities: []config.Capability{config.CapabilityVision}}, config.UnknownCapabilityReject)
+	if err != nil || result.Decision.ResolvedModel != "vision-model" || result.Decision.Stage.DecisionSource != "tier_unavailable" {
+		t.Fatalf("capability fallback = %#v, %v", result, err)
+	}
+	// With only the latest tool result, the earlier edit is outside the window.
+	selector.StageRouter.Picker = modelrouter.StagePickerCapableFirst
+	selector.StageRouter.RecentTurnWindow = 1
+	result, err = SimulateRouting(RoutingSimulationInput{Document: document, RequestedModel: "auto", StageScenario: "tests_passed"}, config.UnknownCapabilityReject)
+	if err != nil || result.Decision.ResolvedModel != "vision-model" || result.Decision.Stage.DecisionSource != "fall_open" {
+		t.Fatalf("tool-result window = %#v, %v", result, err)
+	}
+}
+
 func TestSimulateRoutingUsesProfileUnknownCapabilityDefault(t *testing.T) {
 	document := simulationDocument()
 	document.Deployments[0].Capabilities = nil

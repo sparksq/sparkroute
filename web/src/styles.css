@@ -1084,8 +1084,39 @@ tbody tr:last-child td {
 }
 
 .stage-router-fields {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+.stage-router-section { margin-top: 0; padding: 20px 24px; }
+.routing-policy-bar input, .routing-policy-bar select,
+.routing-projection-fields input, .routing-projection-fields select,
+.routing-simulation-inputs select, .routing-simulation-inputs textarea {
+  width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; font-size: 0.8rem; font-weight: 400;
+}
+.stage-router-fields small { font-weight: 400; }
+.routing-settings-details > .routing-metadata-section, .routing-settings-details > .routing-rules-section { margin: 0; padding: 18px 24px; }
+
+.routing-strategy-guide { margin: 0 24px 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: #f7f9fc; }
+.routing-strategy-guide p { margin: 0 0 8px; color: var(--ink); font-size: 0.85rem; line-height: 1.6; }
+.routing-strategy-guide small, .stage-router-fields small, .routing-stage-summary, .routing-policy-advanced small { color: var(--muted); font-size: 0.76rem; line-height: 1.6; }
+.routing-stage-summary { margin: 16px 0; padding: 12px 14px; background: var(--teal-soft); border-radius: 7px; }
+.routing-stage-tuning summary, .routing-settings-details > summary, .routing-policy-advanced summary { cursor: pointer; font-size: 0.83rem; font-weight: 650; }
+.routing-stage-tuning summary small, .routing-settings-details > summary small { display: block; margin-top: 4px; color: var(--muted); font-size: 0.73rem; font-weight: 400; }
+.routing-stage-tuning .routing-projection-fields { margin-top: 16px; }
+.routing-settings-details { border-top: 1px solid var(--line); }
+.routing-settings-details > summary { padding: 18px 24px; }
+.routing-settings-details > p { padding: 0 24px; }
+.routing-policy-advanced { margin-left: auto; max-width: 320px; order: 1; }
+.routing-policy-advanced[open] { flex-basis: 100%; max-width: 100%; }
+.routing-policy-advanced label { margin-top: 12px; }
+.routing-policy-bar > button { order: 2; }
+.routing-scenario { display: grid; gap: 8px; margin: 18px 0; font-size: 0.8rem; font-weight: 650; }
+.routing-scenario select { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); }
+.routing-scenario small { color: var(--muted); font-size: 0.75rem; font-weight: 400; line-height: 1.6; }
+.routing-stage-signals { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; }
+.routing-stage-signals dt { color: var(--muted); font-size: 0.73rem; }
+.routing-stage-signals dd { margin: 4px 0 0; }
+.routing-rule-order { display: flex; gap: 4px; }
 
 .routing-projection-fields label,
 .routing-projection-model > label {
@@ -1230,7 +1261,7 @@ tbody tr:last-child td {
 
 .routing-rules-list article {
   display: grid;
-  grid-template-columns: minmax(100px, 0.7fr) minmax(180px, 1.6fr) minmax(110px, 0.7fr) auto auto;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(180px, 1.6fr) minmax(110px, 0.7fr) auto auto auto;
   align-items: end;
   gap: 8px;
   border: 1px solid #dfe5eb;

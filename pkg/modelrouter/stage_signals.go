@@ -81,15 +81,17 @@ func chooseStageRoute(plan RoutePlan) (string, *StageRouteTrace) {
 	confidence := math.Abs(score)
 	tier := "efficient"
 	source := "dimensions"
-	if !hasSignals {
+	if plan.StageHistory.Compacted || dimensions.Severity >= stageCriticalSeverity {
+		tier, source, score, confidence = "capable", "override", 0, 1
+	} else if !hasSignals {
 		tier = stageDefaultTier(policy.effectivePicker())
 		source = "fall_open"
 		score, confidence = 0, 0
-	} else if plan.StageHistory.Compacted || dimensions.Severity >= stageCriticalSeverity {
-		tier, source, score, confidence = "capable", "override", 0, 1
 	} else if testsPassed && dimensions.ProductionIntensity > 0 && dimensions.Severity == 0 {
 		tier, source, score, confidence = "efficient", "tests_passed", 0, 1
-	} else if confidence < policy.effectiveThreshold() {
+	} else if confidence <= policy.effectiveThreshold() {
+		// The ambiguous band includes its boundary, including a neutral score
+		// at threshold zero. Such turns retain the configured default tier.
 		tier = stageDefaultTier(policy.effectivePicker())
 		source = "fall_open"
 	} else if score > 0 {
@@ -264,6 +266,7 @@ func appendStageResult(category StageToolCategory, output any, explicitError boo
 }
 
 var nonzeroTestFailures = regexp.MustCompile(`(?:^|[^0-9])[1-9][0-9]*\s+(?:failed|failures?|errors?)(?:[^a-z]|$)`)
+var stagePythonCommand = regexp.MustCompile(`(?:^|[;&|\n])\s*(?:[a-z0-9_./-]*/)?python[0-9.]*\s`)
 
 func stageErrorSeverity(text string) float64 {
 	for _, pattern := range []string{"out of memory", "memoryerror", "cannot allocate memory", "connection refused", "econnrefused"} {
@@ -324,6 +327,9 @@ func classifyStageTool(name string, arguments any) StageToolCategory {
 			return StageToolEdit
 		}
 		if containsAny(command, "cat >", "cat >>", "echo >", "echo >>", "tee ", "printf >", "printf >>", "<<eof", "<<'eof'") {
+			return StageToolWrite
+		}
+		if stagePythonCommand.MatchString(command) && containsAny(command, ".write_text(", ".write_bytes(", ".write(") {
 			return StageToolWrite
 		}
 		if containsAny(command, "cat ", "grep ", "rg ", "ls ", "find ", "head ", "tail ", "diff ", "stat ", "less ", "more ") {

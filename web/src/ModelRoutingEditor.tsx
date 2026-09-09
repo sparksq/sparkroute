@@ -1,10 +1,12 @@
 import { missingRoutingModels, reconcileRoutingMetadata } from "./modelRoutingReferences";
 import { deploymentMetadata } from "./DeploymentMetadataEditor";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { routingStrategies, routingStrategyLabel, stageDecisionLabels, stageScenarios } from "./modelRoutingOptions";
 import type {
   ConfigurationDocument,
   DiscoveredMetadataState,
   RoutingSimulationResult,
+  RoutingStageScenario,
 } from "./types";
 import { capabilityOptions } from "./capabilities";
 
@@ -14,23 +16,12 @@ const MM_PROJECTION_CONFIGURATION_VISIBLE = false;
 
 type JSONObject = Record<string, unknown>;
 
-const strategies = [
-  "random",
-  "round_robin",
-  "weighted_round_robin",
-  "smallest",
-  "largest",
-  "lowest_cost",
-  "fastest",
-  "balanced",
-  "stage_router",
-] as const;
-
 export type RoutingSimulator = (
   document: ConfigurationDocument,
   requestedModel: string,
   routingText: string,
   requiredCapabilities: string[],
+  stageScenario?: RoutingStageScenario,
 ) => Promise<RoutingSimulationResult>;
 
 export function ModelRoutingEditor({
@@ -200,7 +191,7 @@ export function ModelRoutingEditor({
   return (
     <div className="model-routing-workspace">
       <div className="routing-policy-bar">
-        <label>
+        <details className="routing-policy-advanced"><summary>Advanced policy settings</summary><label>
           Policy revision
           <input
             disabled={disabled}
@@ -212,7 +203,7 @@ export function ModelRoutingEditor({
             type="number"
             value={numberValue(policy.revision) || 1}
           />
-        </label>
+        </label><small>Policy format v{numberValue(policy.version) || 2}. You do not need to change the revision to apply edits with Validate and Save.</small></details>
         <label>
           Default selector
           <select
@@ -226,7 +217,6 @@ export function ModelRoutingEditor({
             {selectors.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
-        <span>Policy v{numberValue(policy.version) || 2}</span>
         <button className={confirmRemovePolicy ? "danger-button confirm" : "danger-button"} disabled={disabled}
           onClick={removePolicy} onBlur={() => setConfirmRemovePolicy(false)} type="button">
           {confirmRemovePolicy ? "Confirm remove model routing" : "Remove model routing"}
@@ -264,7 +254,7 @@ export function ModelRoutingEditor({
                 type="button"
               >
                 <span>{name}</span>
-                <small>{stringValue(objectValue(selectorMap[name]).strategy)}</small>
+                <small>{routingStrategyLabel(stringValue(objectValue(selectorMap[name]).strategy))}</small>
               </button>
             ))}
           </div>
@@ -301,6 +291,7 @@ export function ModelRoutingEditor({
               <label>
                 Routing strategy
                 <select
+                  aria-label="Routing strategy"
                   onChange={(event) => updateSelector((current) => setRoutingStrategy(
                     current,
                     event.target.value,
@@ -308,7 +299,9 @@ export function ModelRoutingEditor({
                   ))}
                   value={stringValue(selected.strategy)}
                 >
-                  {strategies.map((strategy) => <option key={strategy} value={strategy}>{label(strategy)}</option>)}
+                  {[...new Set(routingStrategies.map(strategy => strategy.group))].map(group => <optgroup key={group} label={group}>
+                    {routingStrategies.filter(strategy => strategy.group === group).map(strategy => <option key={strategy.value} value={strategy.value}>{strategy.label}</option>)}
+                  </optgroup>)}
                 </select>
               </label>
               <label className="wide">
@@ -319,15 +312,21 @@ export function ModelRoutingEditor({
                     aliases: splitList(event.target.value),
                   }))}
                   defaultValue={stringArray(selected.aliases).join(", ")}
-                  key={`${selectedName}-aliases`}
+                  key={`${selectedName}-aliases-${stringArray(selected.aliases).join(",")}`}
                   placeholder="smart, recommended"
                 />
               </label>
             </div>
 
+            <div className="routing-strategy-guide" role="note">
+              <p>{routingStrategies.find(strategy => strategy.value === selected.strategy)?.help}</p>
+              <small>Clients request <code>{selectedName}</code>{stringArray(selected.aliases).length ? <> or {stringArray(selected.aliases).map(alias => <code key={alias}>{alias} </code>)}</> : null}. The selector chooses one of your virtual models.</small>
+            </div>
+
             {stringValue(selected.strategy) === "stage_router" ? (
               <StageRouterEditor
                 canonicalModels={canonicalModels}
+                disabledModels={canonicalModels.filter(name => objectValue(metadata[name]).enabled !== true)}
                 onChange={updateSelector}
                 onUseBalanced={() => updateSelector((current) => setRoutingStrategy(current, "balanced", canonicalModels))}
                 selector={selected}
@@ -362,19 +361,26 @@ export function ModelRoutingEditor({
               />
             ) : null}
 
-            <ModelMetadataTable
+            <details className="routing-settings-details" key={`${selectedName}-${selected.strategy}`} open={selected.strategy === "weighted_round_robin"}>
+              <summary>Shared model settings <small>Availability, weights, priority, and deployment metadata</small></summary>
+              {selected.strategy === "stage_router" && <p className="routing-projection-help">Stage routing uses the two model roles above. Weights, prices, and priorities do not decide between those roles; disabling a model makes that role ineligible.</p>}
+              <ModelMetadataTable
               deploymentFields={deploymentMetadata(document, additionalDocument)}
               candidates={canonicalModels}
               discoveredMetadata={discoveredMetadata}
               metadata={metadata}
               onChange={updateMetadata}
-            />
+              />
+            </details>
 
-            <KeywordRuleEditor
+            <details className="routing-settings-details" open={arrayValue(policy.keyword_rules).length > 0}>
+              <summary>Keyword overrides <small>{arrayValue(policy.keyword_rules).length} rules · optional, shared across selectors</small></summary>
+              <KeywordRuleEditor
               onChange={(rules) => updatePolicy((current) => ({ ...current, keyword_rules: rules }))}
               rules={arrayValue(policy.keyword_rules)}
               selectors={selectors}
-            />
+              />
+            </details>
           </fieldset>
         </div>
       </div>
@@ -382,6 +388,7 @@ export function ModelRoutingEditor({
       <RoutingSimulationPanel
         document={document}
         endpoints={routingEndpoints(selectorMap)}
+        hasStageRouting={Object.values(selectorMap).some(value => objectValue(value).strategy === "stage_router")}
         simulate={simulate}
       />
       <p className="routing-advanced-note">
@@ -392,16 +399,19 @@ export function ModelRoutingEditor({
   );
 }
 
-function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced }: {
+function StageRouterEditor({ canonicalModels, disabledModels, selector, onChange, onUseBalanced }: {
   canonicalModels: string[];
+  disabledModels: string[];
   selector: JSONObject;
   onChange: (transform: (current: JSONObject) => JSONObject) => void;
   onUseBalanced: () => void;
 }) {
   const stage = objectValue(selector.stage_router);
-  const models = stringArray(selector.models);
-  const capable = stringValue(stage.capable_model) || models[0] || "";
-  const efficient = stringValue(stage.efficient_model) || models[1] || "";
+  const capable = stringValue(stage.capable_model);
+  const efficient = stringValue(stage.efficient_model);
+  const threshold = typeof stage.confidence_threshold === "number" ? stage.confidence_threshold : 0.5;
+  const picker = stringValue(stage.picker) || "efficient_first";
+  const defaultModel = picker === "capable_first" ? capable : efficient;
   const updateRole = (role: "capable_model" | "efficient_model", model: string) => {
     onChange((current) => {
       const currentStage = objectValue(current.stage_router);
@@ -422,7 +432,7 @@ function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced 
       <div className="section-title">
         <div>
           <strong>Agent-stage routing</strong>
-          <small>Uses a content-free projection of recent tool results; raw prompts, tool names, arguments, and output are not retained.</small>
+          <small>Choose the roles based on how your models perform on your tasks. Capability and cost are not inferred from model names.</small>
         </div>
       </div>
       {canonicalModels.length < 2 || capable === efficient || !canonicalModels.includes(capable) || !canonicalModels.includes(efficient) ? (
@@ -432,34 +442,55 @@ function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced 
           <button className="secondary-button" onClick={onUseBalanced} type="button">Use Balanced routing</button>
         </div>
       ) : null}
+      {[capable, efficient].some(model => disabledModels.includes(model)) && <p className="notice info">
+        {[capable, efficient].filter(model => disabledModels.includes(model)).join(", ")} disabled in Shared model settings. Enable the model there to make its role eligible.
+      </p>}
       <div className="routing-projection-fields stage-router-fields">
         <label>
           Capable model
-          <select aria-label="Capable model" onChange={(event) => updateRole("capable_model", event.target.value)} value={capable}>
+          <select required aria-label="Capable model" onChange={(event) => updateRole("capable_model", event.target.value)} value={capable}>
             {!capable ? <option value="">Choose a model</option> : !canonicalModels.includes(capable) ? <option value={capable}>{capable} (missing model)</option> : null}
             {canonicalModels.map((model) => <option key={model} value={model}>{model}</option>)}
           </select>
+          <small>For difficult work and error recovery.</small>
         </label>
         <label>
           Efficient model
-          <select aria-label="Efficient model" onChange={(event) => updateRole("efficient_model", event.target.value)} value={efficient}>
+          <select required aria-label="Efficient model" onChange={(event) => updateRole("efficient_model", event.target.value)} value={efficient}>
             {!efficient ? <option value="">Choose a model</option> : !canonicalModels.includes(efficient) ? <option value={efficient}>{efficient} (missing model)</option> : null}
             {canonicalModels.map((model) => <option key={model} value={model}>{model}</option>)}
           </select>
+          <small>For routine work, usually cheaper or faster.</small>
         </label>
         <label>
-          Ambiguous-signal default
+          Default model choice
           <select
-            aria-label="Ambiguous-signal default"
+            aria-label="Default model choice"
             onChange={(event) => onChange((current) => updateStageRouter(current, (value) => setOptionalString(value, "picker", event.target.value)))}
-            value={stringValue(stage.picker) || "efficient_first"}
+            value={picker}
           >
-            <option value="efficient_first">Efficient first</option>
-            <option value="capable_first">Capable first</option>
+            <option value="efficient_first">Cost first · efficient model</option>
+            <option value="capable_first">Quality first · capable model</option>
           </select>
+          <small>Used for new conversations and inconclusive tool results.</small>
         </label>
+        <label>Switching sensitivity
+          <select aria-label="Switching sensitivity" value={[0.3, 0.5, 0.7].includes(threshold) ? String(threshold) : "custom"}
+            onChange={event => { if (event.target.value !== "custom") onChange(current => updateStageRouter(current, value => ({ ...value, confidence_threshold: Number(event.target.value) }))); }}>
+            <option value="0.3">Earlier switching · one clear signal</option>
+            <option value="0.5">More evidence · default</option>
+            <option value="0.7">Strong evidence · fewer switches</option>
+            {![0.3, 0.5, 0.7].includes(threshold) && <option value="custom">Custom threshold · {threshold}</option>}
+          </select>
+          <small>{picker === "capable_first" ? "Earlier switching moves routine work to the efficient model sooner." : "Earlier switching moves uncertain or failing work to the capable model sooner."}</small>
+        </label>
+      </div>
+      <p className="routing-stage-summary">Without tool history, requests use <strong>{defaultModel || "the selected default role"}</strong>.
+        {threshold >= 0.5 && picker === "capable_first" ? " At this sensitivity, successful edits alone do not switch to efficient; edits plus passing tests can. Choose Earlier switching to allow routine edits to switch." : " Use the activity examples below to check when this configuration switches models."}</p>
+      <details className="routing-stage-tuning"><summary>Advanced stage tuning <small>Threshold {threshold} · last {numberValue(stage.recent_turn_window) || 3} tool results</small></summary>
+      <div className="routing-projection-fields">
         <label>
-          Confidence threshold
+          Switching threshold
           <input
             aria-label="Stage confidence threshold"
             max="1"
@@ -472,7 +503,7 @@ function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced 
           />
         </label>
         <label>
-          Recent turn window
+          Recent tool-result window
           <input
             aria-label="Stage recent turn window"
             max="32"
@@ -485,6 +516,9 @@ function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced 
           />
         </label>
       </div>
+      <p className="routing-projection-help">Threshold is signal strength, not a measured probability of success. Lower values switch away from your default with less evidence; higher values stay on it longer. The window counts completed tool results, not chat messages.
+        {threshold >= Math.tanh(1) && " This threshold is above the ordinary scorer's range: only critical errors, compaction, and settled test results can switch away from the default."}</p>
+      </details>
       <p className="routing-projection-help">
         Critical failures and compaction select the capable tier. Passing tests with settled production work select the efficient tier. An unavailable tier falls back only to the other configured model.
       </p>
@@ -735,7 +769,7 @@ function KeywordRuleEditor({ rules, selectors, onChange }: {
       </div>
       <div className="routing-rules-list">
         {rules.map((rule, index) => (
-          <article key={`${stringValue(rule.name)}-${index}`}>
+          <article key={index}>
             <label>Name<input onChange={(event) => update(index, (current) => ({ ...current, name: event.target.value }))} value={stringValue(rule.name)} /></label>
             <label className="wide">Keywords<input onChange={(event) => update(index, (current) => ({ ...current, keywords: splitList(event.target.value) }))} value={stringArray(rule.keywords).join(", ")} /></label>
             <label>
@@ -754,6 +788,10 @@ function KeywordRuleEditor({ rules, selectors, onChange }: {
               </select>
             </label>
             <label className="routing-checkbox"><input checked={rule.match_all === true} onChange={(event) => update(index, (current) => ({ ...current, match_all: event.target.checked }))} type="checkbox" /> Match every keyword</label>
+            <div className="routing-rule-order">
+              <button className="text-button" aria-label={`Move rule ${stringValue(rule.name) || index + 1} up`} disabled={index === 0} onClick={() => { const next = [...rules]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; onChange(next); }} type="button">↑</button>
+              <button className="text-button" aria-label={`Move rule ${stringValue(rule.name) || index + 1} down`} disabled={index === rules.length - 1} onClick={() => { const next = [...rules]; [next[index + 1], next[index]] = [next[index]!, next[index + 1]!]; onChange(next); }} type="button">↓</button>
+            </div>
             <button className="icon-button remove" aria-label={`Remove rule ${stringValue(rule.name) || index + 1}`} onClick={() => onChange(rules.filter((_, ruleIndex) => ruleIndex !== index))} type="button">−</button>
           </article>
         ))}
@@ -763,10 +801,11 @@ function KeywordRuleEditor({ rules, selectors, onChange }: {
   );
 }
 
-function RoutingSimulationPanel({ document, endpoints, simulate }: {
+function RoutingSimulationPanel({ document, endpoints, simulate, hasStageRouting }: {
   document: ConfigurationDocument;
   endpoints: string[];
   simulate?: RoutingSimulator;
+  hasStageRouting: boolean;
 }) {
   const [requested, setRequested] = useState(endpoints[0] ?? "auto");
   const [text, setText] = useState("");
@@ -774,6 +813,11 @@ function RoutingSimulationPanel({ document, endpoints, simulate }: {
   const [result, setResult] = useState<RoutingSimulationResult>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stageScenario, setStageScenario] = useState<RoutingStageScenario>("no_tools");
+  const inputKey = JSON.stringify([document, requested, text, capabilities, hasStageRouting ? stageScenario : ""]);
+  const latestInput = useRef(inputKey);
+  latestInput.current = inputKey;
+  useEffect(() => { setResult(undefined); setError(""); }, [inputKey]);
   useEffect(() => {
     if (!endpoints.includes(requested)) setRequested(endpoints[0] ?? "auto");
   }, [endpoints, requested]);
@@ -782,10 +826,10 @@ function RoutingSimulationPanel({ document, endpoints, simulate }: {
     setBusy(true);
     setError("");
     try {
-      setResult(await simulate(document, requested, text, capabilities));
+      const result = await simulate(document, requested, text, capabilities, hasStageRouting ? stageScenario : undefined);
+      if (latestInput.current === inputKey) setResult(result);
     } catch (value) {
-      setResult(undefined);
-      setError(value instanceof Error ? value.message : "Routing simulation failed");
+      if (latestInput.current === inputKey) { setResult(undefined); setError(value instanceof Error ? value.message : "Routing simulation failed"); }
     } finally {
       setBusy(false);
     }
@@ -793,9 +837,15 @@ function RoutingSimulationPanel({ document, endpoints, simulate }: {
   return (
     <section className="routing-simulation-panel">
       <div className="section-title">
-        <div><p className="eyebrow">Stateless policy preview</p><h3>Simulate routing</h3></div>
+        <div><p className="eyebrow">Try this configuration</p><h3>Simulate routing</h3><small>Uses the current draft. No model is called or started.</small></div>
         <button className="secondary-button" disabled={busy} onClick={() => void run()} type="button">{busy ? "Simulating…" : "Simulate"}</button>
       </div>
+      {hasStageRouting && <label className="routing-scenario">Example agent activity
+        <select value={stageScenario} onChange={event => setStageScenario(event.target.value as RoutingStageScenario)}>
+          {stageScenarios.map(scenario => <option key={scenario.value} value={scenario.value}>{scenario.label}</option>)}
+        </select>
+        <small>{stageScenarios.find(scenario => scenario.value === stageScenario)?.help} These sample tool results apply when the resolved strategy is Agent stages.</small>
+      </label>}
       <div className="routing-simulation-inputs">
         <label>Requested selector<select onChange={(event) => setRequested(event.target.value)} value={requested}>{endpoints.map((endpoint) => <option key={endpoint} value={endpoint}>{endpoint}</option>)}</select></label>
         <label className="wide">Latest user routing text<textarea maxLength={16 * 1024} onChange={(event) => setText(event.target.value)} placeholder="Optional text for ordered keyword rules" value={text} /></label>
@@ -810,14 +860,22 @@ function RoutingSimulationPanel({ document, endpoints, simulate }: {
       {result ? (
         <div className="routing-simulation-result" aria-label="Routing simulation result" role="region">
           <div><span>Selected logical model</span><strong>{result.decision.resolved_model}</strong></div>
-          <div><span>Strategy</span><strong>{label(result.decision.strategy)}</strong></div>
-          <div><span>Reason</span><strong>{result.decision.reason}</strong></div>
+          <div><span>Strategy</span><strong>{routingStrategyLabel(result.decision.strategy)}</strong></div>
+          {!result.decision.stage && <div><span>Reason</span><strong>{result.decision.reason}</strong></div>}
           <div><span>Matched rule</span><strong>{result.decision.matched_rule || "None"}</strong></div>
+          {result.decision.stage && <>
+            <div><span>Model role</span><strong>{label(result.decision.stage.tier)}</strong></div>
+            <div><span>Stage decision</span><strong>{stageDecisionLabels[result.decision.stage.decision_source] ?? result.decision.stage.decision_source}</strong></div>
+            <details className="wide"><summary>Tool-signal details</summary><dl className="routing-stage-signals">
+              {Object.entries(result.decision.stage.dimensions).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{value.toFixed(2)}</dd></div>)}
+              <div><dt>Signal strength</dt><dd>{result.decision.stage.confidence.toFixed(2)}</dd></div>
+            </dl></details>
+          </>}
           {result.decision.provider_priority?.length ? (
             <div className="wide"><span>Provider preference</span><strong>{result.decision.provider_priority.join(" → ")}</strong></div>
           ) : null}
           <p>{result.available_models.length} capability-compatible model{result.available_models.length === 1 ? "" : "s"}; live adaptive observations are excluded.</p>
-          <ul>{result.decision.candidates.map((candidate) => <li key={candidate.model} className={candidate.eligible ? "eligible" : "ineligible"}><span>{candidate.model}</span><small>{candidate.eligible ? candidate.score === undefined ? "Eligible" : `Score ${candidate.score}` : candidate.reason || "Ineligible"}</small></li>)}</ul>
+          <ul>{result.decision.candidates.map((candidate) => <li key={candidate.model} className={candidate.eligible ? "eligible" : "ineligible"}><span>{candidate.model}</span><small>{candidate.eligible ? candidate.model === result.decision.resolved_model ? "Selected" : result.decision.stage || candidate.score === undefined ? "Eligible" : `Score ${candidate.score}` : candidate.reason || "Ineligible"}</small></li>)}</ul>
         </div>
       ) : null}
     </section>
@@ -915,12 +973,11 @@ function setRoutingStrategy(value: JSONObject, strategy: string, canonicalModels
     next.models = [...new Set(stringArray(value.models).filter((model) => canonicalModels.includes(model)))];
     return next;
   }
-  const existing = stringArray(value.models).filter((model) => canonicalModels.includes(model));
-  const candidates = [...new Set([...existing, ...canonicalModels])].slice(0, 2);
-  next.models = candidates;
+  if (value.strategy === "stage_router" && isObject(value.stage_router)) return next;
+  next.models = [];
   next.stage_router = {
-    capable_model: candidates[0] ?? "",
-    efficient_model: candidates[1] ?? "",
+    capable_model: "",
+    efficient_model: "",
     picker: "efficient_first",
   };
   return next;

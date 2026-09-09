@@ -21,6 +21,7 @@ type RoutingSimulationInput struct {
 	RequestedModel       string              `json:"requested_model"`
 	RoutingText          string              `json:"routing_text,omitempty"`
 	RequiredCapabilities []config.Capability `json:"required_capabilities,omitempty"`
+	StageScenario        string              `json:"stage_scenario,omitempty"`
 }
 
 // RoutingSimulationResult reports the exact native policy decision together
@@ -64,6 +65,10 @@ func SimulateRoutingWithMetadata(
 	}
 	if err := config.ValidateCapabilitySet(input.RequiredCapabilities); err != nil {
 		return RoutingSimulationResult{}, fmt.Errorf("required_capabilities: %w", err)
+	}
+	stageHistory, err := simulationStageHistory(input.StageScenario)
+	if err != nil {
+		return RoutingSimulationResult{}, err
 	}
 	if input.Document.ModelRouting == nil {
 		return RoutingSimulationResult{}, fmt.Errorf("document has no model_routing policy")
@@ -117,7 +122,7 @@ func SimulateRoutingWithMetadata(
 	sort.Strings(available)
 	decision, err := manager.Select(
 		requested,
-		modelrouter.NormalizedRequest{Text: input.RoutingText},
+		modelrouter.NormalizedRequest{Text: input.RoutingText, StageHistory: stageHistory},
 		available,
 		true,
 	)
@@ -130,6 +135,31 @@ func SimulateRoutingWithMetadata(
 		RequiredCapabilities: append([]config.Capability(nil), input.RequiredCapabilities...),
 		StateMode:            simulationStateMode(metadata),
 	}, nil
+}
+
+// Fixed, content-free examples exercise the real scorer without accepting or
+// executing tool calls, retaining conversations, or invoking another model.
+func simulationStageHistory(scenario string) (modelrouter.StageHistory, error) {
+	history := modelrouter.StageHistory{TurnDepth: 10}
+	switch scenario {
+	case "", "no_tools":
+		return modelrouter.StageHistory{}, nil
+	case "exploring":
+		history.Events = []modelrouter.StageEvent{{Category: modelrouter.StageToolRead}, {Category: modelrouter.StageToolRead}, {Category: modelrouter.StageToolPlan}}
+	case "error_recovery":
+		history.Events = []modelrouter.StageEvent{{Category: modelrouter.StageToolRead}, {Category: modelrouter.StageToolOther, Severity: 0.7}}
+	case "productive":
+		history.Events = []modelrouter.StageEvent{{Category: modelrouter.StageToolWrite}, {Category: modelrouter.StageToolEdit}}
+	case "tests_passed":
+		history.Events = []modelrouter.StageEvent{{Category: modelrouter.StageToolEdit}, {Category: modelrouter.StageToolOther, TestsPassed: true}}
+	case "critical_error":
+		history.Events = []modelrouter.StageEvent{{Category: modelrouter.StageToolOther, Severity: 1}}
+	case "compacted":
+		history.Compacted = true
+	default:
+		return modelrouter.StageHistory{}, fmt.Errorf("stage_scenario must be no_tools, exploring, error_recovery, productive, tests_passed, critical_error, or compacted")
+	}
+	return history, nil
 }
 
 func simulationStateMode(metadata modelrouter.DiscoveredMetadataState) string {
