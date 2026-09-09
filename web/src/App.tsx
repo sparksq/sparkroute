@@ -5,7 +5,6 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,7 +15,8 @@ import { ConfigurationPresetSelector } from "./ConfigurationPresetSelector";
 import { configurationSection, configurationSections } from "./configurationSections";
 import { TraceExportWorkspace } from "./TraceExportWorkspace";
 import { TrafficWorkspace } from "./TrafficWorkspace";
-import { RuntimeWorkspace } from "./RuntimeWorkspace";
+import { OverviewWorkspace } from "./OverviewWorkspace";
+import { TargetFact } from "./TargetHealthDetail";
 import { CredentialsWorkspace } from "./CredentialsWorkspace";
 import type {
   AdminConfigurationWorkspaceProps,
@@ -28,7 +28,6 @@ import type {
   AdminBootstrap,
   GatewayStatus,
   MMProjectionStatus,
-  TargetStatus,
 } from "./types";
 import "./styles.css";
 
@@ -42,7 +41,7 @@ type ConnectionState =
       status?: GatewayStatus;
     };
 
-type BuiltInConsolePage = "overview" | "configuration" | "credentials" | "traffic" | "runtime" | "traces";
+type BuiltInConsolePage = "overview" | "configuration" | "credentials" | "traffic" | "traces";
 type ConsolePage = BuiltInConsolePage | string;
 
 export function AdminApp({
@@ -234,6 +233,7 @@ function ConsoleLayout({
   const [operatorBusy, setOperatorBusy] = useState(false);
   const [presetBusy, setPresetBusy] = useState(false);
   const [configurationReload, setConfigurationReload] = useState(0);
+  const [overviewRefresh, setOverviewRefresh] = useState(0);
   const [presetsRefresh, setPresetsRefresh] = useState(0);
   const extensionContext: AdminExtensionContext = {
     bootstrap,
@@ -275,7 +275,11 @@ function ConsoleLayout({
   const traceExportAvailable = Boolean(bootstrap.features.saved_trace_export);
   const credentialsAvailable = Boolean(bootstrap.features.client_credentials);
   useEffect(() => {
-    const update = () => setPage(pageFromPath(window.location.pathname, pageExtensions));
+    const update = () => {
+      if (window.location.pathname === "/admin/runtime") window.history.replaceState({}, "", "/admin/");
+      setPage(pageFromPath(window.location.pathname, pageExtensions));
+    };
+    if (window.location.pathname === "/admin/runtime") update();
     window.addEventListener("popstate", update);
     return () => window.removeEventListener("popstate", update);
   }, [pageExtensions]);
@@ -285,7 +289,6 @@ function ConsoleLayout({
       configuration: "/admin/configuration",
       credentials: "/admin/credentials",
       traffic: "/admin/traffic",
-      runtime: "/admin/runtime",
       traces: "/admin/traces",
     } satisfies Record<BuiltInConsolePage, string>)[next as BuiltInConsolePage]
       ?? (configurationSection(next) ? `/admin/${next}` : undefined)
@@ -300,7 +303,6 @@ function ConsoleLayout({
     configuration: "Configuration",
     credentials: "Client credentials",
     traffic: "Traffic history",
-    runtime: "Runtime lifecycle",
     traces: "Saved trace export",
   } satisfies Record<BuiltInConsolePage, string>)[page as BuiltInConsolePage]
     ?? pageExtensions.find((extension) => extension.id === page)?.heading
@@ -381,20 +383,6 @@ function ConsoleLayout({
               Traffic
             </a>
           ) : null}
-          {runtimeAvailable ? (
-            <a
-              aria-current={page === "runtime" ? "page" : undefined}
-              className={page === "runtime" ? "nav-item active" : "nav-item"}
-              href="/admin/runtime"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate("runtime");
-              }}
-            >
-              <span className="nav-glyph">R</span>
-              Runtime
-            </a>
-          ) : null}
           {traceExportAvailable ? (
             <a
               aria-current={page === "traces" ? "page" : undefined}
@@ -446,7 +434,7 @@ function ConsoleLayout({
             {bootstrap.features.config_presets ? <ConfigurationPresetSelector token={token} canWrite={Boolean(bootstrap.features.config_write)}
               dirty={operatorDirty} locked={operatorBusy} refreshKey={`${bootstrap.config_revision}:${presetsRefresh}`}
               onBusyChange={setPresetBusy} onApplied={() => setConfigurationReload(value => value + 1)} /> : <Revision revision={bootstrap.config_revision} />}
-            <button className="secondary-button" onClick={onRefresh} type="button">
+            <button className="secondary-button" onClick={page === "overview" ? () => setOverviewRefresh(value => value + 1) : onRefresh} type="button">
               Refresh
             </button>
           </div>
@@ -480,18 +468,14 @@ function ConsoleLayout({
           credentialsAvailable ? <CredentialsWorkspace bootstrap={bootstrap} token={token} /> : <ModuleUnavailable />
         ) : page === "traffic" ? (
           trafficAvailable ? <TrafficWorkspace bootstrap={bootstrap} token={token} /> : <ModuleUnavailable />
-        ) : page === "runtime" ? (
-          runtimeAvailable ? <RuntimeWorkspace bootstrap={bootstrap} token={token} /> : <ModuleUnavailable />
         ) : page === "traces" ? (
           traceExportAvailable ? <TraceExportWorkspace bootstrap={bootstrap} token={token} /> : <ModuleUnavailable />
         ) : activePageExtension ? (
           <activePageExtension.Component {...extensionContext} />
         ) : (
           <>
-            {status ? (
-              <StatusOverview
-                status={status}
-              />
+            {status || runtimeAvailable ? (
+              <OverviewWorkspace bootstrap={bootstrap} token={token} initialStatus={status} refreshKey={configurationReload + overviewRefresh} />
             ) : <PermissionNotice />}
             {overviewExtensions.map((extension) => (
               <extension.Component {...extensionContext} key={extension.id} />
@@ -512,151 +496,11 @@ function pageFromPath(
   if (configurationSection(configurationPage)) return configurationPage;
   if (pathname === "/admin/credentials") return "credentials";
   if (pathname === "/admin/traffic") return "traffic";
-  if (pathname === "/admin/runtime") return "runtime";
+  if (pathname === "/admin/runtime") return "overview";
   if (pathname === "/admin/traces") return "traces";
   const extension = extensions.find((candidate) => candidate.path === pathname);
   if (extension) return extension.id;
   return "overview";
-}
-
-function StatusOverview({ status }: {
-  status: GatewayStatus;
-}) {
-  const [deploymentFilter, setDeploymentFilter] = useState("");
-  const [availabilityFilter, setAvailabilityFilter] = useState("all");
-  const [circuitFilter, setCircuitFilter] = useState("all");
-  const [failureFilter, setFailureFilter] = useState("all");
-  const [selectedDeployment, setSelectedDeployment] = useState("");
-  const available = status.targets.filter(
-    (target) => target.admission_available,
-  ).length;
-  const active = status.targets.reduce(
-    (total, target) => total + target.active_requests,
-    0,
-  );
-  const filteredTargets = useMemo(() => {
-    const query = deploymentFilter.trim().toLowerCase();
-    return status.targets.filter((target) => {
-      if (query && !`${target.deployment} ${target.title ?? ""}`.toLowerCase().includes(query)) return false;
-      if (availabilityFilter === "admitting" && !target.admission_available) return false;
-      if (availabilityFilter === "unavailable" && target.admission_available) return false;
-      if (circuitFilter !== "all" && target.circuit_state !== circuitFilter) return false;
-      const hasFailures = (target.recent_failures?.length ?? 0) > 0;
-      if (failureFilter === "recent" && !hasFailures) return false;
-      if (failureFilter === "none" && hasFailures) return false;
-      return true;
-    });
-  }, [availabilityFilter, circuitFilter, deploymentFilter, failureFilter, status.targets]);
-  const selectedTarget = filteredTargets.find(
-    (target) => target.deployment === selectedDeployment,
-  );
-  return (
-    <>
-      <section className="metric-grid" aria-label="Gateway inventory">
-        <Metric label="Virtual models" value={status.virtual_models} />
-        <Metric label="Deployments" value={status.deployments} />
-        <Metric label="Providers" value={status.providers} />
-        <Metric
-          accent={status.targets.length > 0 && available === status.targets.length}
-          label="Targets admitting"
-          value={`${available}/${status.targets.length}`}
-        />
-      </section>
-
-      <section className="panel target-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Live routing state</p>
-            <h2>Deployment targets</h2>
-          </div>
-          <span className="activity-summary">{active} active requests</span>
-        </div>
-        {status.targets.length ? (
-          <>
-            <div className="target-filters">
-              <label className="wide">
-                <span>Filter deployments</span>
-                <input
-                  onChange={(event) => setDeploymentFilter(event.target.value)}
-                  placeholder="Deployment name"
-                  value={deploymentFilter}
-                />
-              </label>
-              <label>
-                <span>Availability</span>
-                <select value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)}>
-                  <option value="all">All targets</option>
-                  <option value="admitting">Admitting only</option>
-                  <option value="unavailable">Unavailable only</option>
-                </select>
-              </label>
-              <label>
-                <span>Circuit state</span>
-                <select value={circuitFilter} onChange={(event) => setCircuitFilter(event.target.value)}>
-                  <option value="all">All states</option>
-                  <option value="closed">Closed</option>
-                  <option value="open">Open</option>
-                  <option value="half_open">Half open</option>
-                </select>
-              </label>
-              <label>
-                <span>Recent failures</span>
-                <select value={failureFilter} onChange={(event) => setFailureFilter(event.target.value)}>
-                  <option value="all">Any history</option>
-                  <option value="recent">Has recent failures</option>
-                  <option value="none">No recent failures</option>
-                </select>
-              </label>
-              <span className="filter-count">{filteredTargets.length} of {status.targets.length}</span>
-            </div>
-            {filteredTargets.length ? (
-              <div className="table-wrap">
-                <table className="target-table">
-                  <thead>
-                    <tr>
-                      <th>Deployment</th>
-                      <th>Availability</th>
-                      <th>Circuit</th>
-                      <th>Concurrency</th>
-                      <th>Failures</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTargets.map((target) => (
-                      <TargetRow
-                        key={target.deployment}
-                        onSelect={() => setSelectedDeployment(
-                          selectedDeployment === target.deployment ? "" : target.deployment,
-                        )}
-                        selected={selectedDeployment === target.deployment}
-                        target={target}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty-state compact">
-                <strong>No targets match these filters</strong>
-                <span>Adjust the deployment, availability, circuit, or failure filters.</span>
-              </div>
-            )}
-            {selectedTarget ? (
-              <TargetHealthDetail
-                onClose={() => setSelectedDeployment("")}
-                target={selectedTarget}
-              />
-            ) : null}
-          </>
-        ) : (
-          <div className="empty-state">
-            <strong>No deployment targets</strong>
-            <span>Add a deployment to the active gateway configuration.</span>
-          </div>
-        )}
-      </section>
-    </>
-  );
 }
 
 function MMProjectionStatusPanel({ canProbe, initialStatus, token }: {
@@ -721,128 +565,6 @@ function MMProjectionStatusPanel({ canProbe, initialStatus, token }: {
   );
 }
 
-
-function TargetRow({
-  target,
-  selected,
-  onSelect,
-}: {
-  target: TargetStatus;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const concurrency =
-    target.max_concurrency > 0
-      ? `${target.active_requests} / ${target.max_concurrency}`
-      : `${target.active_requests} / unlimited`;
-  return (
-    <tr className={selected ? "selected" : ""}>
-      <td>
-        <button
-          aria-expanded={selected}
-          className="target-link"
-          title={target.deployment}
-          onClick={onSelect}
-          type="button"
-        >
-          {target.title || target.deployment}
-        </button>
-      </td>
-      <td>
-        <StatusPill good={target.admission_available}>
-          {target.admission_available ? "Admitting" : "Unavailable"}
-        </StatusPill>
-      </td>
-      <td>
-        <StatusPill good={target.circuit_state === "closed"}>
-          {humanize(target.circuit_state)}
-        </StatusPill>
-      </td>
-      <td>{concurrency}</td>
-      <td>
-        {target.failures} / {target.samples} samples
-      </td>
-    </tr>
-  );
-}
-
-function TargetHealthDetail({
-  target,
-  onClose,
-}: {
-  target: TargetStatus;
-  onClose: () => void;
-}) {
-  const failures = target.recent_failures ?? [];
-  const concurrency = target.max_concurrency > 0
-    ? `${target.active_requests} / ${target.max_concurrency}`
-    : `${target.active_requests} / unlimited`;
-  return (
-    <section className="target-health-detail" aria-label={`${target.deployment} target health`}>
-      <div className="target-detail-heading">
-        <div>
-          <p className="eyebrow">Replica-local health drill-down</p>
-          <h3>{target.title || target.deployment}</h3>
-        </div>
-        <button className="text-button" onClick={onClose} type="button">Close</button>
-      </div>
-      <dl className="target-detail-grid">
-        {target.title ? <TargetFact label="Deployment ID" value={target.deployment} /> : null}
-        <TargetFact label="Admission" value={target.admission_available ? "Admitting" : "Unavailable"} />
-        <TargetFact label="Circuit" value={humanize(target.circuit_state)} />
-        <TargetFact label="Concurrency" value={concurrency} />
-        <TargetFact label="Consecutive failures" value={String(target.consecutive_failures)} />
-        <TargetFact label="Rolling samples" value={`${target.failures} failures / ${target.samples}`} />
-        <TargetFact label="Ejection count" value={String(target.ejection_count)} />
-        <TargetFact label="Ejected until" value={target.ejected_until ? formatStatusTime(target.ejected_until) : "Not ejected"} />
-        <TargetFact label="Half-open probe" value={target.half_open_probe_active ? "In flight" : "Inactive"} />
-      </dl>
-      <div className="recent-failure-heading">
-        <div>
-          <h4>Recent target failures</h4>
-          <p>Newest first · maximum eight retained per target</p>
-        </div>
-        <span>{failures.length}</span>
-      </div>
-      {failures.length ? (
-        <ol className="recent-failure-list">
-          {failures.map((failure, index) => (
-            <li key={`${failure.occurred_at}-${failure.failure_class}-${index}`}>
-              <code>{failure.failure_class}</code>
-              <span>{formatStatusTime(failure.occurred_at)}</span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="recent-failure-empty">No target failures are retained on this replica.</p>
-      )}
-      <p className="content-boundary-note">
-        This projection contains normalized failure classes and timestamps only. It excludes request content, raw errors, upstream bodies, request IDs, URLs, headers, and credentials, and resets with replica-local target state.
-      </p>
-    </section>
-  );
-}
-
-function TargetFact({ label, value }: { label: string; value: string }) {
-  return <div><dt>{label}</dt><dd>{value}</dd></div>;
-}
-
-function Metric({
-  label,
-  value,
-  accent = false,
-}: {
-  label: string;
-  value: ReactNode;
-  accent?: boolean;
-}) {
-  return (
-    <article className={accent ? "metric accent" : "metric"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
 
 function StatusPill({
   children,

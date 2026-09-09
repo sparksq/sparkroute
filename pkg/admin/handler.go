@@ -80,19 +80,25 @@ type Status struct {
 }
 
 type TargetStatus struct {
-	Deployment          string                `json:"deployment"`
-	Title               string                `json:"title,omitempty"`
-	CircuitState        routing.CircuitState  `json:"circuit_state"`
-	AdmissionAvailable  bool                  `json:"admission_available"`
-	ActiveRequests      int                   `json:"active_requests"`
-	MaxConcurrency      int                   `json:"max_concurrency"`
-	ConsecutiveFailures int                   `json:"consecutive_failures"`
-	Samples             int                   `json:"samples"`
-	Failures            int                   `json:"failures"`
-	EjectionCount       int                   `json:"ejection_count"`
-	EjectedUntil        *time.Time            `json:"ejected_until,omitempty"`
-	HalfOpenProbeActive bool                  `json:"half_open_probe_active"`
-	RecentFailures      []TargetFailureStatus `json:"recent_failures"`
+	Deployment          string                    `json:"deployment"`
+	Title               string                    `json:"title,omitempty"`
+	Provider            string                    `json:"provider,omitempty"`
+	Model               string                    `json:"model,omitempty"`
+	ModelNames          []string                  `json:"model_names,omitempty"`
+	EndpointSource      config.EndpointSourceType `json:"endpoint_source,omitempty"`
+	Controller          string                    `json:"controller,omitempty"`
+	ColdStart           config.ColdStartPolicy    `json:"cold_start,omitempty"`
+	CircuitState        routing.CircuitState      `json:"circuit_state"`
+	AdmissionAvailable  bool                      `json:"admission_available"`
+	ActiveRequests      int                       `json:"active_requests"`
+	MaxConcurrency      int                       `json:"max_concurrency"`
+	ConsecutiveFailures int                       `json:"consecutive_failures"`
+	Samples             int                       `json:"samples"`
+	Failures            int                       `json:"failures"`
+	EjectionCount       int                       `json:"ejection_count"`
+	EjectedUntil        *time.Time                `json:"ejected_until,omitempty"`
+	HalfOpenProbeActive bool                      `json:"half_open_probe_active"`
+	RecentFailures      []TargetFailureStatus     `json:"recent_failures"`
 }
 
 type TargetFailureStatus struct {
@@ -480,12 +486,42 @@ func (h *handler) serveStatus(
 	}
 	status := h.status
 	status.Targets = targetStatuses(h.options.Targets)
-	titles := make(map[string]string, len(h.document.Deployments))
+	deployments := make(map[string]config.Deployment, len(h.document.Deployments))
 	for _, deployment := range h.document.Deployments {
-		titles[deployment.Name] = h.deploymentTitle(request.Context(), deployment)
+		deployments[deployment.Name] = deployment
+	}
+	modelNames := make(map[string]map[string]bool)
+	for _, model := range h.document.VirtualModels {
+		for _, pool := range model.Pools {
+			for _, target := range pool.Targets {
+				if modelNames[target.Deployment] == nil {
+					modelNames[target.Deployment] = make(map[string]bool)
+				}
+				modelNames[target.Deployment][model.Name] = true
+				for _, alias := range model.Aliases {
+					modelNames[target.Deployment][alias] = true
+				}
+			}
+		}
 	}
 	for i := range status.Targets {
-		status.Targets[i].Title = titles[status.Targets[i].Deployment]
+		target := &status.Targets[i]
+		deployment, ok := deployments[target.Deployment]
+		if !ok {
+			continue
+		}
+		target.Title = h.deploymentTitle(request.Context(), deployment)
+		target.Provider = deployment.Provider
+		target.Model = deployment.Model
+		target.EndpointSource = deployment.EndpointSource.Type.Effective()
+		target.Controller = deployment.EndpointSource.Controller
+		if target.EndpointSource == config.EndpointSourceActivatable {
+			target.ColdStart = deployment.EndpointSource.ColdStart.Effective()
+		}
+		for name := range modelNames[target.Deployment] {
+			target.ModelNames = append(target.ModelNames, name)
+		}
+		sort.Strings(target.ModelNames)
 	}
 	status.Credentials = credentialStatus(h.options.Credentials)
 	status.MMProjection = projectionStatus(h.options.MMProjection)

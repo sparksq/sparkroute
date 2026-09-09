@@ -19,6 +19,12 @@ export interface AdminBootstrap {
 export interface TargetStatus {
   deployment: string;
   title?: string;
+  provider?: string;
+  model?: string;
+  model_names?: string[];
+  endpoint_source?: "static" | "discovered" | "activatable";
+  controller?: string;
+  cold_start?: "wait" | "reject";
   circuit_state: "closed" | "open" | "half_open" | string;
   admission_available: boolean;
   active_requests: number;

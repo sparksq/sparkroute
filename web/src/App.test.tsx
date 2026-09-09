@@ -109,7 +109,7 @@ describe("AdminApp", () => {
     );
 
     expect(await screen.findByText("openai-primary")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText(/4 virtual models/)).toBeInTheDocument();
     expect(screen.getByText("Admitting")).toBeInTheDocument();
     expect(screen.getByText("1.2.3")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "AGPL-3.0-only · Source abcd1234abcd" })).toHaveAttribute("href", bootstrap.build.source);
@@ -234,7 +234,7 @@ describe("AdminApp", () => {
     fireEvent.change(screen.getByLabelText("Recent failures"), {
       target: { value: "recent" },
     });
-    expect(screen.getByText("No targets match these filters")).toBeInTheDocument();
+    expect(screen.getByText("No deployments match these filters")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Availability"), {
       target: { value: "all" },
@@ -357,16 +357,17 @@ describe("AdminApp", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<AdminApp productName="SparkRoute" />);
-    fireEvent.click(await screen.findByText("Runtime"));
+    expect(await screen.findByText("Deployments & workloads")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Runtime/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Diagnostics" }));
     expect(await screen.findByText("Runtime controllers")).toBeInTheDocument();
     expect(screen.getByText("3 · 1.0 KiB")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Endpoints" }));
-    expect(screen.getByText("endpoint-a")).toBeInTheDocument();
+    expect(await screen.findByText("endpoint-a")).toBeInTheDocument();
     expect(screen.queryByText(/must-not-render/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Transitions" }));
-    expect(screen.getByText("readiness_succeeded")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(await screen.findByText("readiness_succeeded")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Transition controller"), {
       target: { value: "sparkrun" },
     });

@@ -3419,3 +3419,70 @@ button:disabled {
 
 .runtime-workload-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .runtime-workload-actions button { white-space: nowrap; }
+
+.overview-workspace, .overview-deployments, .overview-diagnostics { min-width: 0; }
+.overview-workspace, .overview-deployments, .overview-diagnostics { grid-template-columns: minmax(0, 1fr); }
+.overview-deployments, .overview-diagnostics { display: grid; gap: 18px; }
+.overview-workspace .panel { min-width: 0; }
+.overview-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.overview-metrics .metric { min-height: 92px; padding: 16px; text-align: left; cursor: pointer; }
+.overview-metrics .metric::after { display: none; }
+.overview-metrics .metric:hover { border-color: var(--teal); }
+.overview-metrics .metric:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.overview-metrics .metric strong { font-size: 1.7rem; }
+.overview-inventory-note { margin: 7px 0 0; color: var(--muted); font-size: 0.72rem; }
+.overview-filters { grid-template-columns: minmax(230px, 1.6fr) repeat(3, minmax(125px, 1fr)); }
+.overview-filter-footer { display: flex; flex-wrap: wrap; align-items: start; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.overview-filter-footer > .text-button { margin-left: auto; }
+.overview-health-filters { font-size: 0.73rem; color: var(--muted); }
+.overview-health-filters summary { cursor: pointer; padding: 4px 0; }
+.overview-health-filters .target-filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); padding: 10px 0 0; border: 0; background: transparent; }
+.deployment-table { min-width: 850px; }
+.deployment-table td { padding-top: 18px; padding-bottom: 18px; }
+.deployment-table td:first-child { width: 29%; }
+.deployment-table td:last-child { width: 24%; min-width: 205px; }
+.deployment-table .target-link { max-width: min(300px, 25vw); white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.deployment-table td small { white-space: normal; overflow-wrap: anywhere; }
+.workload-controls .runtime-workload-actions { margin-top: 0; }
+.workload-controls button { padding: 7px 10px; font-size: 0.72rem; }
+.workload-controls .form-error { max-width: 270px; white-space: normal; overflow-wrap: anywhere; font-size: 0.72rem; }
+.workload-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+.status-pill.neutral { color: #526075; background: #edf0f4; }
+.status-pill.neutral i { background: #8994a5; }
+.overview-workspace .overview-row-warning { color: var(--amber); }
+.overview-source-error, .overview-controller-notice { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin: 0; }
+.overview-source-error > span, .overview-controller-notice > span { flex: 1; min-width: 200px; }
+.deployment-detail { border-top: 1px solid var(--line); background: #fbfcfd; }
+.deployment-detail h4 { margin: 0; color: var(--ink); font-size: 0.85rem; }
+.deployment-detail .target-detail-grid dd { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.deployment-activation-detail > h4, .deployment-endpoints > h4 { padding: 20px 20px 12px; }
+.overview-policy-note { margin: 0; padding: 14px 20px; color: var(--muted); font-size: 0.76rem; line-height: 1.5; }
+.deployment-endpoints ul, .deployment-recent-activity ol { list-style: none; margin: 0; padding: 0 20px 16px; }
+.deployment-endpoints li, .deployment-recent-activity li { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 0.75rem; overflow-wrap: anywhere; }
+.deployment-endpoints li span, .deployment-recent-activity time { color: var(--muted); font-size: 0.68rem; }
+.deployment-endpoints > p, .deployment-recent-activity > p { padding: 0 20px 16px; color: var(--muted); font-size: 0.76rem; }
+.deployment-recent-activity { border-top: 1px solid var(--line); }
+@media (max-width: 1150px) {
+  .overview-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+  .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-metrics .metric { min-height: 80px; padding: 12px; }
+  .overview-filters .wide { grid-column: 1 / -1; }
+  .overview-filter-footer { padding: 10px 14px; }
+  .overview-health-filters { order: 3; flex-basis: 100%; }
+  .deployment-table .target-link { max-width: 230px; }
+  .deployment-detail .target-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deployment-table { min-width: 0; }
+  .deployment-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .deployment-table tbody { display: block; }
+  .deployment-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; gap: 14px; border-bottom: 1px solid var(--line); }
+  .deployment-table td { display: block; width: auto; min-width: 0; padding: 0; border: 0; white-space: normal; }
+  .deployment-table td:first-child, .deployment-table td:last-child { grid-column: 1 / -1; width: auto; min-width: 0; }
+  .deployment-table td::before { content: attr(data-label); display: block; margin-bottom: 7px; color: var(--muted); font-size: 0.64rem; font-weight: 700; }
+  .deployment-table td:first-child::before { display: none; }
+  .deployment-table td small { max-width: none; }
+  .deployment-table .target-link { max-width: 100%; }
+  .workload-controls button { min-height: 36px; padding: 8px 12px; }
+}

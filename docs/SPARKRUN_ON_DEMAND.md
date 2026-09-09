@@ -125,7 +125,7 @@ line and truncate to fit. The expanded editor selects the request API and values
 `messages`, etc.); values replace caller parameters before protocol translation.
 Profiles share the deployment and lifecycle; the colon has no implicit parser.
 
-Runtime **Start** activates an inactive recipe deployment without an inference
+Overview **Start** activates an inactive recipe deployment without an inference
 request, including one that has never launched. It uses the same bounded queue,
 activation timeout and fencing as inference admission, and releases its lease
 as soon as the workload is ready. An explicit Start can also prewarm a binding
@@ -135,7 +135,7 @@ requiring zero active request leases. It removes serving endpoints and retains
 the binding for a later Start or on-demand request. Both controls work without
 ColdSnap; adopted workloads cannot be stopped from the gateway.
 
-Runtime sleep/wake requires actual ColdSnap use, an enabled lifecycle API,
+Overview sleep/wake requires actual ColdSnap use, an enabled lifecycle API,
 SparkRoute ownership, and zero active request leases. ColdSnap verifies the job,
 hosts, and capture identity. Idle time starts after the final lease ends; an
 uncertain transition blocks serving until reconciled. Coordination remains

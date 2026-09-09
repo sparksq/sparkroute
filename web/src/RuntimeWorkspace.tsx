@@ -1,169 +1,8 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  fetchLifecycleStatus,
-  controlSparkrunWorkload,
-  fetchRuntimeEndpoints,
-  fetchRuntimeEvents,
-} from "./api";
-import type {
-  AdminBootstrap,
-  LifecycleBindingStatus,
-  LifecycleSnapshot,
-  RuntimeEndpointFilters,
-  RuntimeEndpointPage,
-  RuntimeEventFilters,
-  RuntimeEventPage,
-} from "./types";
+import { type FormEvent, useState } from "react";
+import type { LifecycleSnapshot, RuntimeEndpointFilters, RuntimeEndpointPage, RuntimeEventFilters, RuntimeEventPage } from "./types";
 
-type RuntimeView = "overview" | "endpoints" | "transitions";
-
-const emptyEndpoints: RuntimeEndpointPage = { endpoints: [] };
-const emptyEvents: RuntimeEventPage = { records: [] };
-
-export function RuntimeWorkspace({
-  bootstrap,
-  token,
-}: {
-  bootstrap: AdminBootstrap;
-  token: string;
-}) {
-  const hasStatus = Boolean(bootstrap.features.lifecycle_status);
-  const hasEndpoints = Boolean(bootstrap.features.endpoint_inventory);
-  const hasEvents = Boolean(bootstrap.features.runtime_events);
-  const [view, setView] = useState<RuntimeView>(
-    hasStatus ? "overview" : hasEndpoints ? "endpoints" : "transitions",
-  );
-  const [endpointFilters, setEndpointFilters] = useState<RuntimeEndpointFilters>({ limit: 100 });
-  const [eventFilters, setEventFilters] = useState<RuntimeEventFilters>({ limit: 100 });
-  const [endpoints, setEndpoints] = useState(emptyEndpoints);
-  const [events, setEvents] = useState(emptyEvents);
-  const [status, setStatus] = useState<LifecycleSnapshot>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async (signal?: AbortSignal, showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError("");
-    try {
-      const [nextStatus, nextEndpoints, nextEvents] = await Promise.all([
-        hasStatus ? fetchLifecycleStatus(token, signal) : Promise.resolve(undefined),
-        hasEndpoints
-          ? fetchRuntimeEndpoints(token, endpointFilters, signal)
-          : Promise.resolve(emptyEndpoints),
-        hasEvents
-          ? fetchRuntimeEvents(token, eventFilters, signal)
-          : Promise.resolve(emptyEvents),
-      ]);
-      if (signal?.aborted) return;
-      setStatus(nextStatus);
-      setEndpoints(nextEndpoints);
-      setEvents(nextEvents);
-    } catch (caught) {
-      if (signal?.aborted) return;
-      setError(caught instanceof Error ? caught.message : "Runtime status request failed");
-    } finally {
-      if (!signal?.aborted && showLoading) setLoading(false);
-    }
-  }, [endpointFilters, eventFilters, hasEndpoints, hasEvents, hasStatus, token]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    const timer = setInterval(() => { if (!document.hidden) void load(controller.signal, false); }, 5000);
-    return () => { controller.abort(); clearInterval(timer); };
-  }, [load]);
-
-  const readyEndpoints = hasEndpoints ? endpoints.endpoints.filter(
-    (endpoint) => endpoint.state === "ready" && !endpoint.expired,
-  ).length : status?.controllers.reduce((total, c) => total + c.ready_endpoints, 0) ?? 0;
-  const queuedWaiters = status?.controllers.reduce(
-    (total, controller) => total + controller.queued_waiters,
-    0,
-  ) ?? 0;
-  const availableViews = useMemo(() => [
-    ...(hasStatus ? [{ id: "overview" as const, label: "Controllers & queues" }] : []),
-    ...(hasEndpoints ? [{ id: "endpoints" as const, label: "Endpoints" }] : []),
-    ...(hasEvents ? [{ id: "transitions" as const, label: "Transitions" }] : []),
-  ], [hasEndpoints, hasEvents, hasStatus]);
-
+export function ControllerInventory({ snapshot }: { snapshot: LifecycleSnapshot }) {
   return (
-    <div className="runtime-workspace">
-      <section className="scope-banner">
-        <div>
-          <p className="eyebrow">Content-free runtime operations</p>
-          <strong>Lifecycle controllers, cold-start admission, and serving instances</strong>
-        </div>
-        <span>URLs, credentials, raw errors, and registry metadata are excluded.</span>
-      </section>
-
-      <section className="metric-grid" aria-label="Runtime inventory">
-        <Metric label="Controllers" value={status?.controllers.length ?? 0} />
-        <Metric label="Endpoints" value={hasEndpoints ? endpoints.endpoints.length : status?.controllers.reduce((total, c) => total + c.endpoints, 0) ?? 0} />
-        <Metric label="Ready endpoints" value={readyEndpoints} accent={readyEndpoints > 0} />
-        <Metric label="Queued waiters" value={queuedWaiters} accent={queuedWaiters === 0} />
-      </section>
-
-      <div className="workspace-tabs" role="tablist" aria-label="Runtime views">
-        {availableViews.map((item) => (
-          <button
-            aria-selected={view === item.id}
-            className={view === item.id ? "active" : ""}
-            key={item.id}
-            onClick={() => setView(item.id)}
-            role="tab"
-            type="button"
-          >
-            {item.label}
-          </button>
-        ))}
-        <button className="runtime-refresh" onClick={() => void load()} type="button">
-          Refresh runtime
-        </button>
-      </div>
-
-      {error ? <p className="form-error panel-error">{error}</p> : null}
-      {loading ? <section className="panel runtime-loading">Loading runtime state…</section> : null}
-      {!loading && !error && view === "overview" && status ? (
-        <LifecycleOverview snapshot={status} token={token} canControl={Boolean(bootstrap.features.sparkrun_controls)} onRefresh={() => void load(undefined, false)} />
-      ) : null}
-      {!loading && !error && view === "endpoints" ? (
-        <EndpointInventory
-          filters={endpointFilters}
-          page={endpoints}
-          onApply={setEndpointFilters}
-        />
-      ) : null}
-      {!loading && !error && view === "transitions" ? (
-        <TransitionHistory
-          filters={eventFilters}
-          page={events}
-          onApply={setEventFilters}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-const workloadActionLabels: Record<string, string> = { start: "Start", stop: "Stop", status: "Check status", sleep: "Sleep", wake: "Wake" };
-
-function workloadActions(binding: LifecycleBindingStatus): string[] {
-  if (binding.controller !== "sparkrun") return [];
-  const actions = binding.job_id ? (binding.lifecycle_actions ?? []).filter(action => action in workloadActionLabels) : [];
-  const transitioning = ["activating", "draining", "deactivating"].includes(binding.state) || ["activating", "deactivating"].includes(binding.phase ?? "");
-  if (!transitioning && ["offline", "failed", "unknown"].includes(binding.state)) actions.push("start");
-  if (!transitioning && binding.job_id && binding.owned === true && binding.phase !== "offline") actions.push("stop");
-  return [...new Set(actions)];
-}
-
-function LifecycleOverview({ snapshot, token, canControl, onRefresh }: { snapshot: LifecycleSnapshot; token: string; canControl: boolean; onRefresh: () => void }) {
-  const [busyAction, setBusyAction] = useState<{ deployment: string; operation: string }>(); const [actionError, setActionError] = useState("");
-  async function action(deployment: string, job: string, operation: string) {
-    setBusyAction({ deployment, operation }); setActionError("");
-    try {await controlSparkrunWorkload(token, deployment, job, operation); onRefresh();}
-    catch(e) {setActionError(e instanceof Error ? e.message : "Workload control failed.");} finally {setBusyAction(undefined);}
-  }
-  return (
-    <>
       <section className="panel">
         <div className="panel-heading">
           <div><p className="eyebrow">Controller observations</p><h2>Runtime controllers</h2></div>
@@ -185,33 +24,10 @@ function LifecycleOverview({ snapshot, token, canControl, onRefresh }: { snapsho
         ) : <Empty title="No controllers reported" detail="No lifecycle controller has published status." />}
       </section>
 
-      <section className="panel">
-        <div className="panel-heading">
-          <div><p className="eyebrow">Bounded cold-start admission</p><h2>Activation bindings</h2></div>
-          <span className="activity-summary">{snapshot.bindings.length} bindings</span>
-        </div>
-        {actionError && <p className="notice error" role="alert">{actionError}</p>}
-        {snapshot.bindings.length ? (
-          <div className="table-wrap"><table><thead><tr>
-            <th>Deployment</th><th>Model</th><th>State</th><th>Queue</th><th>Leases</th><th>Deadline</th><th>Workload controls</th>
-          </tr></thead><tbody>
-            {snapshot.bindings.map((binding) => <tr key={`${binding.controller}/${binding.binding_revision}`}>
-              <td className="deployment-name">{binding.deployment}<small>{binding.cluster_candidates?.join(", ") || binding.controller}</small><small>{binding.job_id}</small><small>{binding.owned === true ? "Started by SparkRoute" : binding.owned === false ? "Adopted · manual stop" : ""}</small></td>
-              <td>{binding.virtual_model || "—"}</td>
-              <td><StatePill value={binding.state} good={binding.state === "ready"} /><small>{binding.phase?.replaceAll("_", " ")}</small><small>{binding.reason?.replaceAll("_", " ")}</small></td>
-              <td>{binding.queued_waiters} / {binding.max_queued_waiters || "∞"}<small>{formatBytes(binding.queued_body_bytes)} / {binding.max_queued_body_bytes ? formatBytes(binding.max_queued_body_bytes) : "∞"}</small></td>
-              <td>{binding.active_leases}</td>
-              <td>{binding.activation_deadline ? formatTime(binding.activation_deadline) : "—"}</td>
-              <td><small>Plugins in use: {binding.plugins_in_use?.join(", ") || "None reported"}</small><div className="runtime-workload-actions">{canControl && workloadActions(binding).map((operation) => <button key={operation} type="button" disabled={Boolean(busyAction) || (operation !== "status" && binding.active_leases > 0)} onClick={() => void action(binding.deployment, operation === "start" ? "" : binding.job_id!, operation)}>{workloadActionLabels[operation]}</button>)}</div>{busyAction?.deployment === binding.deployment && <small role="status">{busyAction.operation === "start" ? "Starting workload…" : busyAction.operation === "stop" ? "Stopping workload…" : "Controlling workload…"}</small>}</td>
-            </tr>)}
-          </tbody></table></div>
-        ) : <Empty title="No activation bindings" detail="No cold-start-capable binding has published status." />}
-      </section>
-    </>
   );
 }
 
-function EndpointInventory({
+export function EndpointInventory({
   filters,
   page,
   onApply,
@@ -251,7 +67,7 @@ function EndpointInventory({
   </section>;
 }
 
-function TransitionHistory({
+export function TransitionHistory({
   filters,
   page,
   onApply,
@@ -293,24 +109,20 @@ function TransitionHistory({
   </section>;
 }
 
-function Metric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
-  return <article className={accent ? "metric accent" : "metric"}><span>{label}</span><strong>{value}</strong></article>;
-}
-
-function StatePill({ value, good }: { value: string; good: boolean }) {
+export function StatePill({ value, good }: { value: string; good: boolean }) {
   return <span className={good ? "status-pill good" : "status-pill warning"}><i />{humanize(value)}</span>;
 }
 
-function Empty({ title, detail }: { title: string; detail: string }) {
+export function Empty({ title, detail }: { title: string; detail: string }) {
   return <div className="empty-state compact"><strong>{title}</strong><span>{detail}</span></div>;
 }
 
-function formatTime(value: string) {
+export function formatTime(value: string) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(parsed);
 }
 
-function formatBytes(value: number) {
+export function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
@@ -322,6 +134,6 @@ function formatDuration(nanoseconds: number) {
   return `${(nanoseconds / 1_000_000_000).toFixed(2)} s`;
 }
 
-function humanize(value: string) {
+export function humanize(value: string) {
   return value.split("_").filter(Boolean).map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ");
 }

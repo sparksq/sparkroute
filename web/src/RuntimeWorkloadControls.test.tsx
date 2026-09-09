@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { RuntimeWorkspace } from "./RuntimeWorkspace";
+import { OverviewWorkspace } from "./OverviewWorkspace";
 import type { AdminBootstrap, LifecycleBindingStatus } from "./types";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -29,7 +29,7 @@ it("starts a never-launched deployment, then stops it without requiring ColdSnap
   let complete!: () => void;
   const pending = new Promise<void>(resolve => { complete = resolve; });
   const fetch = mockRuntime(binding, async body => { if (body.action === "start") await pending; });
-  render(<RuntimeWorkspace bootstrap={bootstrap} token="token" />);
+  render(<OverviewWorkspace bootstrap={bootstrap} token="token" />);
   fireEvent.click(await screen.findByRole("button", { name: "Start" }));
   expect(screen.getByText("Starting workload…")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
@@ -46,28 +46,28 @@ it("starts a never-launched deployment, then stops it without requiring ColdSnap
 it("adds Stop beside ColdSnap controls and disables mutations during active requests", async () => {
   mockRuntime({ ...binding, state: "ready", phase: "ready", job_id: "job", owned: true, active_leases: 1,
     plugins_in_use: ["coldsnap"], lifecycle_actions: ["status", "sleep", "wake"] });
-  render(<RuntimeWorkspace bootstrap={bootstrap} token="" />);
+  render(<OverviewWorkspace bootstrap={bootstrap} token="" />);
   expect(await screen.findByRole("button", { name: "Stop" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Sleep" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Wake" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Wake" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
 });
 
 it("keeps Stop unavailable for adopted workloads and all controls unavailable to read-only users", async () => {
   mockRuntime({ ...binding, state: "ready", phase: "ready", job_id: "borrowed", owned: false });
-  const view = render(<RuntimeWorkspace bootstrap={bootstrap} token="" />);
-  await screen.findByText("Adopted · manual stop");
+  const view = render(<OverviewWorkspace bootstrap={bootstrap} token="" />);
+  await screen.findByText("Adopted workload");
   expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
   view.unmount();
   mockRuntime(binding);
-  render(<RuntimeWorkspace bootstrap={{ ...bootstrap, features: { ...bootstrap.features, sparkrun_controls: false } }} token="" />);
+  render(<OverviewWorkspace bootstrap={{ ...bootstrap, features: { ...bootstrap.features, sparkrun_controls: false } }} token="" />);
   await screen.findByText("ds4f");
   expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
 });
 
 it("shows start failures and permits a retry", async () => {
   mockRuntime(binding, async () => { throw new Error("Cluster unavailable"); });
-  render(<RuntimeWorkspace bootstrap={bootstrap} token="" />);
+  render(<OverviewWorkspace bootstrap={bootstrap} token="" />);
   fireEvent.click(await screen.findByRole("button", { name: "Start" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Cluster unavailable");
   await waitFor(() => expect(screen.getByRole("button", { name: "Start" })).toBeEnabled());
