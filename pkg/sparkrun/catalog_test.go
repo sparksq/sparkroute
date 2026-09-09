@@ -43,6 +43,9 @@ func TestRecipeDraftFromEmptyConfigurationAndSharedDeployment(t *testing.T) {
 	if reused || document.Deployments[0].Title != "sparkrun:lab:test/model" {
 		t.Fatal(document)
 	}
+	if len(document.Providers) != 1 || document.Providers[0].Name != "sparkrun" || document.Deployments[0].Provider != "sparkrun" {
+		t.Fatal("empty-install draft did not use the shared provider", document)
+	}
 	if err := document.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +75,23 @@ func TestRecipeDraftFromEmptyConfigurationAndSharedDeployment(t *testing.T) {
 		if operation != "catalog_resolve" && operation != "catalog_clusters" {
 			t.Fatal(operation)
 		}
+	}
+}
+
+func TestRecipeDraftReusesPrepopulatedProvider(t *testing.T) {
+	f := &catalogFixture{revision: "recipe-revision"}
+	generated := config.Document{Providers: []config.Provider{{Name: "sparkrun", Type: "sparkrun"}}}
+	input := RecipeDraft{Reference: "catalog:123", RecipeRevision: f.revision, Name: "coding", Cluster: "lab"}
+	draft, _, reused, err := PrepareRecipeDraft(context.Background(), f, managed.EmptyDocument(), generated, input)
+	if err != nil || reused || len(draft.Providers) != 0 || draft.Deployments[0].Provider != "sparkrun" {
+		t.Fatal("did not reuse the generated provider", draft, err)
+	}
+	if _, err := managed.Merge(map[managed.Owner]config.Document{managed.OwnerOperator: draft, managed.OwnerSparkrun: generated}); err != nil {
+		t.Fatal(err)
+	}
+	generated.Providers[0].BaseURL = "http://localhost:8000/v1"
+	if _, _, _, err := PrepareRecipeDraft(context.Background(), f, managed.EmptyDocument(), generated, input); err == nil || !strings.Contains(err.Error(), "conflicting settings") {
+		t.Fatal("accepted conflicting shared provider", err)
 	}
 }
 

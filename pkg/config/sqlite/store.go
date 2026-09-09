@@ -319,15 +319,13 @@ func (s *Store) BuildCandidate(
 	if err != nil {
 		return config.Document{}, managed.Validation{}, err
 	}
-	_, setRevision, err := managed.FragmentRevision(document)
-	if err != nil {
-		return config.Document{}, managed.Validation{}, err
-	}
 	sets[owner] = document
-	candidate, _, candidateRevision, _, err := s.compile(sets)
+	candidate, _, candidateRevision, fragments, err := s.compile(sets)
 	if err != nil {
 		return config.Document{}, managed.Validation{}, err
 	}
+	setRevision := fragments[owner].version
+
 	return candidate, managed.Validation{
 		Owner: owner, SetRevision: setRevision,
 		ActiveRevision:    current.Version,
@@ -372,36 +370,46 @@ func (s *Store) ReplaceSet(
 	if err != nil {
 		return managed.ReplaceResult{}, err
 	}
-	_, previousRevision, err := managed.FragmentRevision(sets[owner])
-	if err != nil {
-		return managed.ReplaceResult{}, err
-	}
-	nextRaw, nextRevision, err := managed.FragmentRevision(document)
-	if err != nil {
-		return managed.ReplaceResult{}, err
-	}
-	if nextRevision == previousRevision {
-		metadata, err := readSetMetadata(ctx, tx, owner)
+	previous := make(map[managed.Owner]config.Version, len(sets))
+	for setOwner, fragment := range sets {
+		_, revision, err := managed.FragmentRevision(fragment)
 		if err != nil {
 			return managed.ReplaceResult{}, err
 		}
-		return managed.ReplaceResult{
-			Set: metadata, Current: current, Changed: false,
-		}, nil
+		previous[setOwner] = revision
 	}
 	sets[owner] = document
-	_, mergedRaw, mergedVersion, _, err := s.compile(sets)
+	_, mergedRaw, mergedVersion, fragments, err := s.compile(sets)
 	if err != nil {
 		return managed.ReplaceResult{}, err
 	}
+
+	// The reserved shared provider is the only normalization that can move
+	// configuration across owners. Commit every affected fragment together so
+	// readers never see duplicate providers or dangling deployment references.
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE gateway_config_managed_sets
-		SET revision_id = ?, document_json = ?, updated_at = ?, updated_by = ?, reason = ?
-		WHERE owner = ?
-	`, nextRevision, nextRaw, formatTime(now), options.Actor, nullString(options.Reason), owner); err != nil {
-		return managed.ReplaceResult{}, fmt.Errorf("replace SQLite managed set: %w", err)
+	changed := false
+	for setOwner, fragment := range fragments {
+		if fragment.version == previous[setOwner] {
+			continue
+		}
+		changed = true
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE gateway_config_managed_sets
+			SET revision_id = ?, document_json = ?, updated_at = ?, updated_by = ?, reason = ?
+			WHERE owner = ?
+		`, fragment.version, fragment.raw, formatTime(now), options.Actor, nullString(options.Reason), setOwner); err != nil {
+			return managed.ReplaceResult{}, fmt.Errorf("replace SQLite managed set: %w", err)
+		}
 	}
+	metadata, err := readSetMetadata(ctx, tx, owner)
+	if err != nil {
+		return managed.ReplaceResult{}, err
+	}
+	if !changed {
+		return managed.ReplaceResult{Set: metadata, Current: current, Changed: false}, nil
+	}
+
 	currentState := current
 	if mergedVersion != current.Version {
 		currentState = managed.Current{
@@ -421,14 +429,7 @@ func (s *Store) ReplaceSet(
 		return managed.ReplaceResult{}, fmt.Errorf("commit SQLite managed-set replacement: %w", err)
 	}
 	s.notify(mergedVersion)
-	return managed.ReplaceResult{
-		Set: managed.SetMetadata{
-			Owner: owner, Revision: nextRevision, UpdatedAt: now,
-			UpdatedBy: options.Actor, Reason: options.Reason,
-		},
-		Current: currentState,
-		Changed: true,
-	}, nil
+	return managed.ReplaceResult{Set: metadata, Current: currentState, Changed: true}, nil
 }
 
 func (s *Store) Close() error {
@@ -452,6 +453,10 @@ type compiledFragment struct {
 func (s *Store) compile(
 	sets map[managed.Owner]config.Document,
 ) (config.Document, []byte, config.Version, map[managed.Owner]compiledFragment, error) {
+	sets, err := managed.NormalizeSparkrunProvider(sets)
+	if err != nil {
+		return config.Document{}, nil, "", nil, fmt.Errorf("%w: %v", ErrInvalidConfiguration, err)
+	}
 	document, err := managed.Merge(sets)
 	if err != nil {
 		return config.Document{}, nil, "", nil, fmt.Errorf("%w: %v", ErrInvalidConfiguration, err)

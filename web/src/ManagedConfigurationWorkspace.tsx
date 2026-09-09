@@ -97,9 +97,11 @@ export function ManagedConfigurationWorkspace({
         setActiveDocument(active.document);
         setDiscoveredMetadata(discovered);
       }
+      return true;
     } catch (error) {
       setValidatedCandidate(undefined);
       setNotice(errorNotice(error));
+      return false;
     } finally {
       setBusy("");
     }
@@ -213,11 +215,9 @@ export function ManagedConfigurationWorkspace({
         storedRevision,
         "",
       );
-      setStoredRevision(result.current.revision);
-      setSets((current) => current.map((set) => (
-        set.owner === selectedOwner ? result.managed_set : set
-      )));
-      setStoredDocuments((current) => ({ ...current, [selectedOwner]: parsed.document }));
+      // Saving can consolidate the shared sparkrun provider into the generated
+      // set. Reload both fragments so ownership, draft and revision match storage.
+      if (!await load()) return;
       setNotice({
         kind: "success",
         text: result.changed

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sparksq/sparkroute/pkg/config"
+	"github.com/sparksq/sparkroute/pkg/config/managed"
 	"github.com/sparksq/sparkroute/pkg/modelrouter"
 )
 
@@ -142,12 +143,6 @@ func resolveDetails(ctx context.Context, catalog Catalog, reference string, over
 // PrepareRecipeDraft returns a complete operator draft; it never saves or launches.
 // Reusing a workload also reuses its lifecycle policy, including generated entries.
 func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generated config.Document, input RecipeDraft) (config.Document, string, bool, error) {
-	operator.Providers = slices.Clone(operator.Providers)
-	for i, provider := range operator.Providers {
-		if provider.Name == "sparkrun:operator" && (reflect.DeepEqual(provider, config.Provider{Name: provider.Name, Type: "openai"}) || reflect.DeepEqual(provider, config.Provider{Name: provider.Name, Type: "openai_compatible"})) {
-			operator.Providers[i].Type = "sparkrun"
-		}
-	}
 
 	details, err := resolveDetails(ctx, catalog, input.Reference, input.Overrides)
 	if err != nil {
@@ -253,28 +248,23 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	if !reused {
 		digest := sha256.Sum256([]byte(details.Revision + "\x00" + strings.Join(candidates, "\x00")))
 		deploymentName = "sparkrun:" + hex.EncodeToString(digest[:12])
-		providerName := "sparkrun:operator"
+		providerName := managed.SharedSparkrunProvider
 		provider := config.Provider{Name: providerName, Type: "sparkrun"}
 		found := false
 		for _, existing := range append(slices.Clone(operator.Providers), generated.Providers...) {
 			if existing.Name == providerName {
-				if existing.Type == "openai" || existing.Type == "openai_compatible" {
-					existing.Type = "sparkrun"
-					for i := range operator.Providers {
-						if operator.Providers[i].Name == providerName {
-							operator.Providers[i] = existing
-						}
-					}
-				}
 				if !reflect.DeepEqual(existing, provider) {
-					return operator, "", false, fmt.Errorf("the reserved sparkrun provider has conflicting settings")
+					return operator, "", false, fmt.Errorf("the shared sparkrun provider has conflicting settings")
 				}
 				found = true
 			}
 		}
 		if !found {
-			operator.Providers = append(operator.Providers, provider)
+			// Keep an empty-install draft complete. The managed store moves this
+			// reserved provider into the sparkrun set atomically on Save.
+			operator.Providers = append(slices.Clone(operator.Providers), provider)
 		}
+
 		source := config.EndpointSource{Type: config.EndpointSourceActivatable, Controller: "sparkrun", Recipe: details.Reference,
 			RecipeRevision: details.Revision, ClusterCandidates: candidates, Overrides: input.Overrides,
 			ActivationTimeout: input.ActivationTimeout, IdleTTL: input.IdleTTL, IdleAction: input.IdleAction, ColdStart: config.ColdStartWait,

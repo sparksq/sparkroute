@@ -92,7 +92,21 @@ explicit capacity checks, and optional idle sleep for ColdSnap recipes. Catalog
 metadata filters use declared values and preserve unknowns. Registry controls
 require explicit trust acknowledgement; browsing never refreshes automatically.
 
-The `sparkrun` provider delegates endpoint management to the integration. Native
+Generated and operator-created deployments share the provider named `sparkrun`,
+with type `sparkrun` and no provider-level overrides. The managed store keeps
+this reserved provider in the read-only sparkrun set. Saving the first recipe
+creates it there even without a prior plugin sync; a later sync reuses it, and
+removing generated inventory cannot remove a provider still used by an operator
+binding. Other providers retain the normal ownership and collision rules.
+
+On the next configuration Save or sync, the store migrates uncustomized legacy
+`sparkrun:operator` providers and their lifecycle deployment references to the
+shared provider. Both fragments and the merged configuration are committed in
+one transaction. Deployment IDs, binding revisions, aliases and lifecycle
+settings are preserved; customized providers and non-lifecycle uses are left
+alone. Validate previews this normalization without changing stored state.
+
+The shared provider delegates endpoint management to the integration. Native
 APIs are per deployment/runtime: vLLM offers Chat Completions, Responses, and
 Anthropic Messages by default, including nightly/custom images. Recognized vLLM
 versions older than 0.12.0 default to Chat Completions only. Recipe
