@@ -3360,8 +3360,10 @@ button:disabled {
 .routing-stage-warning { padding: 0 22px 14px; color: var(--muted); font-size: .8rem; }
 .routing-stage-warning p { line-height: 1.5; }
 
-.sparkrun-removal { margin: 0 22px 18px; }
-.sparkrun-removal .notice { margin-top: 12px; overflow-wrap: anywhere; }
+.sparkrun-removal .model-form-heading { flex-wrap: wrap; }
+.sparkrun-removal .model-form-heading > div { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
+.sparkrun-removal .model-form-heading > button { flex-shrink: 0; }
+.sparkrun-removal .notice { margin: 12px 22px 18px; overflow-wrap: anywhere; }
 .sparkrun-removal .notice p + p { margin-top: 8px; }
 .sparkrun-removal ul { padding-left: 20px; }
 .sparkrun-exclusions { padding: 20px; border-top: 1px solid var(--line); }

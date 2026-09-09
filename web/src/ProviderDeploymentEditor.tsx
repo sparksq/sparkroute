@@ -313,10 +313,11 @@ export function ProviderDeploymentEditor({
           />
         ) : selectedDeployment && sparkrun && objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? (
           <>
-            <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} hideRemove={readOnlySelected && allowGeneratedRemoval} />
             {readOnlySelected && allowGeneratedRemoval && readOnlyDocument ? <SparkrunRemoval
               key={stringValue(selectedDeployment.name)} document={document} generated={readOnlyDocument}
-              deployments={[stringValue(selectedDeployment.name)]} disabled={disabled} onChange={onChange} /> : null}
+              deployments={[stringValue(selectedDeployment.name)]} disabled={disabled} onChange={onChange}
+              heading={<div><p className="eyebrow">sparkrun workload</p><h3>{deploymentTitle(selectedDeployment)}</h3></div>} />
+              : <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />}
             <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
             {readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <p className="notice info">
               This deployment is retained by a recipe binding in sparkrun’s proxy.yaml, even while its workload is stopped.

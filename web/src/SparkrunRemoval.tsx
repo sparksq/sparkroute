@@ -1,18 +1,23 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { ConfigurationDocument } from "./types";
 import { deploymentChoices } from "./deploymentTitles";
 import { excludedSparkrunDeployments, setSparkrunExclusions, sparkrunRemovalPreview } from "./sparkrunExclusions";
 
-export function SparkrunRemoval({document, generated, deployments, disabled, onChange}: {
+export function SparkrunRemoval({document, generated, deployments, disabled, onChange, heading}: {
   document: ConfigurationDocument; generated: ConfigurationDocument; deployments: string[];
   disabled: boolean; onChange: (document: ConfigurationDocument) => void;
+  heading?: ReactNode;
 }) {
   const [confirm, setConfirm] = useState(false);
   const preview = sparkrunRemovalPreview(document, generated, deployments);
   const titles = deploymentChoices(document, generated);
   return <section className="sparkrun-removal" aria-label="Remove generated sparkrun entry">
+    <div className="model-form-heading">
+    {heading}
     <button type="button" className="danger-button" disabled={disabled || !deployments.length}
       onClick={() => setConfirm(!confirm)}>{confirm ? "Cancel removal" : "Remove from sparkroute"}</button>
+    </div>
     {confirm && <div className="notice info">
       <p>Exclude {deployments.map(id => titles[id] || id).join(", ")} from sparkroute. Future syncs will keep it excluded. Running workloads are left alone.</p>
       {preview.removed.length > 0 && <p>Generated names and their aliases removed: {preview.removed.join(", ")}.</p>}

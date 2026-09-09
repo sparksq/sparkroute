@@ -194,12 +194,15 @@ export function VirtualModelEditor({
         {selected && readOnlySelected ? <p className="read-only-note">sparkrun generated · Model and routing settings are read only. Policy assignments are operator managed.</p> : null}
         {selected ? (
           <>
-            <div className="model-form-heading">
+            {readOnlySelected && allowGeneratedRemoval && readOnlyDocument ? <SparkrunRemoval
+              key={selectedName} document={document} generated={readOnlyDocument} deployments={modelDeploymentNames(selected)}
+              disabled={disabled} onChange={onChange}
+              heading={<div><p className="eyebrow">Logical product and routing boundary</p><h3>{stringValue(selected.name) || "Unnamed virtual model"}</h3></div>} /> : <div className="model-form-heading">
               <div>
                 <p className="eyebrow">Logical product and routing boundary</p>
                 <h3>{stringValue(selected.name) || "Unnamed virtual model"}</h3>
               </div>
-              {!readOnlySelected || !allowGeneratedRemoval ? <button
+              <button
                 className={confirmRemove ? "danger-button confirm" : "danger-button"}
                 disabled={formDisabled}
                 onBlur={() => setConfirmRemove(false)}
@@ -207,12 +210,8 @@ export function VirtualModelEditor({
                 type="button"
               >
                 {confirmRemove ? "Confirm remove" : "Remove model"}
-              </button> : null}
-            </div>
-
-            {readOnlySelected && allowGeneratedRemoval && readOnlyDocument ? <SparkrunRemoval
-              key={selectedName} document={document} generated={readOnlyDocument} deployments={modelDeploymentNames(selected)}
-              disabled={disabled} onChange={onChange} /> : null}
+              </button>
+            </div>}
 
             {!readOnlySelected && selectedRoutingUses.length > 0 ? (
               <p className="notice info" role="status">Used by model routing: {selectedRoutingUses.join("; ")}.
