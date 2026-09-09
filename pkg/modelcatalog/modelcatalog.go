@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package modelcatalog defines exact-name, tenant-scoped virtual-model
 // resolution. A Resolver is an external adapter; Directory is the mandatory
 // validating, bounded, and coalescing boundary used by the gateway.

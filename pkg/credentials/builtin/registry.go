@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package builtin composes the credential sources shipped with the standalone
 // gateway. Sources are initialized only when the active document references
 // their scheme.

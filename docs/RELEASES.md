@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Scitrera LLC
+SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 # SparkRoute OSS releases
 
 The public repository is `sparksq/sparkroute`. Build and release from its root;
@@ -39,3 +45,41 @@ available just because the standalone routing container is running.
 SparkRun's plugin verifies a pinned archive digest before using any release.
 Keep the archive with its notices when distributing the extracted executable.
 Development overrides are explicit and do not qualify a published release pin.
+
+## Public release qualification
+
+For v0.0.1, first run the Release workflow manually on the intended `main`
+commit. Require successful Go/web, license/notice, archive, and native-platform
+jobs before creating the tag. A job that never starts is not a passing check.
+Changing repository visibility and creating the release tag are separate manual
+decisions; neither happens during a source audit.
+
+File licensing follows [REUSE 3.3](https://reuse.software/spec-3.3/). Commentable
+source has SPDX headers; `REUSE.toml` covers generated data and immutable fixtures.
+The BSD-3-Clause helper scripts retain their original license. Run:
+
+```sh
+(cd web && npm ci)
+python3 scripts/collect-third-party-notices.py --check
+uvx --from reuse==6.2.0 reuse lint
+gitleaks git . --log-opts=--all --redact=100
+```
+
+Use Gitleaks 8.30.1 or a reviewed newer version. Scan all history intended for
+publication, not just the working tree. Review findings before publishing;
+do not commit scan reports containing secrets. Also review tracked fixtures,
+documentation, and Git author metadata for material unsuitable for publication.
+
+Dependency updates require a fresh `govulncheck ./...` and `npm audit`, notice
+regeneration, and a console rebuild. The notice collector covers packages linked
+into `cmd/sparkroute` with `CGO_ENABLED=0` on all six platforms and production npm
+dependencies. It retains upstream license and notice texts with SHA-256 hashes;
+review newly introduced components and license terms rather than assuming that
+successful generation alone establishes compatibility. Go's toolchain license
+is included. Container base-image contents retain their upstream licensing;
+the runtime uses the pinned Debian 12 distroless image family.
+
+The console exposes the full notices at `/admin/legal.html`; the same dependency
+bundle ships beside the executable in every archive and under `/licenses` in the
+container. Keep the exact corresponding source available at the commit reported
+by `--build-info` and the console's Source link, including for modified builds.

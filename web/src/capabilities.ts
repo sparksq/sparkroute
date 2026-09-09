@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Shared structured-UI choices. Other declarations remain supported in JSON
 // and must survive edits to these visible capabilities.
 export const capabilityOptions = [

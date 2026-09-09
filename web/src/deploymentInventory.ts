@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import type { GatewayStatus, LifecycleBindingStatus, LifecycleSnapshot, RuntimeEndpoint, TargetStatus } from "./types";
 
 export type WorkloadState = "running" | "stopped" | "sleeping" | "starting" | "stopping" | "draining" | "failed" | "unknown" | "external";

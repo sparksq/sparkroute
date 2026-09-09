@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";

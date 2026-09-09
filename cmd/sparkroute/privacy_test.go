@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package main
 
 import (
@@ -51,7 +55,7 @@ func TestPrivacyRuntimeRequestIsDiskFreeAndConversationSurvivesRestart(t *testin
 		t.Fatal(err)
 	}
 	restarted := &privacyRuntime{ctx: context.Background(), path: path}
-	defer restarted.Close()
+	defer func() { _ = restarted.Close() }()
 	provider, err = restarted.ForDocument(piiDocument(config.PIIScopeConversation))
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +99,7 @@ func TestPrivacyRuntimeNeverReplacesMissingKeyForExistingDatabase(t *testing.T) 
 func TestPrivacyRuntimeEnablesConversationStorageForAssignedProfile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "private", "mappings.sqlite")
 	runtime := &privacyRuntime{ctx: context.Background(), path: path}
-	defer runtime.Close()
+	defer func() { _ = runtime.Close() }()
 	ref := "conversation"
 	document := config.Document{PIIProfiles: map[string]config.PIIPolicy{ref: {Scope: config.PIIScopeConversation}}, ModelPolicies: map[string]config.ModelPolicyAssignment{"generated": {PIIProfile: &ref}}}
 	if _, err := runtime.ForDocument(document); err != nil {

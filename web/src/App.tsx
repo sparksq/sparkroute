@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { piiVirtualModelExtension } from "./PIIEditor";
 import {
   type ComponentType,
@@ -416,6 +420,7 @@ function ConsoleLayout({
         <div className="sidebar-footer">
           <span>Gateway</span>
           <strong>{bootstrap.gateway_version || "development"}</strong>
+          <a href="/admin/legal.html" target="_blank" rel="noreferrer">License &amp; notices</a>
           {bootstrap.build && (
             <a href={bootstrap.build.source} target="_blank" rel="noreferrer">
               {bootstrap.build.license} · Source {bootstrap.build.commit.slice(0, 12)}

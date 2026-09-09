@@ -1,0 +1,445 @@
+{
+  "components": [
+    {
+      "name": "Go",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "path": "PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        }
+      ],
+      "version": "go1.25.14"
+    },
+    {
+      "name": "github.com/cenkalti/backoff/v5",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "5c0476add4c38b55d0ed5ac11b85e00c38f26e1caee20dfe3ab58190103d1fbc"
+        }
+      ],
+      "version": "v5.0.3"
+    },
+    {
+      "name": "github.com/cespare/xxhash/v2",
+      "notices": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c"
+        }
+      ],
+      "version": "v2.3.0"
+    },
+    {
+      "name": "github.com/dustin/go-humanize",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71"
+        }
+      ],
+      "version": "v1.0.1"
+    },
+    {
+      "name": "github.com/go-logr/logr",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        }
+      ],
+      "version": "v1.4.3"
+    },
+    {
+      "name": "github.com/go-logr/stdr",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "version": "v1.2.2"
+    },
+    {
+      "name": "github.com/google/uuid",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "0a8d61ed3cbfd5312326e8126c31ce9c627a283adc99131b56896d29ada04b2d"
+        }
+      ],
+      "version": "v1.6.0"
+    },
+    {
+      "name": "github.com/grpc-ecosystem/grpc-gateway/v2",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "a15b1d1b168954c92ff7fb1620382418f7c72f4f4d251ee791d1098ad68ab0c4"
+        },
+        {
+          "path": "internal/casing/LICENSE.md",
+          "sha256": "20873bd48d04a4e4075ee881ec2a5f3a3b14bf4920018b1131a7c52ec9b4a318"
+        }
+      ],
+      "version": "v2.29.0"
+    },
+    {
+      "name": "github.com/mattn/go-isatty",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1"
+        }
+      ],
+      "version": "v0.0.20"
+    },
+    {
+      "name": "github.com/ncruces/go-strftime",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "38ae43959daf953a393a585b2988672cb65a5a541aca0d0be5e72595a0a16883"
+        }
+      ],
+      "version": "v1.0.0"
+    },
+    {
+      "name": "github.com/remyoudompheng/bigfft",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d"
+        }
+      ],
+      "version": "v0.0.0-20230129092748-24d4a6f8daec"
+    },
+    {
+      "name": "github.com/scitrera/go-llm",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "e02fed7e7074e22233196cdf9c6fe7d95058ca935295777acdd0ffc6fce10fe7"
+        },
+        {
+          "path": "NOTICE",
+          "sha256": "4fc0872417b3ed2446c5c498df4632249dd28c0b97ecfb0507faf3c5b9f399aa"
+        }
+      ],
+      "version": "v0.3.0"
+    },
+    {
+      "name": "go.opentelemetry.io/auto/sdk",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "version": "v1.2.1"
+    },
+    {
+      "name": "go.opentelemetry.io/otel",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/metric",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/sdk",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/sdk/metric",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/otel/trace",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "1ae07514be1d7bb33f0698f8d91fb51b8b9fe1463157ec1c72081a49b9bc6f40"
+        }
+      ],
+      "version": "v1.44.0"
+    },
+    {
+      "name": "go.opentelemetry.io/proto/otlp",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "version": "v1.10.0"
+    },
+    {
+      "name": "golang.org/x/net",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "path": "PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        }
+      ],
+      "version": "v0.56.0"
+    },
+    {
+      "name": "golang.org/x/sys",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "path": "PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        }
+      ],
+      "version": "v0.46.0"
+    },
+    {
+      "name": "golang.org/x/text",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "path": "PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        }
+      ],
+      "version": "v0.39.0"
+    },
+    {
+      "name": "google.golang.org/genproto/googleapis/api",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "version": "v0.0.0-20260526163538-3dc84a4a5aaa"
+    },
+    {
+      "name": "google.golang.org/genproto/googleapis/rpc",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "version": "v0.0.0-20260526163538-3dc84a4a5aaa"
+    },
+    {
+      "name": "google.golang.org/grpc",
+      "notices": [
+        {
+          "path": "AUTHORS",
+          "sha256": "627c695f80fdac6412d66e6ad4160a4acb41923ca7ee3fd7e112e105f0ff46b9"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "NOTICE.txt",
+          "sha256": "693ff28ec216d5112ac1bbfe64ef539005867d1c7bd427b57d579683293b947f"
+        }
+      ],
+      "version": "v1.82.1"
+    },
+    {
+      "name": "google.golang.org/protobuf",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "4835612df0098ca95f8e7d9e3bffcb02358d435dbb38057c844c99d7f725eb20"
+        },
+        {
+          "path": "PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        }
+      ],
+      "version": "v1.36.11"
+    },
+    {
+      "name": "modernc.org/libc",
+      "notices": [
+        {
+          "path": "AUTHORS",
+          "sha256": "b164ff1da4615d0ad236250dac4692e21d180ef556a2fa401829b41b4bb80d7d"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600"
+        },
+        {
+          "path": "LICENSE-3RD-PARTY.md",
+          "sha256": "f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c"
+        }
+      ],
+      "version": "v1.70.0"
+    },
+    {
+      "name": "modernc.org/mathutil",
+      "notices": [
+        {
+          "path": "AUTHORS",
+          "sha256": "51fcdd68bb605f080283bb6eabb72452591289650599d3d67603381834e536af"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "bfa9bf72a72ca009fd62a8f84fca3dca67e51d93af96352723646599898b6cf5"
+        },
+        {
+          "path": "mersenne/AUTHORS",
+          "sha256": "f79ff8b413938c3ce7c60db12242a663d8e840249bd838fcf58f4aaccfec5454"
+        },
+        {
+          "path": "mersenne/LICENSE",
+          "sha256": "c05630f9ca899ea094620d37daea6ba66f99adbf9268ea5fea9db607e1102bd9"
+        }
+      ],
+      "version": "v1.7.1"
+    },
+    {
+      "name": "modernc.org/memory",
+      "notices": [
+        {
+          "path": "AUTHORS",
+          "sha256": "df1f424436f279309de85b82e494d548297a2570e9b5794630d7e72c9eb50b6a"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "59895e669f48f168b6b858358f6005779cdf40a265f7828813061b56af67b496"
+        },
+        {
+          "path": "LICENSE-GO",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+        },
+        {
+          "path": "LICENSE-MMAP-GO",
+          "sha256": "c2eba69f20d05414538c3a5df7694dde392e065ff70882e1625e90f5d6659fff"
+        }
+      ],
+      "version": "v1.11.0"
+    },
+    {
+      "name": "modernc.org/sqlite",
+      "notices": [
+        {
+          "path": "AUTHORS",
+          "sha256": "37ba1c249409a736fe6a65c0918e8a2af97fdb49238e05da4f5e0309ea09ba34"
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "c6fe05491a60ae13bcd223088d2705e36dede24e5587226231d2459ada5c4822"
+        }
+      ],
+      "version": "v1.48.1"
+    },
+    {
+      "name": "npm:react",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "version": "19.2.8"
+    },
+    {
+      "name": "npm:react-dom",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "version": "19.2.8"
+    },
+    {
+      "name": "npm:scheduler",
+      "notices": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "version": "0.27.0"
+    }
+  ],
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64",
+    "darwin/amd64",
+    "darwin/arm64",
+    "windows/amd64",
+    "windows/arm64"
+  ],
+  "schema_version": 1
+}

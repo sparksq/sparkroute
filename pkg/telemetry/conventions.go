@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package telemetry provides OpenTelemetry instrumentation for the gateway data
 // plane. It deliberately separates backend-specific attributes from the core
 // GenAI vocabulary so a profile can add sink compatibility without coupling

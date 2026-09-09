@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package pii provides bounded, request-scoped PII substitution primitives.
 // It deliberately separates deterministic span detection from protocol-aware
 // request and response traversal, which remains the gateway's responsibility.

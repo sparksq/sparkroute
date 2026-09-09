@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useEffect, useRef, useState } from "react";
 import { sparkRunCatalog, type SparkrunOperation } from "./api";
 type Capacity = {cluster: string; observed_at: number; hosts: {host: string; reachable: boolean; free_slots: number | null; used_slots: number | null; workloads: number | null}[]};

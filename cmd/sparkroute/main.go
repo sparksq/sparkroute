@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package main
 
 import (
@@ -730,7 +734,11 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		}
 	}
 	privacyRuntime := &privacyRuntime{ctx: ctx, path: *piiSQLitePath, keyPath: *piiKeyringFile}
-	defer privacyRuntime.Close()
+	defer func() {
+		if err := privacyRuntime.Close(); err != nil {
+			logger.Error("close PII mapping storage", "error", err)
+		}
+	}()
 	runtimeOptions := runtimeBuildOptions{
 		Privacy:     privacyRuntime,
 		TraceStores: newTraceStores(*traceStorage, tracePath, traceStore), TraceReader: traceStore,

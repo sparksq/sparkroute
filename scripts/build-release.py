@@ -22,6 +22,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORMS = tuple(f"{system}/{arch}" for system in ("linux", "darwin", "windows") for arch in ("amd64", "arm64"))
+RELEASE_NOTICES = ("LICENSE", "NOTICE", "COPYRIGHT", "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_LICENSES.txt", "third-party-manifest.json", "README.md")
+
+
+def release_notices(root: Path) -> dict[str, tuple[bytes, int]]:
+    files = {name: ((root / name).read_bytes(), 0o644) for name in RELEASE_NOTICES}
+    for path in sorted((root / "LICENSES").glob("*")):
+        if path.is_file():
+            files[path.relative_to(root).as_posix()] = (path.read_bytes(), 0o644)
+    return files
 
 
 def identity(root: Path) -> tuple[str, str]:
@@ -69,12 +78,7 @@ def build(go: str, platforms: list[str], output: Path) -> list[Path]:
         "source": "https://github.com/sparksq/sparkroute/tree/" + commit,
         "license": "AGPL-3.0-only",
     }, sort_keys=True, indent=2).encode() + b"\n"
-    files = {"build-info.json": (identity_file, 0o644)}
-    for name in ("LICENSE", "NOTICE", "COPYRIGHT", "THIRD_PARTY_NOTICES.md", "README.md"):
-        files[name] = ((ROOT / name).read_bytes(), 0o644)
-    for path in sorted((ROOT / "LICENSES").glob("*")):
-        if path.is_file():
-            files[path.relative_to(ROOT).as_posix()] = (path.read_bytes(), 0o644)
+    files = {"build-info.json": (identity_file, 0o644), **release_notices(ROOT)}
     artifacts = []
     with tempfile.TemporaryDirectory(prefix="sparkroute-release-") as temporary:
         binary = Path(temporary) / "sparkroute"

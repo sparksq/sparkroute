@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import type { JSONObject, VirtualModelEditorContext, VirtualModelEditorExtension } from "./extensions";
 
 const defaultPIIEntities = ["email", "phone", "ssn", "credit_card", "ipv4"] as const;

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import type { ConfigurationDocument } from "./types";
 
 export function deploymentTitle(deployment: Record<string, unknown>): string {

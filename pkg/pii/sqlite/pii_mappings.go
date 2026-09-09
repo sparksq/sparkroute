@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package sqlite
 
 import (
@@ -29,7 +33,7 @@ func (s *Store) LoadPIIMappings(
 	if err != nil {
 		return nil, fmt.Errorf("begin SQLite PII mapping load: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	nowNS := now.UTC().UnixNano()
 	if _, err = tx.ExecContext(ctx, `
 		UPDATE llm_pii_conversation_mappings
@@ -65,12 +69,12 @@ func (s *Store) LoadPIIMappings(
 			&record.Nonce, &record.Ciphertext, &record.OriginalBytes,
 			&createdNS, &usedNS, &expiresNS, &absoluteNS,
 		); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, fmt.Errorf("scan SQLite PII mapping: %w", err)
 		}
 		totalBytes += record.OriginalBytes
 		if len(records) >= limits.MaximumMappings || totalBytes > limits.MaximumOriginalBytes {
-			rows.Close()
+			_ = rows.Close()
 			return nil, privacy.ErrConversationLimit
 		}
 		record.CreatedAt = time.Unix(0, createdNS).UTC()
@@ -80,7 +84,7 @@ func (s *Store) LoadPIIMappings(
 		records = append(records, record)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return nil, fmt.Errorf("iterate SQLite PII mappings: %w", err)
 	}
 	if err := rows.Close(); err != nil {
@@ -111,7 +115,7 @@ func (s *Store) PutPIIMappingIfAbsent(
 	if err != nil {
 		return privacy.EncryptedMapping{}, fmt.Errorf("begin SQLite PII mapping write: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	nowNS := now.UTC().UnixNano()
 	if _, err = tx.ExecContext(ctx, `
 		DELETE FROM llm_pii_conversation_mappings

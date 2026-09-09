@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Scitrera LLC
+SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 # sparkrun named-cluster display metadata
 
 Bridge schema **4** includes optional `cluster_name` to endpoint replies from

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package otlpexport builds OpenTelemetry SDK providers backed by OTLP/HTTP.
 // It is kept separate from package telemetry so library users that supply their
 // own providers do not need to initialize globals or adopt this bootstrap.

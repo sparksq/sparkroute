@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Command traceverify reconciles black-box request evidence with a canonical
 // SparkRoute JSONL trace export. It fails if any gateway-handled request is
 // missing or duplicated; optional strict mode also rejects unrelated traces.

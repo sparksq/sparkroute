@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package version carries the identity this binary reports to anything outside
 // the process: `--version`, the User-Agent sent to upstream providers, and the
 // telemetry distro attributes.

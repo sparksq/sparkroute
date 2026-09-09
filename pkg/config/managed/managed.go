@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package managed defines the single-process, ownership-aware configuration
 // contract used by the mutable standalone profile. Managed sets are fragments; only
 // their deterministic merge is a runnable gateway configuration.

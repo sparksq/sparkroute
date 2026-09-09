@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package savedtrace
 
 import (
@@ -378,7 +382,6 @@ func newBlockingStore() *blockingStore {
 }
 
 func (s *blockingStore) Append(ctx context.Context, record Record) error {
-	s.startedCount.Add(1)
 	current := s.concurrent.Add(1)
 	defer s.concurrent.Add(-1)
 	for {
@@ -387,6 +390,9 @@ func (s *blockingStore) Append(ctx context.Context, record Record) error {
 			break
 		}
 	}
+	// Publish "started" only after concurrency accounting is visible. The test
+	// may release every blocked writer as soon as it observes the fourth start.
+	s.startedCount.Add(1)
 	s.started <- struct{}{}
 	select {
 	case <-s.release:

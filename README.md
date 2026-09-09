@@ -1,8 +1,14 @@
+<!--
+SPDX-FileCopyrightText: 2026 Scitrera LLC
+SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 # SparkRoute OSS
 
 SparkRoute OSS is a standalone, provider-neutral AI gateway distributed under
-AGPL-3.0-only. It is the local/Sparkrun distribution of SparkRoute and the base
-module used by the enterprise edition.
+AGPL-3.0-only. It runs independently or integrates with Sparkrun for local model discovery
+and on-demand workload management.
 
 The Go module is `github.com/sparksq/sparkroute`. Provider protocol clients and
 intermediate request/response types come from the independently reusable
@@ -27,13 +33,17 @@ Apache-2.0 `github.com/scitrera/go-llm v0.3.0` module.
 - exported storage, identity, routing, lifecycle, telemetry, model-catalog,
   and PII-provider extension seams used by downstream compositions.
 
-PostgreSQL/TimescaleDB, cross-tenant trusted-network authentication, Aether,
-MLflow relay, concrete PII detection/reversible substitution/persistence,
-replicated coordination, and the Kubernetes chart are not OSS runtime
-dependencies. An OSS data plane rejects an enabled `privacy.pii` policy unless
-a downstream `privacy.Provider` is injected.
+Optional PII detection and reversible substitution are included, with memory or
+SQLite mapping storage. See [Privacy and guardrails](docs/PRIVACY_AND_GUARDRAILS.md).
+SparkRoute runs as a single gateway process; managed configuration and local
+storage do not require an external database.
 
 ## Run
+
+Build from source with Go 1.25.14 or newer. The embedded console is committed,
+so running the Go command does not require Node. Release archives and checksums
+will be available from [GitHub Releases](https://github.com/sparksq/sparkroute/releases).
+See [Release builds](docs/RELEASES.md) for supported platforms and verification.
 
 ```sh
 go run ./cmd/sparkroute -config ./examples/config.yaml
@@ -109,6 +119,8 @@ request, trace, and allowlisted metadata filters. Tenant remains an empty,
 fixed scope in OSS.
 
 ## Development
+
+Use the toolchain pinned in `versions.yaml` and Node 24 for frontend changes.
 
 ```sh
 go test ./...
@@ -188,7 +200,7 @@ are managed through that parent’s table. Existing profiles remain explicit vir
 models sharing the original deployment.
 
 See the [named-cluster bridge contract](docs/SPARKRUN_CLUSTER_METADATA_CONTRACT.md)
-for schema v3 requirements and treatment of older job metadata.
+for schema v4 requirements and treatment of older job metadata.
 
 ## On-demand sparkrun models
 
@@ -204,11 +216,13 @@ readiness checks, and routes to the assigned port. Aliases share one workload.
 The cluster's actual name is saved even when it was selected as the default.
 Unrecognized API model names never cause automatic recipe selection.
 
-Cold-start wait defaults to 15 minutes. Client timeouts must allow the model to
+Cold-start wait defaults to 30 minutes. Client timeouts must allow the model to
 load. Optional idle shutdown suggests 30 minutes and begins after the last
 request completes; streaming requests hold their lease until they finish.
 Only SparkRoute-owned jobs are stopped. Deleting a route does not stop its job.
-The Runtime page shows startup phase, cluster, job, failure, and ownership.
+Overview combines active deployments and activatable models, with startup phase,
+cluster, job ownership, circuit health, and Start/Stop controls. ColdSnap workloads
+also offer Sleep/Wake. Activity and Diagnostics provide runtime detail.
 
 Search is cache-only. **Refresh registries** explicitly updates caches and keeps
 usable results when a registry fails. Browser uploads are limited to one YAML
@@ -231,7 +245,7 @@ The catalog uses the local sparkrun bridge even before the first deployment
 exists. Install the paired plugin and a sparkrun build with the public catalog
 API, then enable `gateway.sparkroute`. Without that integration, ordinary cloud
 provider configuration continues to work. Gateway and plugin require bridge
-schema v3 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).
+schema v4 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).
 
 ## Native provider configuration
 
@@ -324,3 +338,12 @@ See [PII and guardrails](docs/PRIVACY_AND_GUARDRAILS.md) for configuration,
 conversation identity, and encrypted mapping storage. Deployment size, context,
 prices, and tags feed model routing; see the
 [metadata contract](docs/SPARKRUN_MODEL_METADATA_CONTRACT.md#deployment-configuration).
+
+## License
+
+SparkRoute is licensed under [AGPL-3.0-only](LICENSE). Existing upstream notices
+and the BSD-3-Clause license on two repository helper scripts are preserved.
+[Third-party notices](THIRD_PARTY_NOTICES.md) describe provenance;
+[THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) retains dependency license texts.
+Source headers and [REUSE.toml](REUSE.toml) identify file-level licensing.
+See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md).

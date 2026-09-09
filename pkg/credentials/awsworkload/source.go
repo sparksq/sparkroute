@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package awsworkload resolves refreshable AWS workload credentials for
 // Bedrock SigV4 authentication. It intentionally implements only non-interactive
 // workload sources: environment, EKS web identity, ECS/EKS container

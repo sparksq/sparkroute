@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package sqlite
 
 import (
@@ -198,7 +202,7 @@ func TestPresetMigrationSeedsExistingOperator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	catalog, err := store.ListPresets(ctx)
 	if err != nil || catalog.ActivePreset != "default" || len(catalog.Presets) != 1 {
 		t.Fatalf("migration: %#v, %v", catalog, err)

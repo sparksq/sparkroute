@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { fetchLifecycleStatus, fetchRuntimeEndpoints, fetchRuntimeEvents, fetchStatus } from "./api";
 import { deploymentInventory, routingLabel, type DeploymentEntry } from "./deploymentInventory";

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package promptcache provides content-free, best-effort prompt-prefix route
 // affinity. It stores keyed fingerprints and route identifiers, never prompt
 // content, and is deliberately separate from hard provider-owned state.

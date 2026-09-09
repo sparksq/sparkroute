@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Scitrera LLC
+# SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
 # SPDX-License-Identifier: AGPL-3.0-only
 """Exercise the release script against disposable public and nested repositories."""
 import importlib.util
@@ -64,6 +66,26 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(archive.read('sparkroute.exe'), b'MZ fixture')
             self.assertEqual(archive.read('LICENSE'), b'AGPL')
             self.assertEqual(archive.getinfo('sparkroute.exe').date_time, (1980, 1, 1, 0, 0, 0))
+
+    def test_distribution_requires_full_dependency_notices(self):
+        for name in release.RELEASE_NOTICES:
+            (self.root / name).write_text(name)
+        (self.root / 'LICENSES').mkdir()
+        (self.root / 'LICENSES/BSD-3-Clause.txt').write_text('retained BSD text')
+        files = release.release_notices(self.root)
+        for suffix in ('.tar.gz', '.zip'):
+            archive = self.root / ('notices' + suffix)
+            release.write_archive(archive, files)
+            if suffix == '.zip':
+                with zipfile.ZipFile(archive) as handle:
+                    self.assertEqual(handle.read('THIRD_PARTY_LICENSES.txt'), b'THIRD_PARTY_LICENSES.txt')
+            else:
+                with tarfile.open(archive) as handle:
+                    self.assertEqual(handle.extractfile('THIRD_PARTY_LICENSES.txt').read(), b'THIRD_PARTY_LICENSES.txt')
+        self.assertEqual(files['LICENSES/BSD-3-Clause.txt'][0], b'retained BSD text')
+        (self.root / 'THIRD_PARTY_LICENSES.txt').unlink()
+        with self.assertRaises(FileNotFoundError):
+            release.release_notices(self.root)
 
 
 if __name__ == '__main__':

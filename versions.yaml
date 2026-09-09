@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Scitrera LLC
+# SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+# SPDX-License-Identifier: AGPL-3.0-only
+
 # Authoritative versions for SparkRoute.
 # Run: sync-versions             to apply
 # Run: sync-versions --check     to verify (CI-friendly)
@@ -43,7 +47,7 @@ ci:
         # here is what makes a released binary report its tag rather than the
         # in-tree default.
         ldflags: "-s -w -buildid= -X github.com/sparksq/sparkroute/pkg/version.Version=$VERSION -X github.com/sparksq/sparkroute/pkg/version.Commit=$COMMIT"
-        extra_files: [ LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES.md, README.md ]
+        extra_files: [ LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES.md, THIRD_PARTY_LICENSES.txt, third-party-manifest.json, README.md ]
   npm:
     # No publish job is generated for `web`: package.json marks it private, and
     # it ships embedded in the Go binary rather than to npm.

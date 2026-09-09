@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { routingModelUses } from "./modelRoutingReferences";
 import { SparkrunRemoval } from "./SparkrunRemoval";
 import { modelDeploymentNames } from "./sparkrunExclusions";

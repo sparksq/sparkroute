@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package identity defines provider-neutral caller authentication and trusted
 // attribution contracts. Protocol handlers consume only the resulting
 // content-free identity; profile-specific trust policy remains outside core.

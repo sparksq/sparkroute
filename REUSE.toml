@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Scitrera LLC
+# SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+# SPDX-License-Identifier: AGPL-3.0-only
+
+version = 1
+
+# Structured data and immutable migrations keep their original bytes.
+[[annotations]]
+path = ["COPYRIGHT", "NOTICE", "go.mod", "go.sum", "third-party-manifest.json",
+        "web/package.json", "web/package-lock.json", "web/tsconfig.json",
+        "examples/*.json", "benchmarks/blackbox/requests/*.json",
+        "benchmarks/blackbox/sparkroute-config.json",
+        "pkg/gateway/testdata/**/*.json", "pkg/gateway/testdata/**/*.sse",
+        "pkg/*/sqlite/migrations/*.sql"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["2026 Scitrera LLC", "2026 Fox Engine Ltd."]
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Generated workflows must remain byte-for-byte equal to repo-tools output.
+[[annotations]]
+path = [".github/workflows/test-go.yml", ".github/workflows/test-npm.yml", ".github/workflows/version-check.yml"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["2026 Scitrera LLC", "2026 Fox Engine Ltd."]
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Bundles include React, React DOM, and Scheduler; their MIT texts are retained.
+[[annotations]]
+path = ["pkg/adminui/ui/assets/*.js"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2026 Scitrera LLC", "2026 Fox Engine Ltd.", "Meta Platforms, Inc. and affiliates"]
+SPDX-License-Identifier = "AGPL-3.0-only AND MIT"
+
+[[annotations]]
+path = ["pkg/adminui/ui/assets/*.css", "pkg/adminui/ui/index.html"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["2026 Scitrera LLC", "2026 Fox Engine Ltd."]
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# This is a verbatim collection, not a relicensing of the upstream notices.
+[[annotations]]
+path = ["THIRD_PARTY_LICENSES.txt"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "The upstream authors identified in THIRD_PARTY_LICENSES.txt"
+SPDX-License-Identifier = "Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause AND MIT"

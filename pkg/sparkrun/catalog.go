@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package sparkrun
 
 import (
@@ -170,7 +174,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 			}
 		}
 		if slices.Contains(input.NativeAPIs, "responses") && !slices.Contains(input.NativeAPIs, "chat_completions") {
-			return operator, "", false, fmt.Errorf("Responses requires Chat Completions for this runtime")
+			return operator, "", false, fmt.Errorf("responses requires chat completions for this runtime")
 		}
 	}
 	if input.RecipeRevision == "" || input.RecipeRevision != details.Revision {

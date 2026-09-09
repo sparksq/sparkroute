@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package sparkrun integrates the standalone gateway with Sparkrun's hidden
 // one-shot JSON bridge command.
 package sparkrun

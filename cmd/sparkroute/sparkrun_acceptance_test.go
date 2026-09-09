@@ -249,7 +249,10 @@ func TestSparkrunRuntimeBoundsColdStartAndPropagatesCancellation(t *testing.T) {
 	statePath := newAcceptanceBridgeFixture(t, upstream.server.URL, acceptanceBridgeState{
 		EnsureDelayMilliseconds: 350,
 	})
-	document, _ := acceptanceRoutingDocument(false, 2, 4096, 10*time.Second, 80*time.Millisecond)
+	// Keep the workload alive across the admission observer's 100 ms polls.
+	// An 80 ms idle window could expire between polls after the first request
+	// finished, turning this queue-bound test into an idle/reactivation race.
+	document, _ := acceptanceRoutingDocument(false, 2, 4096, 10*time.Second, time.Second)
 	generation, cancelRuntime := buildAcceptanceRuntime(t, document, nil, nil)
 	defer func() {
 		cancelRuntime()

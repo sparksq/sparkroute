@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package main
 
 import (
@@ -119,7 +123,7 @@ func loadPIIKeyring(path, database string, create bool) (*pii.Keyring, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer os.Remove(file.Name())
+		defer func() { _ = os.Remove(file.Name()) }()
 		_, writeErr := io.WriteString(file, base64.StdEncoding.EncodeToString(key))
 		if writeErr == nil {
 			writeErr = file.Sync()
@@ -151,7 +155,7 @@ func loadPIIKeyring(path, database string, create bool) (*pii.Keyring, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	material, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	defer clear(material)
 	if err != nil {

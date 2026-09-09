@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package file resolves credentials from read-only files below allowlisted
 // roots. Each resolution opens the current path, supporting atomic replacement
 // and Kubernetes-style projected-volume symlink rotation.

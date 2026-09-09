@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Scitrera LLC
+# SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
 # SPDX-License-Identifier: AGPL-3.0-only
 """Qualify an actual release archive on its native controller platform."""
 from __future__ import annotations
@@ -46,10 +48,16 @@ def smoke(archive: Path):
             with zipfile.ZipFile(archive) as source:
                 binary.write_bytes(source.read(executable))
                 metadata = json.loads(source.read('build-info.json'))
+                notices = source.read('THIRD_PARTY_LICENSES.txt')
+                manifest = json.loads(source.read('third-party-manifest.json'))
         else:
             with tarfile.open(archive) as source:
                 binary.write_bytes(source.extractfile(executable).read())
                 metadata = json.load(source.extractfile('build-info.json'))
+                notices = source.extractfile('THIRD_PARTY_LICENSES.txt').read()
+                manifest = json.load(source.extractfile('third-party-manifest.json'))
+        assert b'npm:react' in notices and b'modernc.org/libc' in notices
+        assert any(component['name'] == 'Go' for component in manifest['components'])
         binary.chmod(0o700)
         info = json.loads(subprocess.check_output([str(binary), '--build-info'], text=True))
         assert info == metadata
@@ -107,6 +115,9 @@ def smoke(archive: Path):
                             raise RuntimeError('gateway failed to start: ' + log.read()) from None
                         time.sleep(0.1)
                 assert bootstrap['build'] == info
+                with urllib.request.urlopen(admin + '/admin/legal.html', timeout=10) as reply:
+                    legal = reply.read().decode()
+                    assert 'GNU AFFERO GENERAL PUBLIC LICENSE' in legal and 'npm:react' in legal
                 assert bootstrap['features']['provider_auth']
                 sign_in = request(admin + '/v1/provider-auth/openai/smoke', token='smoke-test-token')
                 assert sign_in['state'] == 'signed_out'

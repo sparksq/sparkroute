@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package privacy defines the optional privacy-provider contract used by the
 // gateway. The standalone implementation lives in pkg/pii; downstream
 // distributions may supply additional detectors and persistence backends.

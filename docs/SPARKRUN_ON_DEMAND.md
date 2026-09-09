@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Scitrera LLC
+SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 # sparkrun on-demand configuration and lifecycle
 
 The executable enables sparkrun only with `-sparkrun`; the plugin passes it
@@ -83,6 +89,11 @@ stops check ownership again through sparkrun. Idle intervals start anew after a
 gateway process restart and observation. Removing a route disables its idle
 policy without stopping its job. This is one local gateway's coordination, not
 multi-replica distributed ownership.
+
+For v0.0.1, use idle intervals of at least one second (normally minutes).
+Sub-second intervals can expire between the admission coordinator's 100 ms
+readiness polls: an already queued request can miss the ready window and time
+out. The default minute-scale settings avoid this known edge case.
 
 ## Recipe management and native APIs
 

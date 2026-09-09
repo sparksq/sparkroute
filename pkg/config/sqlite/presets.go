@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package sqlite
 
 import (
@@ -52,7 +56,7 @@ func (s *Store) ListPresets(ctx context.Context) (managed.PresetCatalog, error) 
 	if err != nil {
 		return result, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var item managed.PresetMetadata
 		var updated string

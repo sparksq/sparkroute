@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Scitrera LLC
+SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 # Sparkrun bridge model-metadata extension
 
 Current bridge contract: [schema v2 named-cluster metadata](SPARKRUN_CLUSTER_METADATA_CONTRACT.md).

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package admin
 
 import (
@@ -24,7 +28,7 @@ func TestPresetAPIManagementAndReadOnlyPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	if _, err := store.Initialize(ctx, managed.EmptyDocument(), "bootstrap", ""); err != nil {
 		t.Fatal(err)
 	}

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Command mockupstream provides deterministic OpenAI-compatible unary and SSE
 // responses for black-box proxy measurements. It deliberately performs no
 // inference work so configured delays define the upstream cost.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package clientcredentials manages gateway-issued bearer credentials.
 //
 // The package is profile-neutral. An empty tenant is the standalone

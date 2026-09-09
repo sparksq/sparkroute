@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package sqlite
 
 import (
@@ -19,7 +23,7 @@ func TestPIIConversationMappingsStableEncryptedRotatableAndDeletable(t *testing.
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
 	scope := privacy.ConversationScope{
@@ -94,7 +98,7 @@ func TestPIIConversationMappingsConvergeAcrossConcurrentSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
 	keyring := testPIIKeyring(t, "v1")
 	scope := privacy.ConversationScope{Tenant: "t", Principal: "p", Conversation: "c"}
@@ -152,7 +156,7 @@ func TestPIIConversationMappingsExpirePruneAndEnforceBounds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
 	keyring := testPIIKeyring(t, "v1")
 	scope := privacy.ConversationScope{Tenant: "t", Principal: "p", Conversation: "c"}

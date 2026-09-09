@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package adminui
 
 import (
@@ -8,6 +12,23 @@ import (
 	"testing"
 	"testing/fstest"
 )
+
+func TestEmbeddedLicenseNotices(t *testing.T) {
+	handler, err := NewEmbedded("/admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/legal.html", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("license page status = %d", response.Code)
+	}
+	for _, notice := range []string{"GNU AFFERO GENERAL PUBLIC LICENSE", "npm:react", "modernc.org/libc", "github.com/scitrera/go-llm", "Permission is hereby granted"} {
+		if !strings.Contains(response.Body.String(), notice) {
+			t.Errorf("embedded license page missing %q", notice)
+		}
+	}
+}
 
 func TestHandlerServesAssetsAndSPAFallback(t *testing.T) {
 	t.Parallel()

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package main
 
 import (
@@ -30,9 +34,9 @@ func TestMMProjectionGenerationEnableUpdateDisableAndInherit(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			switch r.URL.Path {
 			case "/v1/models":
-				io.WriteString(w, `{"data":[{"id":"vision"}]}`)
+				_, _ = io.WriteString(w, `{"data":[{"id":"vision"}]}`)
 			case "/v1/mmprojection/capabilities":
-				io.WriteString(w, `{"name":"pilco-mmbridge","projection_api":1,"endpoints":["/v1/chat/completions","/v1/responses"]}`)
+				_, _ = io.WriteString(w, `{"name":"pilco-mmbridge","projection_api":1,"endpoints":["/v1/chat/completions","/v1/responses"]}`)
 			default:
 				t.Errorf("unexpected bridge path: %s", r.URL.Path)
 				w.WriteHeader(http.StatusNotFound)
@@ -57,7 +61,7 @@ func TestMMProjectionGenerationEnableUpdateDisableAndInherit(t *testing.T) {
 	options.MMProjectionCredentials = registry
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"id":"test","object":"chat.completion","model":"vision","choices":[{"index":0,"message":{"role":"assistant","content":"analyzed"},"finish_reason":"stop"}]}`)
+		_, _ = io.WriteString(w, `{"id":"test","object":"chat.completion","model":"vision","choices":[{"index":0,"message":{"role":"assistant","content":"analyzed"},"finish_reason":"stop"}]}`)
 	}))
 	defer upstream.Close()
 	build := func(setting *config.MMProjectionConfig) *runtimeGeneration {

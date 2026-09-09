@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Command loadgen runs a closed-loop HTTP benchmark and emits both per-request
 // JSONL evidence and a machine-readable summary. It is intentionally generic:
 // the target may be SparkRoute, Envoy, Traefik, or another HTTP proxy.

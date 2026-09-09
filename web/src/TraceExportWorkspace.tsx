@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Scitrera LLC
+// SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { type FormEvent, type ReactNode, useState } from "react";
 import { fetchSavedTraceExport } from "./api";
 import type { AdminBootstrap, SavedTraceExportFilters } from "./types";

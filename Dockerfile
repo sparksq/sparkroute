@@ -1,4 +1,8 @@
 # syntax=docker/dockerfile:1.7
+# SPDX-FileCopyrightText: 2026 Scitrera LLC
+# SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
+# SPDX-License-Identifier: AGPL-3.0-only
+
 
 ARG GO_IMAGE=golang:1.25.14-alpine
 ARG NODE_IMAGE=node:24-alpine
@@ -10,6 +14,7 @@ WORKDIR /src
 COPY web/package.json web/package-lock.json ./web/
 RUN cd web && npm ci
 COPY web ./web
+COPY LICENSE COPYRIGHT NOTICE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.txt ./
 RUN cd web && npm run build
 
 FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS build
@@ -20,7 +25,7 @@ RUN GOWORK=off go mod download
 COPY . ./
 COPY --from=frontend /src/pkg/adminui/ui ./pkg/adminui/ui
 
-ARG VERSION=0.1.0-dev
+ARG VERSION=0.0.1
 ARG COMMIT=development
 ARG TARGETOS
 ARG TARGETARCH
@@ -31,7 +36,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
       ./cmd/sparkroute
 
 FROM ${RUNTIME_IMAGE}
-ARG VERSION=0.1.0-dev
+ARG VERSION=0.0.1
 ARG COMMIT=development
 LABEL org.opencontainers.image.title="SparkRoute" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
@@ -47,7 +52,7 @@ ENV SPARKROUTE_DATA_ADDRESS=0.0.0.0:8080 \
     SPARKROUTE_OPERATIONS_ADDRESS=0.0.0.0:9090
 
 COPY --from=build /out/sparkroute /sparkroute
-COPY LICENSE NOTICE COPYRIGHT THIRD_PARTY_NOTICES.md /licenses/
+COPY LICENSE NOTICE COPYRIGHT THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.txt third-party-manifest.json /licenses/
 COPY LICENSES /licenses/LICENSES/
 
 EXPOSE 8080 9090
