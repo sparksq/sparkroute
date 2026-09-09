@@ -1,3 +1,4 @@
+import { missingRoutingModels, reconcileRoutingMetadata } from "./modelRoutingReferences";
 import { deploymentMetadata } from "./DeploymentMetadataEditor";
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -58,6 +59,7 @@ export function ModelRoutingEditor({
   )].filter(Boolean).sort(), [canonicalModelNames, document.virtual_models]);
   const [selectedName, setSelectedName] = useState(selectors[0] ?? "auto");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmRemovePolicy, setConfirmRemovePolicy] = useState(false);
 
   useEffect(() => {
     if (!selectors.includes(selectedName)) setSelectedName(selectors[0] ?? "auto");
@@ -70,8 +72,9 @@ export function ModelRoutingEditor({
           <p className="eyebrow">Model-policy layer</p>
           <h3>No model-routing selectors configured</h3>
           <p>
-            Enable a version 2 policy to publish selectors such as <code>auto</code>
-            ahead of ordinary virtual-model execution.
+            Model routing is optional. Enable it to choose between virtual models through
+            a public selector such as <code>auto</code>. Virtual models and aliases
+            can also be called directly.
           </p>
         </div>
         <button
@@ -92,8 +95,18 @@ export function ModelRoutingEditor({
 
   const selected = objectValue(selectorMap[selectedName]);
   const metadata = objectValue(policy.models);
+  const missingModels = missingRoutingModels(policy, canonicalModels);
+  const candidateNames = [...new Set([...canonicalModels, ...stringArray(selected.models)])].sort();
+  const removePolicy = () => {
+    if (disabled) return;
+    if (!confirmRemovePolicy) { setConfirmRemovePolicy(true); return; }
+    const next = { ...document };
+    delete next.model_routing;
+    onChange(next);
+    setConfirmRemovePolicy(false);
+  };
   const updatePolicy = (transform: (current: JSONObject) => JSONObject) => {
-    onChange({ ...document, model_routing: transform({ ...policy }) });
+    onChange({ ...document, model_routing: reconcileRoutingMetadata(transform({ ...policy }), canonicalModels) });
   };
   const updateSelector = (transform: (current: JSONObject) => JSONObject) => {
     if (!selectedName) return;
@@ -117,7 +130,7 @@ export function ModelRoutingEditor({
     setSelectedName(name);
   };
   const renameSelector = (name: string) => {
-    if (!selectedName || name === selectedName) return;
+    if (!selectedName || selectedName === "auto" || name === selectedName) return;
     const currentSelectors = objectValue(policy.virtual_models);
     const nextSelectors: JSONObject = {};
     Object.entries(currentSelectors).forEach(([key, value]) => {
@@ -214,7 +227,26 @@ export function ModelRoutingEditor({
           </select>
         </label>
         <span>Policy v{numberValue(policy.version) || 2}</span>
+        <button className={confirmRemovePolicy ? "danger-button confirm" : "danger-button"} disabled={disabled}
+          onClick={removePolicy} onBlur={() => setConfirmRemovePolicy(false)} type="button">
+          {confirmRemovePolicy ? "Confirm remove model routing" : "Remove model routing"}
+        </button>
       </div>
+
+      {confirmRemovePolicy ? <p className="notice info routing-policy-notice" role="status">
+        Remove all routing selectors, routing preferences, presets, and keyword rules from this draft.
+        Direct virtual models, their aliases, and deployments remain available. Validate, then Save to apply.
+      </p> : null}
+      {missingModels.length ? <section className="notice error routing-policy-notice" aria-label="Missing routing models">
+        <strong>Model routing references models that are no longer available</strong>
+        <ul>{missingModels.map(({ name, locations }) => <li key={name}>
+          <code>{name}</code>: {locations.length ? locations.join("; ") : "Unused routing preferences"}
+        </li>)}</ul>
+        <p>Update the candidates or stage roles below, choose another routing strategy, or remove model routing.
+          Preset and inline keyword-rule references can also be edited in JSON.</p>
+        {missingModels.some(({ locations }) => !locations.length) ? <button className="secondary-button" disabled={disabled}
+          onClick={() => updatePolicy((current) => current)} type="button">Remove unused preferences</button> : null}
+      </section> : null}
 
       <div className="structured-editor routing-editor" aria-disabled={disabled}>
         <aside className="model-list" aria-label="Model-routing selectors">
@@ -244,15 +276,15 @@ export function ModelRoutingEditor({
               <p className="eyebrow">Caller-facing model selector</p>
               <h3>{selectedName}</h3>
             </div>
-            <button
+            {selectedName === "auto" ? <small className="routing-required-selector">Required while model routing is enabled</small> : <button
               className={confirmRemove ? "danger-button confirm" : "danger-button"}
-              disabled={disabled || selectedName === "auto"}
+              disabled={disabled}
               onBlur={() => setConfirmRemove(false)}
               onClick={removeSelector}
               type="button"
             >
-              {selectedName === "auto" ? "Required selector" : confirmRemove ? "Confirm remove" : "Remove selector"}
-            </button>
+              {confirmRemove ? "Confirm remove" : "Remove selector"}
+            </button>}
           </div>
           <fieldset disabled={disabled}>
             <div className="model-field-grid">
@@ -262,6 +294,7 @@ export function ModelRoutingEditor({
                   onBlur={(event) => renameSelector(event.target.value.trim())}
                   onChange={() => undefined}
                   defaultValue={selectedName}
+                  readOnly={selectedName === "auto"}
                   key={selectedName}
                 />
               </label>
@@ -296,6 +329,7 @@ export function ModelRoutingEditor({
               <StageRouterEditor
                 canonicalModels={canonicalModels}
                 onChange={updateSelector}
+                onUseBalanced={() => updateSelector((current) => setRoutingStrategy(current, "balanced", canonicalModels))}
                 selector={selected}
               />
             ) : (
@@ -304,14 +338,14 @@ export function ModelRoutingEditor({
                   <div><strong>Candidate virtual models</strong><small>Capability filtering happens before this policy runs.</small></div>
                 </div>
                 <div className="capability-grid routing-candidate-grid">
-                  {canonicalModels.map((name) => (
+                  {candidateNames.map((name) => (
                     <label key={name}>
                       <input
                         checked={stringArray(selected.models).includes(name)}
                         onChange={(event) => toggleCandidate(name, event.target.checked)}
                         type="checkbox"
                       />
-                      <span>{name}</span>
+                      <span>{name}{!canonicalModels.includes(name) ? " (missing model)" : ""}</span>
                     </label>
                   ))}
                 </div>
@@ -358,10 +392,11 @@ export function ModelRoutingEditor({
   );
 }
 
-function StageRouterEditor({ canonicalModels, selector, onChange }: {
+function StageRouterEditor({ canonicalModels, selector, onChange, onUseBalanced }: {
   canonicalModels: string[];
   selector: JSONObject;
   onChange: (transform: (current: JSONObject) => JSONObject) => void;
+  onUseBalanced: () => void;
 }) {
   const stage = objectValue(selector.stage_router);
   const models = stringArray(selector.models);
@@ -390,19 +425,25 @@ function StageRouterEditor({ canonicalModels, selector, onChange }: {
           <small>Uses a content-free projection of recent tool results; raw prompts, tool names, arguments, and output are not retained.</small>
         </div>
       </div>
-      {canonicalModels.length < 2 ? (
-        <p className="routing-projection-help">Add at least two logical models before validating this selector.</p>
+      {canonicalModels.length < 2 || capable === efficient || !canonicalModels.includes(capable) || !canonicalModels.includes(efficient) ? (
+        <div className="routing-stage-warning">
+          <p>Stage routing requires two different, available virtual models. Add or select a replacement model,
+            use Balanced routing with the remaining models, or remove model routing.</p>
+          <button className="secondary-button" onClick={onUseBalanced} type="button">Use Balanced routing</button>
+        </div>
       ) : null}
       <div className="routing-projection-fields stage-router-fields">
         <label>
           Capable model
           <select aria-label="Capable model" onChange={(event) => updateRole("capable_model", event.target.value)} value={capable}>
+            {!capable ? <option value="">Choose a model</option> : !canonicalModels.includes(capable) ? <option value={capable}>{capable} (missing model)</option> : null}
             {canonicalModels.map((model) => <option key={model} value={model}>{model}</option>)}
           </select>
         </label>
         <label>
           Efficient model
           <select aria-label="Efficient model" onChange={(event) => updateRole("efficient_model", event.target.value)} value={efficient}>
+            {!efficient ? <option value="">Choose a model</option> : !canonicalModels.includes(efficient) ? <option value={efficient}>{efficient} (missing model)</option> : null}
             {canonicalModels.map((model) => <option key={model} value={model}>{model}</option>)}
           </select>
         </label>
@@ -871,6 +912,7 @@ function setRoutingStrategy(value: JSONObject, strategy: string, canonicalModels
   const next: JSONObject = { ...value, strategy };
   if (strategy !== "stage_router") {
     delete next.stage_router;
+    next.models = [...new Set(stringArray(value.models).filter((model) => canonicalModels.includes(model)))];
     return next;
   }
   const existing = stringArray(value.models).filter((model) => canonicalModels.includes(model));

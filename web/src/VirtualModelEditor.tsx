@@ -1,3 +1,4 @@
+import { routingModelUses } from "./modelRoutingReferences";
 import { RequestProfileEditor } from "./RequestProfileEditor";
 import { ModelPolicyAssignments } from "./ModelPolicyAssignments";
 import { capabilityOptions, capabilitySelectionSummary } from "./capabilities";
@@ -48,6 +49,7 @@ export function VirtualModelEditor({
   // Profiles remain explicit virtual models in the document; group named
   // children here without changing their routing or generated-set ownership.
   const selectedName = stringValue(selected?.name);
+  const selectedRoutingUses = routingModelUses(document.model_routing)[selectedName] ?? [];
   const profileBase = selected;
   const profileRows = profileBase ? models.flatMap((model, index) => model.request_overrides &&
     (model.name === profileBase.name || stringValue(model.name).startsWith(`${profileBase.name}:`))
@@ -204,6 +206,10 @@ export function VirtualModelEditor({
               </button>
             </div>
 
+            {!readOnlySelected && selectedRoutingUses.length > 0 ? (
+              <p className="notice info" role="status">Used by model routing: {selectedRoutingUses.join("; ")}.
+                If you remove or rename this model, update Model Routing or remove its configuration before saving.</p>
+            ) : null}
             <fieldset disabled={formDisabled}>
               <div className="model-field-grid">
                 <Field label="Canonical name">

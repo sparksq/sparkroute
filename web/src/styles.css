@@ -3351,3 +3351,11 @@ button:disabled {
 .mmbridge-active-connection dd { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
 .mmbridge-active-connection dt { color: var(--muted); font-size: 0.8rem; }
 @media (max-width: 700px) { .mmbridge-settings .model-field-grid { grid-template-columns: 1fr; } }
+
+.routing-policy-bar { flex-wrap: wrap; }
+.routing-policy-notice { margin: 16px 18px; }
+.routing-policy-notice li, .routing-required-selector { overflow-wrap: anywhere; }
+.routing-policy-notice p { margin: 10px 0; }
+.routing-required-selector { max-width: 15rem; color: var(--muted); text-align: right; }
+.routing-stage-warning { padding: 0 22px 14px; color: var(--muted); font-size: .8rem; }
+.routing-stage-warning p { line-height: 1.5; }

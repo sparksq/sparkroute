@@ -312,6 +312,11 @@ export function ProviderDeploymentEditor({
           <>
             <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />
             <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
+            {readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <p className="notice info">
+              This deployment is retained by a recipe binding in sparkrun’s proxy.yaml, even while its workload is stopped.
+              To retire it, remove dependent virtual models or routing references, then remove the binding or use sparkrun proxy unload for this recipe.
+              Removing the binding leaves a running workload alone; proxy unload also stops it.
+            </p> : null}
             <DeploymentMetadataEditor deployment={selectedDeployment} disabled={formDisabled} onChange={updateDeployment} />
             {sparkrun?.enabled && !readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <button type="button" className="secondary-button" disabled={disabled} onClick={() => setEditingRecipe(true)}>Edit recipe settings</button> : null}
             <p className="section-help">Manage public names and aliases in Virtual Models / Aliases. Deployment settings are shared by all of its names.</p></div>
@@ -363,6 +368,7 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
   return <>
     <dl className="sparkrun-deployment-summary">
       <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
+      <div><dt>Availability</dt><dd>{source.type === "activatable" ? "On demand · retained while stopped" : "Discovered while running"}</dd></div>
       <div><dt>Native APIs</dt><dd>{[...(stringArray(deployment.native_protocols).includes("openai") ? ["OpenAI (Chat Completions)"] : []), ...(stringArray(deployment.capabilities).includes("responses") ? ["OpenAI (Responses)"] : []), ...(stringArray(deployment.native_protocols).includes("anthropic") ? ["Anthropic Messages"] : [])].join(", ") || "OpenAI (Chat Completions)"}</dd></div>
       {capabilityOptions.some(({value}) => stringArray(deployment.capabilities).includes(value)) && <div><dt>Model capabilities</dt><dd>{capabilityOptions.filter(({value}) => stringArray(deployment.capabilities).includes(value)).map(({label}) => label).join(", ")}</dd></div>}
       <div><dt>Recipe</dt><dd><small className="recipe-source">{preview?.source_path || recipe || "Discovered workload"}</small></dd></div>

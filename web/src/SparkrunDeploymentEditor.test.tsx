@@ -86,6 +86,8 @@ it("keeps generated sparkrun deployments read-only", async () => {
   mockCatalog(); render(<Editor generated={integrated} />);
   expect(await screen.findByText("/recipes/coder.yaml")).toBeVisible();
   expect(screen.getByText("sparkrun generated · Read only")).toBeVisible();
+  expect(screen.getByText("On demand · retained while stopped")).toBeVisible();
+  expect(screen.getByText(/retained by a recipe binding in sparkrun’s proxy.yaml/)).toBeVisible();
   expect(screen.queryByRole("button", {name: "Edit recipe settings"})).not.toBeInTheDocument();
   expect(screen.getByLabelText("Deployment type")).toBeDisabled();
   expect(draft()).toEqual(empty);
