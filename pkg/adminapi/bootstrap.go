@@ -13,6 +13,7 @@ const (
 	FeatureConfigWrite        = "config_write"
 	FeatureConfigHistory      = "config_history"
 	FeatureConfigManagedSets  = "config_managed_sets"
+	FeatureConfigPresets      = "config_presets"
 	FeatureLedgerQuery        = "ledger_query"
 	FeatureLedgerAggregate    = "ledger_aggregate"
 	FeatureSavedTraceExport   = "saved_trace_export"

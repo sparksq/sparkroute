@@ -12,6 +12,7 @@ import {
 import { AdminAPIError, fetchBootstrap, fetchStatus, probeMMProjection } from "./api";
 import { ConfigurationWorkspace } from "./ConfigurationWorkspace";
 import { ManagedConfigurationWorkspace } from "./ManagedConfigurationWorkspace";
+import { ConfigurationPresetSelector } from "./ConfigurationPresetSelector";
 import { configurationSection, configurationSections } from "./configurationSections";
 import { TraceExportWorkspace } from "./TraceExportWorkspace";
 import { TrafficWorkspace } from "./TrafficWorkspace";
@@ -229,6 +230,11 @@ function ConsoleLayout({
   const ConfigurationComponent: ComponentType<AdminConfigurationWorkspaceProps> =
     extensions?.configuration ?? ConfigurationWorkspace;
   const { bootstrap, status } = connection;
+  const [operatorDirty, setOperatorDirty] = useState(false);
+  const [operatorBusy, setOperatorBusy] = useState(false);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const [configurationReload, setConfigurationReload] = useState(0);
+  const [presetsRefresh, setPresetsRefresh] = useState(0);
   const extensionContext: AdminExtensionContext = {
     bootstrap,
     status,
@@ -437,7 +443,9 @@ function ConsoleLayout({
             <h1>{heading}</h1>
           </div>
           <div className="topbar-actions">
-            <Revision revision={bootstrap.config_revision} />
+            {bootstrap.features.config_presets ? <ConfigurationPresetSelector token={token} canWrite={Boolean(bootstrap.features.config_write)}
+              dirty={operatorDirty} locked={operatorBusy} refreshKey={`${bootstrap.config_revision}:${presetsRefresh}`}
+              onBusyChange={setPresetBusy} onApplied={() => setConfigurationReload(value => value + 1)} /> : <Revision revision={bootstrap.config_revision} />}
             <button className="secondary-button" onClick={onRefresh} type="button">
               Refresh
             </button>
@@ -446,7 +454,8 @@ function ConsoleLayout({
 
         {configurationAvailable && bootstrap.features.config_managed_sets && configurationVisited ? (
           <div hidden={!section}>
-            <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} runtimeTargets={status?.targets} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current} />
+            <ManagedConfigurationWorkspace bootstrap={bootstrap} token={token} runtimeTargets={status?.targets} virtualModelExtensions={virtualModelExtensions} section={lastConfigurationSection.current}
+              reloadKey={configurationReload} externalBusy={presetBusy} onDirtyChange={setOperatorDirty} onBusyChange={setOperatorBusy} onSaved={() => setPresetsRefresh(value => value + 1)} />
           </div>
         ) : null}
         {section === "advanced" ? (

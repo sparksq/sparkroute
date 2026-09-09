@@ -647,6 +647,7 @@ describe("AdminApp", () => {
       });
       if (path === "/v1/config/managed-sets") return jsonResponse({
         active_revision: activeRevision,
+        presets_revision: 7,
         managed_sets: [
           { owner: "operator", revision: "1".repeat(64), updated_at: "2026-08-04T12:00:00Z", updated_by: "operator-a" },
           { owner: "sparkrun", revision: "2".repeat(64), updated_at: "2026-08-04T12:00:00Z", updated_by: "sparkrun-a" },
@@ -724,6 +725,7 @@ describe("AdminApp", () => {
 
     const saveCall = fetchMock.mock.calls.find(([path, options]) => path === "/v1/config/managed-sets/operator" && options?.method === "PUT");
     expect(JSON.parse(String(saveCall?.[1]?.body)).document).toEqual(candidate);
+    expect(JSON.parse(String(saveCall?.[1]?.body)).expected_presets_revision).toBe(7);
     expect(fetchMock.mock.calls.some(([path, options]) => path === "/v1/config/managed-sets/sparkrun" && options?.method === "PUT")).toBe(false);
     expect(screen.queryByRole("link", { name: "sparkrun Generated" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Structured" }));

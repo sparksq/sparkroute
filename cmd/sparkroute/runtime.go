@@ -264,7 +264,7 @@ func buildRuntimeGeneration(
 		}
 		if admissionCoordinator != nil {
 			adminOptions.Lifecycle = admissionCoordinator
-			adminOptions.SparkrunControl = runtimeController
+			adminOptions.SparkrunControl = sparkrunruntime.WorkloadControl{Controller: runtimeController, Admission: admissionCoordinator}
 		}
 		if endpointRegistry != nil {
 			adminOptions.Endpoints = endpointRegistry

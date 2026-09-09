@@ -441,6 +441,20 @@ func TestManagedConfigurationAPIEnforcesOwnerRoles(t *testing.T) {
 	}
 
 	writerSets := request(http.MethodGet, "/v1/config/managed-sets", writerOnly.APIKey, nil)
+	for _, token := range []string{operator.APIKey, writerOnly.APIKey} {
+		if response := request(http.MethodGet, "/v1/config/presets", token, nil); response.Code != http.StatusOK {
+			t.Fatalf("presets read = %d %s", response.Code, response.Body)
+		}
+	}
+	for _, path := range []string{"/v1/config/presets", "/v1/config/presets/save", "/v1/config/presets/activate", "/v1/config/presets/rename", "/v1/config/presets/delete"} {
+		method := http.MethodPost
+		if path == "/v1/config/presets" {
+			method = http.MethodGet
+		}
+		if response := request(method, path, sparkrun.APIKey, map[string]any{}); response.Code != http.StatusForbidden {
+			t.Fatalf("reconcile-only presets %s = %d %s", path, response.Code, response.Body)
+		}
+	}
 	if writerSets.Code != http.StatusOK || !strings.Contains(writerSets.Body.String(), `"owner":"operator"`) ||
 		strings.Contains(writerSets.Body.String(), `"owner":"sparkrun"`) {
 		t.Fatalf("writer-only managed sets = %d %s", writerSets.Code, writerSets.Body)

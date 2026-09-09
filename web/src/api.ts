@@ -2,6 +2,7 @@ import type {
   ActiveConfiguration,
   AdminBootstrap,
   ConfigurationDocument,
+  ConfigurationPresets,
   ConfigurationValidation,
   DiscoveredMetadataState,
   RoutingSimulationResult,
@@ -177,6 +178,8 @@ export function simulateModelRouting(
 export function fetchManagedConfigurationSets(token: string) {
   return requestJSON<{
     active_revision: string;
+    presets_revision?: number;
+    active_preset?: string;
     managed_sets: ManagedConfigurationSetMetadata[];
   }>("/v1/config/managed-sets", token);
 }
@@ -241,6 +244,7 @@ export function replaceManagedConfigurationSet(
   document: ConfigurationDocument,
   expectedActiveRevision: string,
   reason: string,
+  expectedPresetsRevision?: number,
 ) {
   return requestJSON<ManagedConfigurationReplaceResult>(
     `/v1/config/managed-sets/${owner}`,
@@ -251,9 +255,26 @@ export function replaceManagedConfigurationSet(
         document,
         expected_active_revision: expectedActiveRevision,
         reason,
+        expected_presets_revision: expectedPresetsRevision,
       },
     },
   );
+}
+
+export function fetchConfigurationPresets(token: string) {
+  return requestJSON<ConfigurationPresets>("/v1/config/presets", token);
+}
+
+export function mutateConfigurationPreset(
+  token: string,
+  operation: "save" | "activate" | "rename" | "delete",
+  catalog: ConfigurationPresets,
+  input: { id?: string; name?: string },
+) {
+  return requestJSON<unknown>(`/v1/config/presets/${operation}`, token, {
+    method: "POST",
+    body: { ...input, expected_active_revision: catalog.active_revision, expected_presets_revision: catalog.presets_revision },
+  });
 }
 
 export function fetchRequests(

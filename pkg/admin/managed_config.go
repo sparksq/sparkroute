@@ -12,9 +12,10 @@ import (
 )
 
 type managedSetMutation struct {
-	Document               config.Document `json:"document"`
-	ExpectedActiveRevision *config.Version `json:"expected_active_revision"`
-	Reason                 string          `json:"reason,omitempty"`
+	Document                config.Document `json:"document"`
+	ExpectedActiveRevision  *config.Version `json:"expected_active_revision"`
+	ExpectedPresetsRevision *int64          `json:"expected_presets_revision,omitempty"`
+	Reason                  string          `json:"reason,omitempty"`
 }
 
 type managedSetRoutingSimulation struct {
@@ -80,11 +81,20 @@ func (h *handler) managedSets(writer http.ResponseWriter, request *http.Request)
 		writeManagedConfigError(writer, err)
 		return
 	}
+	response := map[string]any{"active_revision": activeRevision, "managed_sets": sets}
+	if store, ok := h.options.ManagedConfig.(managed.PresetStore); ok && (canReadAll || canWriteOperator) {
+		catalog, err := store.ListPresets(request.Context())
+		if err != nil {
+			writeManagedConfigError(writer, err)
+			return
+		}
+		// Use the configuration revision from the same snapshot as the selection.
+		response["active_revision"] = catalog.ActiveRevision
+		response["presets_revision"] = catalog.PresetsRevision
+		response["active_preset"] = catalog.ActivePreset
+	}
 	writer.Header().Set("Cache-Control", "no-store")
-	writeJSON(writer, http.StatusOK, map[string]any{
-		"active_revision": activeRevision,
-		"managed_sets":    sets,
-	})
+	writeJSON(writer, http.StatusOK, response)
 }
 
 func (h *handler) managedSet(writer http.ResponseWriter, request *http.Request) {
@@ -137,9 +147,10 @@ func (h *handler) managedSet(writer http.ResponseWriter, request *http.Request) 
 		principal, _ := principalFromRequest(request)
 		result, err := h.options.ManagedConfig.ReplaceSet(
 			request.Context(), owner, input.Document, managed.ReplaceOptions{
-				ExpectedActive: *input.ExpectedActiveRevision,
-				Actor:          principal.ID,
-				Reason:         input.Reason,
+				ExpectedActive:          *input.ExpectedActiveRevision,
+				ExpectedPresetsRevision: input.ExpectedPresetsRevision,
+				Actor:                   principal.ID,
+				Reason:                  input.Reason,
 			},
 		)
 		if err != nil {
@@ -300,6 +311,12 @@ func writeManagedConfigError(writer http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, managed.ErrRevisionConflict):
 		writeError(writer, http.StatusConflict, "revision_conflict", "active configuration revision changed")
+	case errors.Is(err, managed.ErrPresetConflict):
+		writeError(writer, http.StatusConflict, "preset_conflict", err.Error())
+	case errors.Is(err, managed.ErrPresetNotFound):
+		writeError(writer, http.StatusNotFound, "preset_not_found", err.Error())
+	case errors.Is(err, managed.ErrInvalidPreset):
+		writeError(writer, http.StatusBadRequest, "invalid_preset", err.Error())
 	case errors.Is(err, managed.ErrSetNotFound):
 		writeError(writer, http.StatusNotFound, "managed_set_not_found", "managed configuration set not found")
 	case errors.Is(err, managed.ErrInvalidConfiguration):

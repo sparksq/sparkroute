@@ -323,6 +323,25 @@ func (c *AdmissionCoordinator) Eligible(deployment string) bool {
 	}
 }
 
+// Start explicitly activates a configured binding without an inference request.
+// It uses the same bounded queue, fencing and leases as request admission, but
+// permits an operator to prewarm a binding whose requests reject cold starts.
+func (c *AdmissionCoordinator) Start(ctx context.Context, deployment string) (endpointregistry.Endpoint, error) {
+	target, exists := c.targets[deployment]
+	if !exists || target.Source != EndpointActivatable {
+		return endpointregistry.Endpoint{}, ErrUnknownDeployment
+	}
+	target.Binding.ColdStart = ColdStartWait
+	lease, err := c.acquireActivatable(ctx, target, AdmissionRequest{Deployment: deployment})
+	if err != nil {
+		return endpointregistry.Endpoint{}, err
+	}
+	if err := c.Release(context.WithoutCancel(ctx), lease, RequestOutcome{Success: true}); err != nil {
+		return endpointregistry.Endpoint{}, err
+	}
+	return lease.Endpoint, nil
+}
+
 func (c *AdmissionCoordinator) Acquire(
 	ctx context.Context,
 	request AdmissionRequest,

@@ -7,6 +7,7 @@ import {
 } from "./api";
 import type {
   AdminBootstrap,
+  LifecycleBindingStatus,
   LifecycleSnapshot,
   RuntimeEndpointFilters,
   RuntimeEndpointPage,
@@ -143,12 +144,23 @@ export function RuntimeWorkspace({
   );
 }
 
+const workloadActionLabels: Record<string, string> = { start: "Start", stop: "Stop", status: "Check status", sleep: "Sleep", wake: "Wake" };
+
+function workloadActions(binding: LifecycleBindingStatus): string[] {
+  if (binding.controller !== "sparkrun") return [];
+  const actions = binding.job_id ? (binding.lifecycle_actions ?? []).filter(action => action in workloadActionLabels) : [];
+  const transitioning = ["activating", "draining", "deactivating"].includes(binding.state) || ["activating", "deactivating"].includes(binding.phase ?? "");
+  if (!transitioning && ["offline", "failed", "unknown"].includes(binding.state)) actions.push("start");
+  if (!transitioning && binding.job_id && binding.owned === true && binding.phase !== "offline") actions.push("stop");
+  return [...new Set(actions)];
+}
+
 function LifecycleOverview({ snapshot, token, canControl, onRefresh }: { snapshot: LifecycleSnapshot; token: string; canControl: boolean; onRefresh: () => void }) {
-  const [busyJob, setBusyJob] = useState(""); const [actionError, setActionError] = useState("");
+  const [busyAction, setBusyAction] = useState<{ deployment: string; operation: string }>(); const [actionError, setActionError] = useState("");
   async function action(deployment: string, job: string, operation: string) {
-    setBusyJob(job); setActionError("");
+    setBusyAction({ deployment, operation }); setActionError("");
     try {await controlSparkrunWorkload(token, deployment, job, operation); onRefresh();}
-    catch(e) {setActionError(e instanceof Error ? e.message : "Workload control failed.");} finally {setBusyJob("");}
+    catch(e) {setActionError(e instanceof Error ? e.message : "Workload control failed.");} finally {setBusyAction(undefined);}
   }
   return (
     <>
@@ -190,7 +202,7 @@ function LifecycleOverview({ snapshot, token, canControl, onRefresh }: { snapsho
               <td>{binding.queued_waiters} / {binding.max_queued_waiters || "∞"}<small>{formatBytes(binding.queued_body_bytes)} / {binding.max_queued_body_bytes ? formatBytes(binding.max_queued_body_bytes) : "∞"}</small></td>
               <td>{binding.active_leases}</td>
               <td>{binding.activation_deadline ? formatTime(binding.activation_deadline) : "—"}</td>
-              <td><small>Plugins in use: {binding.plugins_in_use?.join(", ") || "None reported"}</small>{canControl && binding.job_id && binding.lifecycle_actions?.map((operation) => <button key={operation} type="button" disabled={Boolean(busyJob) || (operation !== "status" && binding.active_leases > 0)} onClick={() => void action(binding.deployment, binding.job_id!, operation)}>{operation === "status" ? "Check status" : operation === "sleep" ? "Sleep" : "Wake"}</button>)}{busyJob === binding.job_id && <small role="status">Controlling workload…</small>}</td>
+              <td><small>Plugins in use: {binding.plugins_in_use?.join(", ") || "None reported"}</small><div className="runtime-workload-actions">{canControl && workloadActions(binding).map((operation) => <button key={operation} type="button" disabled={Boolean(busyAction) || (operation !== "status" && binding.active_leases > 0)} onClick={() => void action(binding.deployment, operation === "start" ? "" : binding.job_id!, operation)}>{workloadActionLabels[operation]}</button>)}</div>{busyAction?.deployment === binding.deployment && <small role="status">{busyAction.operation === "start" ? "Starting workload…" : busyAction.operation === "stop" ? "Stopping workload…" : "Controlling workload…"}</small>}</td>
             </tr>)}
           </tbody></table></div>
         ) : <Empty title="No activation bindings" detail="No cold-start-capable binding has published status." />}

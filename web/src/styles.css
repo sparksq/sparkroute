@@ -345,6 +345,19 @@ button {
   gap: 10px;
 }
 
+.preset-selector { display: grid; gap: 4px; max-width: 280px; }
+.preset-selector > label { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; }
+.preset-selector select, .preset-dialog select, .preset-dialog input { width: 100%; min-width: 160px; border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; background: var(--panel); color: var(--ink); font: inherit; font-size: 0.8rem; }
+.preset-selector small { color: var(--muted); font-size: 0.7rem; }
+.preset-selector [role="alert"], .preset-dialog [role="alert"] { color: #b42318; font-size: 0.8rem; }
+.preset-dialog { width: min(480px, calc(100vw - 32px)); padding: 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 80px rgb(16 24 39 / 20%); }
+.preset-dialog::backdrop { background: rgb(16 24 39 / 45%); }
+.preset-dialog h2 { margin-top: 0; font-size: 1.2rem; }
+.preset-dialog p { color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.preset-dialog form, .preset-dialog label { display: grid; gap: 10px; margin: 16px 0; }
+.preset-dialog label { font-size: 0.8rem; }
+.preset-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
 .revision {
   display: grid;
   gap: 2px;
@@ -3372,3 +3385,6 @@ button:disabled {
 .sparkrun-exclusions ul { padding: 0; list-style: none; }
 .sparkrun-exclusions li { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .sparkrun-exclusions li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+.runtime-workload-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.runtime-workload-actions button { white-space: nowrap; }

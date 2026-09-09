@@ -183,8 +183,8 @@ func (h *handler) sparkrunWorkload(writer http.ResponseWriter, request *http.Req
 	if !decodeRequestJSON(writer, request, &input) {
 		return
 	}
-	if input.Action != "status" && input.Action != "sleep" && input.Action != "wake" {
-		writeError(writer, http.StatusBadRequest, "invalid_action", "Choose status, sleep, or wake")
+	if input.Action != "start" && input.Action != "stop" && input.Action != "status" && input.Action != "sleep" && input.Action != "wake" {
+		writeError(writer, http.StatusBadRequest, "invalid_action", "Choose start, stop, status, sleep, or wake")
 		return
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), time.Hour)

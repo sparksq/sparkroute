@@ -552,19 +552,26 @@ func (c *Controller) stop(
 		return err
 	}
 	defer unlock()
+	return c.stopLocked(ctx, key, binding, clusterID)
+}
+
+// Caller holds the physical workload gate, shared by admission and controls.
+func (c *Controller) stopLocked(ctx context.Context, key string, binding lifecycle.Binding, clusterID string) error {
 	if clusterID == "" {
 		return fmt.Errorf("no tracked sparkrun workload to stop")
 	}
 	if err := c.workloads.canStop(clusterID); err != nil {
 		return err
 	}
+	c.workloads.suspend(clusterID)
+	defer c.workloads.finishAction(clusterID)
 	c.mu.Lock()
 	if state := c.states[key]; state != nil {
 		state.state = endpointregistry.StateDeactivating
 		state.updatedAt = c.now().UTC()
 	}
 	c.mu.Unlock()
-	_, err = c.bridge.Stop(ctx, bridgeBinding(binding), clusterID)
+	_, err := c.bridge.Stop(ctx, bridgeBinding(binding), clusterID)
 	if err != nil {
 		c.setFailure(key, binding, err)
 		return err
@@ -586,6 +593,7 @@ func (c *Controller) stop(
 		c.states[key] = state
 	}
 	state.state = endpointregistry.StateOffline
+	state.phase = "offline"
 	state.endpoint = nil
 	state.updatedAt = c.now().UTC()
 	state.reason = ""

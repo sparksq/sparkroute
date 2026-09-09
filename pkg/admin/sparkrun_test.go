@@ -71,6 +71,13 @@ func TestRecipeUIFlowValidatesAndSavesWithoutLaunching(t *testing.T) {
 		Document config.Document `json:"document"`
 	}
 	_ = json.Unmarshal(draft.Body.Bytes(), &prepared)
+	// Keep Default empty while normal configuration writes update Work.
+	presets, _ := store.ListPresets(context.Background())
+	copyResponse := call("POST", "/v1/config/presets/save", map[string]any{"name": "Work", "expected_active_revision": revision, "expected_presets_revision": presets.PresetsRevision})
+	var work managed.PresetMetadata
+	if copyResponse.Code != 200 || json.Unmarshal(copyResponse.Body.Bytes(), &work) != nil {
+		t.Fatal(copyResponse.Code, copyResponse.Body.String())
+	}
 	mutation := map[string]any{"document": prepared.Document, "expected_active_revision": revision}
 	if response := call("POST", "/v1/config/managed-sets/operator/validate", mutation); response.Code != 200 {
 		t.Fatal(response.Code, response.Body.String())
@@ -98,6 +105,25 @@ func TestRecipeUIFlowValidatesAndSavesWithoutLaunching(t *testing.T) {
 	if response := call("PUT", "/v1/config/managed-sets/operator", mutation); response.Code != 409 {
 		t.Fatal("stale save accepted", response.Body.String())
 	}
+	activatePreset := func(id string) *httptest.ResponseRecorder {
+		presets, _ := store.ListPresets(context.Background())
+		return call("POST", "/v1/config/presets/activate", map[string]any{"id": id, "expected_active_revision": presets.ActiveRevision, "expected_presets_revision": presets.PresetsRevision})
+	}
+	if response := activatePreset("default"); response.Code != 200 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	catalog.revision = "changed"
+	if response := activatePreset(work.ID); response.Code != 422 {
+		t.Fatal("stale recipe activated", response.Code, response.Body.String())
+	}
+	presets, _ = store.ListPresets(context.Background())
+	if presets.ActivePreset != "default" {
+		t.Fatal("failed recipe activation changed selection")
+	}
+	catalog.revision = "recipe-revision"
+	if response := activatePreset(work.ID); response.Code != 200 {
+		t.Fatal(response.Code, response.Body.String())
+	}
 	for _, operation := range catalog.calls {
 		if operation == "ensure_ready" || operation == "stop" {
 			t.Fatal("configuration changed a workload")
@@ -121,5 +147,46 @@ func TestCatalogReadRoleCannotImportRefreshOrInvokeLifecycle(t *testing.T) {
 	}
 	if len(catalog.calls) != 0 {
 		t.Fatal("forbidden operation reached bridge")
+	}
+}
+
+type adminWorkloadControl struct {
+	deployment, job, action string
+	calls                   int
+}
+
+func (c *adminWorkloadControl) WorkloadAction(_ context.Context, deployment, job, action string) (sparkrun.WorkloadInfo, error) {
+	c.deployment, c.job, c.action = deployment, job, action
+	c.calls++
+	return sparkrun.WorkloadInfo{State: "ready"}, nil
+}
+
+func TestWorkloadStartStopAPIRequiresConfigWrite(t *testing.T) {
+	for _, action := range []string{"start", "stop"} {
+		for _, readOnly := range []bool{false, true} {
+			control := &adminWorkloadControl{}
+			options := Options{SparkrunControl: control, AllowInsecureAdmin: !readOnly}
+			if readOnly {
+				options.Authenticator = metadataTestAuthenticator{}
+			}
+			handler := NewHandler(config.Document{}, "revision", options)
+			job := "job"
+			if action == "start" {
+				job = ""
+			}
+			raw, _ := json.Marshal(map[string]string{"deployment": "recipe", "job_id": job, "action": action})
+			request := httptest.NewRequest(http.MethodPost, "/v1/sparkrun/workload", bytes.NewReader(raw))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer metadata-token")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if readOnly {
+				if response.Code != http.StatusForbidden || control.calls != 0 {
+					t.Fatal("read-only caller changed a workload", action, response.Code)
+				}
+			} else if response.Code != http.StatusOK || control.calls != 1 || control.deployment != "recipe" || control.job != job || control.action != action {
+				t.Fatal(action, response.Code, response.Body.String(), control)
+			}
+		}
 	}
 }

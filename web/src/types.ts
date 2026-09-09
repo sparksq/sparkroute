@@ -572,3 +572,16 @@ export interface AdminAppOptions {
   productName: string;
   extensions?: import("./extensions").AdminConsoleExtensions;
 }
+export interface ConfigurationPreset {
+  id: string;
+  name: string;
+  revision: string;
+  updated_at: string;
+}
+
+export interface ConfigurationPresets {
+  active_preset: string;
+  active_revision: string;
+  presets_revision: number;
+  presets: ConfigurationPreset[];
+}

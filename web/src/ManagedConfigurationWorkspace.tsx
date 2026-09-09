@@ -45,12 +45,22 @@ export function ManagedConfigurationWorkspace({
   virtualModelExtensions,
   section = "providers",
   runtimeTargets,
+  reloadKey = 0,
+  externalBusy = false,
+  onDirtyChange,
+  onBusyChange,
+  onSaved,
 }: {
   bootstrap: AdminBootstrap;
   token: string;
   virtualModelExtensions?: VirtualModelEditorExtension[];
   section?: ConfigurationSection;
   runtimeTargets?: GatewayStatus["targets"];
+  reloadKey?: number;
+  externalBusy?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
+  onSaved?: () => void;
 }) {
   const canRead = Boolean(bootstrap.features.config_read);
   const canWriteOperator = Boolean(bootstrap.features.config_write);
@@ -60,6 +70,7 @@ export function ManagedConfigurationWorkspace({
   const [drafts, setDrafts] = useState<Partial<Record<ManagedConfigurationOwner, string>>>({});
   const [storedDocuments, setStoredDocuments] = useState<Partial<Record<ManagedConfigurationOwner, ConfigurationDocument>>>({});
   const [storedRevision, setStoredRevision] = useState(bootstrap.config_revision);
+  const [presetsRevision, setPresetsRevision] = useState<number>();
   const [runtimeRevision, setRuntimeRevision] = useState(bootstrap.config_revision);
   const [activeDocument, setActiveDocument] = useState<ConfigurationDocument>();
   const [discoveredMetadata, setDiscoveredMetadata] = useState<DiscoveredMetadataState>();
@@ -78,6 +89,7 @@ export function ManagedConfigurationWorkspace({
       const setPage = await fetchManagedConfigurationSets(token);
       setSets(setPage.managed_sets);
       setStoredRevision(setPage.active_revision);
+      setPresetsRevision(setPage.presets_revision);
       const visibleOwners = setPage.managed_sets.map((set) => set.owner);
       const loadedSets = await Promise.all(
         visibleOwners.map((owner) => fetchManagedConfigurationSet(token, owner)),
@@ -108,8 +120,12 @@ export function ManagedConfigurationWorkspace({
   }, [canRead, hasDiscoveredMetadata, token]);
 
   useEffect(() => {
+    setValidatedCandidate(undefined);
+    setNotice(undefined);
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
+
+  useEffect(() => { onBusyChange?.(Boolean(busy) || recipeWizard); }, [busy, recipeWizard, onBusyChange]);
 
   const draft = drafts[selectedOwner] ?? emptyDocument;
   const parsed = useMemo(() => parseDocument(draft), [draft]);
@@ -123,8 +139,8 @@ export function ManagedConfigurationWorkspace({
       ? { ...deployment, title: titles.get(deployment.name) } : deployment) };
   }, [operatorParsed.document, storedDocuments.sparkrun, runtimeTargets]);
   const metadata = sets.find((set) => set.owner === selectedOwner);
-  const canEdit = canWriteOperator && Boolean(storedDocuments.operator);
-  const candidateKey = `${storedRevision}\0${draft}`;
+  const canEdit = canWriteOperator && Boolean(storedDocuments.operator) && !externalBusy;
+  const candidateKey = `${storedRevision}\0${presetsRevision}\0${draft}`;
   const validated = validatedCandidate === candidateKey;
   const mergedCandidateModelNames = useMemo(() => {
     const names = new Set(documentEntityNames(operatorParsed.document, "virtual_models"));
@@ -139,6 +155,7 @@ export function ManagedConfigurationWorkspace({
   const dirty = drafts.operator !== undefined && (
     !operatorParsed.document || JSON.stringify(operatorParsed.document) !== JSON.stringify(storedDocuments.operator)
   );
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   // Observe application without reloading or replacing the operator's draft.
   useEffect(() => {
@@ -214,10 +231,12 @@ export function ManagedConfigurationWorkspace({
         parsed.document,
         storedRevision,
         "",
+        presetsRevision,
       );
       // Saving can consolidate the shared sparkrun provider into the generated
       // set. Reload both fragments so ownership, draft and revision match storage.
       if (!await load()) return;
+      onSaved?.();
       setNotice({
         kind: "success",
         text: result.changed

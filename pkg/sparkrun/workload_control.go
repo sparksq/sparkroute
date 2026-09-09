@@ -37,6 +37,36 @@ type WorkloadBridge interface {
 	Lifecycle(context.Context, Binding, string, string, time.Duration) (WorkloadInfo, error)
 }
 
+// WorkloadControl joins explicit Start to normal admission; the controller
+// handles receipt-backed Stop and the optional plugin lifecycle actions.
+type WorkloadControl struct {
+	Controller *Controller
+	Admission  *lifecycle.AdmissionCoordinator
+}
+
+func (w WorkloadControl) WorkloadAction(ctx context.Context, deployment, jobID, action string) (WorkloadInfo, error) {
+	if action != "start" {
+		return w.Controller.WorkloadAction(ctx, deployment, jobID, action)
+	}
+	target, ok := w.Controller.targets[deployment]
+	if !ok || target.Source != lifecycle.EndpointActivatable {
+		return WorkloadInfo{}, fmt.Errorf("choose a configured recipe deployment")
+	}
+	endpoint, err := w.Admission.Start(ctx, deployment)
+	if err != nil {
+		return WorkloadInfo{}, err
+	}
+	w.Controller.mu.Lock()
+	info, exists := w.Controller.workloadInfo[endpoint.JobID]
+	w.Controller.mu.Unlock()
+	if !exists {
+		info = WorkloadInfo{JobID: endpoint.JobID, ClusterName: endpoint.Metadata["cluster_name"], RecipeRevision: endpoint.RecipeRevision,
+			Owned: endpoint.Metadata["owned"] == "true", LifecycleState: "running"}
+	}
+	info.State = "ready"
+	return info, nil
+}
+
 func (c *Client) InspectWorkloads(ctx context.Context) (WorkloadReport, error) {
 	var result WorkloadReport
 	err := c.invoke(ctx, bridgeRequest{Operation: "workloads"}, &result)
@@ -130,7 +160,7 @@ func (c *Controller) WorkloadAction(ctx context.Context, deployment, jobID, acti
 	index := slices.IndexFunc(report.Workloads, func(info WorkloadInfo) bool {
 		return info.JobID == jobID && info.RecipeRevision == target.Binding.RecipeRevision && slices.Contains(target.Binding.ClusterCandidates, info.ClusterName)
 	})
-	if index < 0 || !slices.Contains(report.Workloads[index].LifecycleActions, action) {
+	if index < 0 || (action != "stop" && !slices.Contains(report.Workloads[index].LifecycleActions, action)) {
 		return WorkloadInfo{}, fmt.Errorf("this job does not support the requested lifecycle action")
 	}
 	if action != "status" {
@@ -139,6 +169,20 @@ func (c *Controller) WorkloadAction(ctx context.Context, deployment, jobID, acti
 		}
 		if err := c.workloads.canStop(jobID); err != nil {
 			return WorkloadInfo{}, err
+		}
+		if action == "stop" {
+			if err := c.stopLocked(ctx, lifecycle.ActivationKey(target.Binding), target.Binding, jobID); err != nil {
+				return WorkloadInfo{}, err
+			}
+			info := report.Workloads[index]
+			info.State, info.LifecycleState, info.LifecycleActions = "offline", "offline", nil
+			c.mu.Lock()
+			if c.workloadInfo == nil {
+				c.workloadInfo = map[string]WorkloadInfo{}
+			}
+			c.workloadInfo[jobID] = info
+			c.mu.Unlock()
+			return info, nil
 		}
 		c.workloads.suspend(jobID)
 		defer c.workloads.finishAction(jobID)

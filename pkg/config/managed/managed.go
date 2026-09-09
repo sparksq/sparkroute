@@ -65,9 +65,10 @@ type Current struct {
 }
 
 type ReplaceOptions struct {
-	ExpectedActive config.Version
-	Actor          string
-	Reason         string
+	ExpectedActive          config.Version
+	ExpectedPresetsRevision *int64
+	Actor                   string
+	Reason                  string
 }
 
 type ReplaceResult struct {

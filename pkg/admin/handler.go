@@ -202,6 +202,10 @@ func NewHandler(
 		mux.HandleFunc("/v1/config", h.activeConfiguration)
 		mux.HandleFunc("/v1/config/managed-sets", h.managedSets)
 		mux.HandleFunc("/v1/config/managed-sets/", h.managedSet)
+		if _, ok := options.ManagedConfig.(managed.PresetStore); ok {
+			mux.HandleFunc("/v1/config/presets", h.configurationPresets)
+			mux.HandleFunc("/v1/config/presets/", h.configurationPresets)
+		}
 	}
 	if options.ModelMetadata != nil && privileged {
 		mux.HandleFunc("/v1/model-routing/discovered-metadata", h.discoveredModelMetadata)
@@ -425,6 +429,9 @@ func (h *handler) serveBootstrap(
 		bootstrap.Features[adminapi.FeatureConfigWrite] = h.options.ManagedConfig != nil &&
 			hasRole(principal, RoleConfigWrite)
 		bootstrap.Features[adminapi.FeatureConfigHistory] = false
+		_, supportsPresets := h.options.ManagedConfig.(managed.PresetStore)
+		bootstrap.Features[adminapi.FeatureConfigPresets] = supportsPresets &&
+			(hasRole(principal, RoleConfigRead) || hasRole(principal, RoleConfigWrite))
 		bootstrap.Features[adminapi.FeatureConfigManagedSets] = h.options.ManagedConfig != nil &&
 			(hasRole(principal, RoleConfigRead) || hasRole(principal, RoleConfigWrite) ||
 				hasRole(principal, RoleConfigReconcileSparkrun))

@@ -151,6 +151,9 @@ func (s *Store) Initialize(
 	`, version, raw, formatTime(now), actor, nullString(reason)); err != nil {
 		return false, fmt.Errorf("initialize SQLite configuration state: %w", err)
 	}
+	if err := ensureDefaultPreset(ctx, tx); err != nil {
+		return false, err
+	}
 	if err := tx.Commit(); err != nil {
 		return false, fmt.Errorf("commit SQLite configuration initialization: %w", err)
 	}
@@ -339,6 +342,10 @@ func (s *Store) ReplaceSet(
 	document config.Document,
 	options managed.ReplaceOptions,
 ) (managed.ReplaceResult, error) {
+	return s.replaceSet(ctx, owner, document, options, "")
+}
+
+func (s *Store) replaceSet(ctx context.Context, owner managed.Owner, document config.Document, options managed.ReplaceOptions, activatePreset string) (managed.ReplaceResult, error) {
 	if err := owner.Validate(); err != nil {
 		return managed.ReplaceResult{}, err
 	}
@@ -365,6 +372,20 @@ func (s *Store) ReplaceSet(
 			"%w: expected %q, found %q",
 			ErrRevisionConflict, options.ExpectedActive, current.Version,
 		)
+	}
+	activePreset, presetsRevision, err := presetState(ctx, tx)
+	if err != nil {
+		return managed.ReplaceResult{}, err
+	}
+	if options.ExpectedPresetsRevision != nil && *options.ExpectedPresetsRevision != presetsRevision {
+		return managed.ReplaceResult{}, managed.ErrPresetConflict
+	}
+	if activatePreset != "" {
+		preset, err := readPreset(ctx, tx, activatePreset)
+		if err != nil {
+			return managed.ReplaceResult{}, err
+		}
+		document = preset.Document
 	}
 	sets, err := s.loadSets(ctx, tx)
 	if err != nil {
@@ -404,6 +425,15 @@ func (s *Store) ReplaceSet(
 	}
 	metadata, err := readSetMetadata(ctx, tx, owner)
 	if err != nil {
+		return managed.ReplaceResult{}, err
+	}
+	if activatePreset != "" && activatePreset != activePreset {
+		if _, err := tx.ExecContext(ctx, "UPDATE gateway_config_preset_state SET active_preset = ?, revision = revision + 1 WHERE singleton = 1", activatePreset); err != nil {
+			return managed.ReplaceResult{}, err
+		}
+		changed = true
+	}
+	if err := syncActivePreset(ctx, tx, fragments[managed.OwnerOperator], now); err != nil {
 		return managed.ReplaceResult{}, err
 	}
 	if !changed {
@@ -653,7 +683,15 @@ func runMigrations(ctx context.Context, db *sql.DB) error {
 	if err := migrateLegacyCurrentConfiguration(ctx, db); err != nil {
 		return err
 	}
-	return nil
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := ensureDefaultPreset(ctx, tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func migrateLegacyCurrentConfiguration(ctx context.Context, db *sql.DB) error {

@@ -88,6 +88,43 @@ type recordCollector struct {
 	records []ledger.Record
 }
 
+func TestManualStartUsesBoundedAdmissionAndReleasesLease(t *testing.T) {
+	registry := endpointregistry.NewMemory()
+	controller := &fakeController{registry: registry, started: make(chan struct{}), ready: make(chan struct{}), endpoint: endpointregistry.Endpoint{
+		ID: "endpoint", Target: "deployment", BaseURL: "http://127.0.0.1:9000/v1", Controller: "controller", Protocol: "openai",
+		ServedModels: []string{"upstream"}, State: endpointregistry.StateReady, RegisteredAt: time.Now(), HeartbeatAt: time.Now(),
+	}}
+	target := activationTarget(1, 32)
+	target.Binding.ColdStart = ColdStartReject
+	coordinator, err := NewAdmissionCoordinator([]Target{target}, AdmissionOptions{
+		Registry: registry, Controllers: map[string]Controller{"controller": controller},
+		Authorizer: EndpointAuthorizerFunc(func(context.Context, endpointregistry.Endpoint) error { return nil }),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { _, err := coordinator.Start(ctx, "deployment"); done <- err }()
+	select {
+	case <-controller.started:
+	case <-ctx.Done():
+		t.Fatal("manual activation did not start")
+	}
+	if _, err := coordinator.Start(ctx, "deployment"); !errors.Is(err, ErrQueueFull) {
+		t.Fatal("manual Start bypassed the admission queue limit", err)
+	}
+	close(controller.ready)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := coordinator.Snapshot(ctx)
+	if err != nil || snapshot.Bindings[0].ActiveLeases != 0 || snapshot.Bindings[0].QueuedWaiters != 0 || controller.releases != 1 {
+		t.Fatal("manual activation leaked admission resources", snapshot, err)
+	}
+}
+
 func (c *recordCollector) Record(record ledger.Record) {
 	c.mu.Lock()
 	c.records = append(c.records, record)
