@@ -129,6 +129,11 @@ The Configuration sidebar contains **Providers**, **Model Deployments**,
 **Virtual Models / Aliases**, **Model Routing**, and **Advanced Options**. Each
 configuration list includes operator and sparkrun-generated entries. Generated
 entries are grayed out and read-only; selecting one shows its configuration.
+Generated sparkrun virtual models and deployments also offer **Remove from
+sparkroute**. This saves an exclusion in the operator draft, removes generated
+names that no longer have a target, and prevents later syncs from restoring them.
+It does not stop workloads. **Excluded sparkrun deployments** under Model
+Deployments provides **Restore**; both actions use Validate and Save.
 
 The editable sections share one operator draft, preserved across console navigation.
 Click **Validate** to check it against the combined configuration. Successful

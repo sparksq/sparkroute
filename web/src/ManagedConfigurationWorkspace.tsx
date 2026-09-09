@@ -23,6 +23,8 @@ import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { PolicyProfilesEditor } from "./PolicyProfilesEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
 import { ModelRoutingEditor } from "./ModelRoutingEditor";
+import { visibleSparkrunDocument } from "./sparkrunExclusions";
+import { ExcludedSparkrunDeployments } from "./SparkrunRemoval";
 import type { VirtualModelEditorExtension } from "./extensions";
 import { configurationSections, type ConfigurationSection } from "./configurationSections";
 
@@ -112,12 +114,12 @@ export function ManagedConfigurationWorkspace({
   const operatorDraft = drafts.operator ?? emptyDocument;
   const operatorParsed = useMemo(() => parseDocument(operatorDraft), [operatorDraft]);
   const generatedDocument = useMemo(() => {
-    const stored = storedDocuments.sparkrun;
+    const stored = visibleSparkrunDocument(operatorParsed.document ?? {}, storedDocuments.sparkrun);
     if (!stored || !Array.isArray(stored.deployments)) return stored;
     const titles = new Map(runtimeTargets?.filter((target) => target.title).map((target) => [target.deployment, target.title]));
     return { ...stored, deployments: stored.deployments.map((deployment) => titles.has(deployment.name)
       ? { ...deployment, title: titles.get(deployment.name) } : deployment) };
-  }, [storedDocuments.sparkrun, runtimeTargets]);
+  }, [operatorParsed.document, storedDocuments.sparkrun, runtimeTargets]);
   const metadata = sets.find((set) => set.owner === selectedOwner);
   const canEdit = canWriteOperator && Boolean(storedDocuments.operator);
   const candidateKey = `${storedRevision}\0${draft}`;
@@ -317,6 +319,7 @@ export function ManagedConfigurationWorkspace({
                   disabled={!canEdit || Boolean(busy) || recipeWizard}
                   document={operatorParsed.document}
                   readOnlyDocument={generatedDocument}
+                  allowGeneratedRemoval={Boolean(bootstrap.features.sparkrun_catalog)}
                   reservedModelNames={reservedModelNames}
                   extensions={virtualModelExtensions}
                   onChange={structuredChange}
@@ -346,7 +349,11 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "providers" && section !== "deployments"}>
-                <ProviderDeploymentEditor sparkrun={{enabled: Boolean(bootstrap.features.sparkrun_catalog), token, revision: storedRevision, onEditingChange: setRecipeWizard, onPrepared: (document, message) => { structuredChange(document); setNotice({kind: "info", text: message + " Validate, then Save to make it available. Saving does not launch it."}); }}} section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+                <ProviderDeploymentEditor allowGeneratedRemoval={Boolean(bootstrap.features.sparkrun_catalog)} sparkrun={{enabled: Boolean(bootstrap.features.sparkrun_catalog), token, revision: storedRevision, onEditingChange: setRecipeWizard, onPrepared: (document, message) => { structuredChange(document); setNotice({kind: "info", text: message + " Validate, then Save to make it available. Saving does not launch it."}); }}} section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={generatedDocument} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+              </div>
+              <div hidden={section !== "deployments"}>
+                <ExcludedSparkrunDeployments document={operatorParsed.document} generated={storedDocuments.sparkrun}
+                  disabled={!canEdit || Boolean(busy) || recipeWizard} onChange={structuredChange} />
               </div>
             </>
           ) : (
@@ -368,7 +375,7 @@ export function ManagedConfigurationWorkspace({
             spellCheck={false}
             value={draft}
           />
-          {generatedDocument ? <details className="generated-json"><summary>sparkrun entries · Read only</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(storedDocuments.sparkrun, null, 2)} /></details> : null}
+          {generatedDocument ? <details className="generated-json"><summary>sparkrun entries · Read only · Exclusions applied</summary><textarea aria-label="sparkrun configuration JSON" className="config-editor" readOnly value={JSON.stringify(visibleSparkrunDocument(operatorParsed.document ?? {}, storedDocuments.sparkrun), null, 2)} /></details> : null}
           </>
         ) : null}
       </section>

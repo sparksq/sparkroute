@@ -3359,3 +3359,14 @@ button:disabled {
 .routing-required-selector { max-width: 15rem; color: var(--muted); text-align: right; }
 .routing-stage-warning { padding: 0 22px 14px; color: var(--muted); font-size: .8rem; }
 .routing-stage-warning p { line-height: 1.5; }
+
+.sparkrun-removal { margin: 0 22px 18px; }
+.sparkrun-removal .notice { margin-top: 12px; overflow-wrap: anywhere; }
+.sparkrun-removal .notice p + p { margin-top: 8px; }
+.sparkrun-removal ul { padding-left: 20px; }
+.sparkrun-exclusions { padding: 20px; border-top: 1px solid var(--line); }
+.sparkrun-exclusions summary { cursor: pointer; font-weight: 700; }
+.sparkrun-exclusions p { color: var(--muted); font-size: .85rem; }
+.sparkrun-exclusions ul { padding: 0; list-style: none; }
+.sparkrun-exclusions li { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.sparkrun-exclusions li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }

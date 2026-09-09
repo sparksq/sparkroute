@@ -153,6 +153,9 @@ var protectedExtraBodyFields = map[string]struct{}{
 
 // Validate rejects ambiguous or unsafe configuration before publication.
 func (d Document) Validate() error {
+	if err := d.SparkrunOverrides.Validate(); err != nil {
+		return err
+	}
 	resolved, err := d.ResolveModelPolicies()
 	if err != nil {
 		return err

@@ -307,7 +307,6 @@ function ConsoleLayout({
           <BrandMark />
           <div>
             <strong>{productName}</strong>
-            <span>{bootstrap.edition} profile</span>
           </div>
         </div>
         <nav aria-label="Admin sections">

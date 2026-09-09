@@ -1,4 +1,6 @@
 import { routingModelUses } from "./modelRoutingReferences";
+import { SparkrunRemoval } from "./SparkrunRemoval";
+import { modelDeploymentNames } from "./sparkrunExclusions";
 import { RequestProfileEditor } from "./RequestProfileEditor";
 import { ModelPolicyAssignments } from "./ModelPolicyAssignments";
 import { capabilityOptions, capabilitySelectionSummary } from "./capabilities";
@@ -19,6 +21,7 @@ export function VirtualModelEditor({
   referencedDeployments = [],
   reservedModelNames = [],
   readOnlyDocument,
+  allowGeneratedRemoval = false,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
@@ -27,6 +30,7 @@ export function VirtualModelEditor({
   referencedDeployments?: Array<{ name: string; source: string }>;
   reservedModelNames?: string[];
   readOnlyDocument?: ConfigurationDocument;
+  allowGeneratedRemoval?: boolean;
 }) {
   const shape = useMemo(() => inspectDocument(document, extensions), [document, extensions]);
   const generatedShape = useMemo(() => inspectDocument(readOnlyDocument ?? { deployments: [], virtual_models: [] }, extensions), [readOnlyDocument, extensions]);
@@ -195,7 +199,7 @@ export function VirtualModelEditor({
                 <p className="eyebrow">Logical product and routing boundary</p>
                 <h3>{stringValue(selected.name) || "Unnamed virtual model"}</h3>
               </div>
-              <button
+              {!readOnlySelected || !allowGeneratedRemoval ? <button
                 className={confirmRemove ? "danger-button confirm" : "danger-button"}
                 disabled={formDisabled}
                 onBlur={() => setConfirmRemove(false)}
@@ -203,8 +207,12 @@ export function VirtualModelEditor({
                 type="button"
               >
                 {confirmRemove ? "Confirm remove" : "Remove model"}
-              </button>
+              </button> : null}
             </div>
+
+            {readOnlySelected && allowGeneratedRemoval && readOnlyDocument ? <SparkrunRemoval
+              key={selectedName} document={document} generated={readOnlyDocument} deployments={modelDeploymentNames(selected)}
+              disabled={disabled} onChange={onChange} /> : null}
 
             {!readOnlySelected && selectedRoutingUses.length > 0 ? (
               <p className="notice info" role="status">Used by model routing: {selectedRoutingUses.join("; ")}.

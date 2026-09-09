@@ -97,16 +97,33 @@ type Store interface {
 
 type Validator func(config.Document) error
 
-// Merge concatenates entity collections without precedence or field overlays.
+// Merge applies operator exclusions to generated sparkrun entries, then
+// concatenates the remaining entity collections without field overlays.
 // One owner may additionally supply the document-wide capability defaults.
 // The final document validator rejects cross-owner name/alias/default collisions
 // and all references broken by a managed-set replacement.
 func Merge(sets map[Owner]config.Document) (config.Document, error) {
-	for owner := range sets {
+	filtered := make(map[Owner]config.Document, len(sets))
+	for owner, document := range sets {
 		if err := owner.Validate(); err != nil {
 			return config.Document{}, err
 		}
+		if document.SparkrunOverrides != nil && owner != OwnerOperator {
+			return config.Document{}, fmt.Errorf("sparkrun_overrides must be managed by the operator")
+		}
+		filtered[owner] = document
 	}
+	if err := sets[OwnerOperator].SparkrunOverrides.Validate(); err != nil {
+		return config.Document{}, err
+	}
+	if generated, exists := sets[OwnerSparkrun]; exists {
+		var err error
+		filtered[OwnerSparkrun], err = ApplySparkrunOverrides(sets[OwnerOperator], generated)
+		if err != nil {
+			return config.Document{}, err
+		}
+	}
+	sets = filtered
 	ordered := orderedOwners(sets)
 	if err := validateOwnedEntities(sets, ordered); err != nil {
 		return config.Document{}, fmt.Errorf("validate merged managed configuration: %w", err)
@@ -116,6 +133,11 @@ func Merge(sets map[Owner]config.Document) (config.Document, error) {
 	var modelRoutingOwner Owner
 	for _, owner := range ordered {
 		document := sets[owner]
+		if document.SparkrunOverrides != nil {
+			result.SparkrunOverrides = &config.SparkrunOverrides{
+				ExcludedDeployments: append([]string(nil), document.SparkrunOverrides.ExcludedDeployments...),
+			}
+		}
 		if len(document.PIIProfiles) > 0 || len(document.GuardrailProfiles) > 0 || len(document.ModelPolicies) > 0 {
 			if owner != OwnerOperator {
 				return config.Document{}, fmt.Errorf("policy profiles and model_policies must be managed by the operator")

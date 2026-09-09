@@ -135,7 +135,7 @@ describe("AdminApp", () => {
     render(<AdminApp productName="SparkRoute" />);
 
     expect(await screen.findByText("openai-primary")).toBeInTheDocument();
-    expect(screen.getByText("cluster profile")).toBeInTheDocument();
+    expect(screen.queryByText("cluster profile")).not.toBeInTheDocument();
     expect(screen.queryByText("Shared control plane enabled")).not.toBeInTheDocument();
   });
 

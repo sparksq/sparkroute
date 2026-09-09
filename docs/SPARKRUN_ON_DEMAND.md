@@ -14,9 +14,39 @@ endpoint with a deployment ID; IDs and virtual-model aliases are preserved.
 UI-created models live in the operator managed set. Providers, deployments,
 virtual model names, and aliases are prepared as a single draft and committed
 using the existing revision-checked Validate/Save API. Generated entries remain
-read-only and can be reused without copying their lifecycle policy. Overlapping
+read-only and can be reused without copying their lifecycle policy. Operator
+exclusions can remove generated entries from the effective configuration. Overlapping
 bindings for the same recipe and cluster are rejected; use another alias of the
 existing deployment instead.
+
+## Removing generated entries
+
+Choose **Remove from sparkroute** on a generated virtual model or deployment,
+review the affected names, and confirm. Then **Validate** and **Save**. A stopped
+recipe binding can be removed this way even though its generated model fields
+are read-only. Generated aliases and request profiles disappear with their last
+deployment target; generated models backed by another deployment keep that
+target. Operator-created models and routing are not silently rewritten. The
+preview identifies references that need repairing, and merged validation checks
+all remaining references, including effective guardrail policies.
+
+Removal saves `sparkrun_overrides.excluded_deployments` in the operator fragment,
+using the generated deployment's stable ID. The SQLite managed configuration
+merge applies exclusions before validation and runtime construction, in the same
+revision-checked transaction as other operator edits. No edit to `proxy.yaml`
+is required. The raw sparkrun set remains its source declaration; subsequent
+syncs, disappearance/reappearance, and restarts cannot override the exclusion.
+It applies only to generated deployments, never operator-created deployments.
+
+**Excluded sparkrun deployments** at the bottom of Model Deployments provides
+**Restore**, followed by Validate and Save. Restore uses the latest reported
+source settings. A binding with the same deployment ID remains excluded until
+restored; a new recipe fingerprint produces a distinct deployment ID.
+
+Exclusion removes the deployment from routing and automatic activation. It does
+not stop a running workload. The normal generation switch removes its idle
+policy; explicit workload stop/sleep operations are separate. This is removal
+from sparkroute, not the future promote/demote availability-mode control.
 
 The shared-listener admin path classifier includes `/v1/sparkrun`, so catalog
 and draft calls reach the admin handler on both shared and separate ports.

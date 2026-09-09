@@ -84,7 +84,11 @@ func (h *handler) sparkrunRecipeDraft(writer http.ResponseWriter, request *http.
 	generated := managed.EmptyDocument()
 	set, err := h.options.ManagedConfig.GetSet(request.Context(), managed.OwnerSparkrun)
 	if err == nil {
-		generated = set.Document
+		generated, err = managed.ApplySparkrunOverrides(input.Document, set.Document)
+		if err != nil {
+			writeError(writer, http.StatusBadRequest, "invalid_configuration", err.Error())
+			return
+		}
 	} else if !errors.Is(err, managed.ErrSetNotFound) {
 		writeManagedConfigError(writer, err)
 		return

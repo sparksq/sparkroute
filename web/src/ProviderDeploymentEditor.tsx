@@ -1,4 +1,5 @@
 import { DeploymentMetadataEditor } from "./DeploymentMetadataEditor";
+import { SparkrunRemoval } from "./SparkrunRemoval";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigurationDocument } from "./types";
 import { capabilityOptions } from "./capabilities";
@@ -54,6 +55,7 @@ export function ProviderDeploymentEditor({
   simplifiedCapabilities = false,
   readOnlyDocument,
   sparkrun,
+  allowGeneratedRemoval = false,
 }: {
   document: ConfigurationDocument;
   disabled: boolean;
@@ -62,6 +64,7 @@ export function ProviderDeploymentEditor({
   section?: "all" | "providers" | "deployments";
   simplifiedCapabilities?: boolean;
   readOnlyDocument?: ConfigurationDocument;
+  allowGeneratedRemoval?: boolean;
   sparkrun?: { enabled: boolean; token: string; revision: string;
     onEditingChange: (editing: boolean) => void;
     onPrepared: (document: ConfigurationDocument, message: string) => void };
@@ -310,12 +313,14 @@ export function ProviderDeploymentEditor({
           />
         ) : selectedDeployment && sparkrun && objectValue(selectedDeployment.endpoint_source).controller === "sparkrun" ? (
           <>
-            <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />
+            <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} hideRemove={readOnlySelected && allowGeneratedRemoval} />
+            {readOnlySelected && allowGeneratedRemoval && readOnlyDocument ? <SparkrunRemoval
+              key={stringValue(selectedDeployment.name)} document={document} generated={readOnlyDocument}
+              deployments={[stringValue(selectedDeployment.name)]} disabled={disabled} onChange={onChange} /> : null}
             <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
             {readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <p className="notice info">
               This deployment is retained by a recipe binding in sparkrun’s proxy.yaml, even while its workload is stopped.
-              To retire it, remove dependent virtual models or routing references, then remove the binding or use sparkrun proxy unload for this recipe.
-              Removing the binding leaves a running workload alone; proxy unload also stops it.
+              {allowGeneratedRemoval ? " Use Remove from sparkroute above to exclude it and its generated names. No manual configuration-file edit is needed." : " Its generated names are managed with this deployment."}
             </p> : null}
             <DeploymentMetadataEditor deployment={selectedDeployment} disabled={formDisabled} onChange={updateDeployment} />
             {sparkrun?.enabled && !readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <button type="button" className="secondary-button" disabled={disabled} onClick={() => setEditingRecipe(true)}>Edit recipe settings</button> : null}
@@ -871,6 +876,7 @@ function FormHeading({
   removeTitle,
   onRemove,
   onBlur,
+  hideRemove = false,
 }: {
   eyebrow: string;
   title: string;
@@ -879,11 +885,12 @@ function FormHeading({
   removeTitle: string;
   onRemove: () => void;
   onBlur: () => void;
+  hideRemove?: boolean;
 }) {
   return (
     <div className="model-form-heading">
       <div><p className="eyebrow">{eyebrow}</p><h3>{title}</h3></div>
-      <button
+      {!hideRemove ? <button
         className={confirmRemove ? "danger-button confirm" : "danger-button"}
         disabled={disabled}
         onBlur={onBlur}
@@ -892,7 +899,7 @@ function FormHeading({
         type="button"
       >
         {confirmRemove ? "Confirm remove" : "Remove"}
-      </button>
+      </button> : null}
     </div>
   );
 }
