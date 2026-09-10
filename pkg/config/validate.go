@@ -560,6 +560,12 @@ func validatePrivacy(path string, policy *PrivacyPolicy) error {
 }
 
 func (s EndpointSource) Validate() error {
+	if err := s.Recovery.Validate(); err != nil {
+		return fmt.Errorf("recovery: %w", err)
+	}
+	if s.Recovery.Action != "" && (s.Type != EndpointSourceActivatable || s.Controller != "sparkrun") {
+		return fmt.Errorf("recovery requires an activatable sparkrun source")
+	}
 	sourceType := s.Type.Effective()
 	switch sourceType {
 	case EndpointSourceStatic:

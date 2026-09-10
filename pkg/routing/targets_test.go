@@ -175,6 +175,9 @@ func TestTargetManagerIgnoresCompletionFromEarlierCircuitGeneration(t *testing.T
 	}
 	manager.Complete(probe, TargetSuccess)
 	manager.Complete(stale, TargetFailure)
+	if stale.HealthApplied || stale.CircuitOpened || !failing.HealthApplied || !failing.CircuitOpened || !probe.HealthApplied || probe.CircuitOpened {
+		t.Fatal("stale circuit completion could influence workload recovery")
+	}
 
 	status, _ := manager.Status("target")
 	if status.CircuitState != CircuitClosed ||

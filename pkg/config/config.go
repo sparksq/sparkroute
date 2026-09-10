@@ -140,6 +140,7 @@ func (d Deployment) SupportsNativeProtocol(provider Provider, protocol Protocol)
 // EndpointSource describes how a deployment obtains its serving endpoint.
 // The zero value is a static provider URL for backward compatibility.
 type EndpointSource struct {
+	Recovery           RecoveryPolicy     `json:"recovery,omitzero"`
 	IdleAction         string             `json:"idle_action,omitempty"`
 	Type               EndpointSourceType `json:"type,omitempty"`
 	Controller         string             `json:"controller,omitempty"`
@@ -160,7 +161,7 @@ func (s EndpointSource) IsZero() bool {
 		s.Recipe == "" && s.RecipeRevision == "" &&
 		len(s.ClusterCandidates) == 0 && len(s.Overrides) == 0 &&
 		s.ActivationTimeout == 0 && s.IdleTTL == 0 && s.IdleAction == "" &&
-		s.MaxQueuedWaiters == 0 && s.MaxQueuedBodyBytes == 0 && s.ColdStart == ""
+		s.MaxQueuedWaiters == 0 && s.MaxQueuedBodyBytes == 0 && s.ColdStart == "" && s.Recovery == (RecoveryPolicy{})
 }
 
 type EndpointSourceType string

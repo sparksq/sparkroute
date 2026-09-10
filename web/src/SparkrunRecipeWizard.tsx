@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Fox Engine Ltd.
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { RecoveryFields } from "./RecoveryFields";
 import { capabilityOptions } from "./capabilities";
 import { RecipePluginStatus } from "./RecipePluginStatus";
 import { RegistryManager } from "./RegistryManager";
@@ -38,6 +39,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
   const customName = useRef(false);
   const [aliases, setAliases] = useState("");
   const [waitMinutes, setWaitMinutes] = useState(() => durationMinutes(initialSource.activation_timeout, 30));
+  const [recovery, setRecovery] = useState<Record<string, unknown>>(() => (initialSource.recovery ?? {}) as Record<string, unknown>);
   const [idleAction, setIdleAction] = useState(String(initialSource.idle_action || "stop"));
   const [idle, setIdle] = useState(() => durationMinutes(initialSource.idle_ttl, 0) > 0);
   const [idleMinutes, setIdleMinutes] = useState(() => durationMinutes(initialSource.idle_ttl, 30) || 30);
@@ -222,6 +224,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
         {idle && <label>Idle action<select aria-label="Idle action" value={idleAction} onChange={(e) => setIdleAction(e.target.value)}><option value="stop">Stop workload</option><option value="sleep" disabled={!preview?.required_plugins.some((p) => p === "coldsnap" || p.endsWith(".coldsnap"))}>Sleep with ColdSnap</option></select><small>Sleep releases GPU memory and wakes on the next request; it requires a job actually started with ColdSnap.</small></label>}
         {idle && <label>Idle time (minutes)<input type="number" min={1} required value={idleMinutes} onChange={(e) => setIdleMinutes(Number(e.target.value))} /></label>}
         <p className="section-help">Idle time begins after the last active request finishes. SparkRoute only stops workloads it started; an adopted workload stays running.</p>
+        <RecoveryFields value={recovery} onChange={setRecovery} />
         <details><summary>Advanced launch settings</summary><div className="recipe-fieldset">
           <fieldset className="recipe-fieldset"><legend>Fallback clusters</legend>
             <p className="section-help">Try these clusters in order if the preferred cluster has insufficient capacity; a failed or uncertain launch does not start a second workload.</p>
@@ -248,6 +251,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
             native_apis: nativeAPIs, reference: preview!.reference, recipe_revision: preview!.recipe_revision, name: name.trim(),
             aliases: aliases.split(",").map((v) => v.trim()).filter(Boolean), cluster, fallback_clusters: fallbackClusters, overrides: launchOverrides(),
             activation_timeout: `${waitMinutes}m`, idle_action: idleAction, idle_ttl: idle ? `${idleMinutes}m` : "0s",
+            recovery: recovery.action ? recovery : undefined,
             max_queued_waiters: waiters, max_queued_body_bytes: bodyMiB * 1024 * 1024,
           });
           if (mounted.current) onChange(result.document, result.reused, result.deployment);

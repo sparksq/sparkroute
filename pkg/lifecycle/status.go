@@ -45,9 +45,21 @@ type ControllerStatus struct {
 	Reason          string           `json:"reason,omitempty"`
 }
 
+// RecoveryStatus contains only bounded health and retry metadata.
+type RecoveryStatus struct {
+	Action       string     `json:"action"`
+	Phase        string     `json:"phase"`
+	Reason       string     `json:"reason,omitempty"`
+	FailedProbes int        `json:"failed_probes"`
+	Attempts     int        `json:"attempts"`
+	MaxRestarts  int        `json:"max_restarts"`
+	NextAttempt  *time.Time `json:"next_attempt_at,omitempty"`
+}
+
 // BindingStatus describes one configured activation binding and its bounded
 // cold-start admission state.
 type BindingStatus struct {
+	Recovery           *RecoveryStatus        `json:"recovery,omitempty"`
 	PluginsInUse       []string               `json:"plugins_in_use,omitempty"`
 	LifecycleActions   []string               `json:"lifecycle_actions,omitempty"`
 	Owned              *bool                  `json:"owned,omitempty"`
@@ -180,6 +192,23 @@ func validateControllerStatus(status *ControllerStatus) error {
 }
 
 func validateBindingStatus(status *BindingStatus) error {
+	if r := status.Recovery; r != nil {
+		if r.Action != "restart" && r.Action != "stop" {
+			return fmt.Errorf("invalid recovery action")
+		}
+		switch r.Phase {
+		case "healthy", "monitoring", "scheduled", "draining", "stopping", "restarting", "backoff", "awaiting_demand", "failed", "exhausted":
+		default:
+			return fmt.Errorf("invalid recovery phase")
+		}
+		if r.FailedProbes < 0 || r.Attempts < 0 || r.MaxRestarts < 1 || r.MaxRestarts > 100 || r.Attempts > 100 {
+			return fmt.Errorf("invalid recovery counters")
+		}
+		if err := validateReason(r.Reason); err != nil {
+			return err
+		}
+	}
+
 	if len(status.PluginsInUse) > 64 || len(status.LifecycleActions) > 3 {
 		return fmt.Errorf("too many workload plugin capabilities")
 	}
@@ -313,6 +342,11 @@ func cloneSnapshot(snapshot Snapshot) Snapshot {
 	result.Controllers = append([]ControllerStatus(nil), snapshot.Controllers...)
 	result.Bindings = append([]BindingStatus(nil), snapshot.Bindings...)
 	for index := range result.Bindings {
+		if r := result.Bindings[index].Recovery; r != nil {
+			value := *r
+			value.NextAttempt = cloneTime(r.NextAttempt)
+			result.Bindings[index].Recovery = &value
+		}
 		if result.Bindings[index].Owned != nil {
 			value := *result.Bindings[index].Owned
 			result.Bindings[index].Owned = &value

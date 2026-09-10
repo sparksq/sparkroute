@@ -175,3 +175,13 @@ it("redirects the legacy Runtime URL into Overview and refreshes without losing 
   await waitFor(() => expect(fetch.mock.calls.filter(([url]) => url === "/v1/status")).toHaveLength(2));
   expect(screen.getByRole("tab", { name: "Diagnostics" })).toHaveAttribute("aria-selected", "true");
 });
+
+it("shows exhausted recovery and offers an explicit retry", async () => {
+  const data = { ...status, targets: [{ ...target, active_requests: 0, circuit_state: "open", admission_available: false }] };
+  mockAPI({ status: data, bindings: [{ ...binding, state: "failed", phase: "recovery_failed", reason: "recovery_exhausted", active_leases: 0, queued_waiters: 0, recovery: { action: "restart", phase: "exhausted", reason: "recovery_exhausted", failed_probes: 3, attempts: 3, max_restarts: 3 } }], endpoints: [] });
+  render(<OverviewWorkspace bootstrap={bootstrap} token="" initialStatus={data} />);
+  await waitFor(() => expect(deploymentRow("Flash on g610").getByRole("button", { name: "Start" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Flash on g610" }));
+  expect(screen.getByLabelText("Automatic recovery")).toHaveTextContent("3 / 3");
+  expect(screen.getByLabelText("Automatic recovery")).toHaveTextContent("Start to retry explicitly");
+});

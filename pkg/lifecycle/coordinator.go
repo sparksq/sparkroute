@@ -336,7 +336,7 @@ func (c *AdmissionCoordinator) Start(ctx context.Context, deployment string) (en
 		return endpointregistry.Endpoint{}, ErrUnknownDeployment
 	}
 	target.Binding.ColdStart = ColdStartWait
-	lease, err := c.acquireActivatable(ctx, target, AdmissionRequest{Deployment: deployment})
+	lease, err := c.acquireActivatable(ctx, target, AdmissionRequest{Deployment: deployment, Features: RequestFeatures{ManualStart: true}})
 	if err != nil {
 		return endpointregistry.Endpoint{}, err
 	}
@@ -393,8 +393,14 @@ func (c *AdmissionCoordinator) acquireActivatable(
 		return c.acquireControllerLease(ctx, target, request.Features, ready)
 	}
 	if readyErr != nil && binding.ColdStart == ColdStartReject {
-		c.recordRejected(binding, request.Features.VirtualModel, "cold_start_rejected")
-		return nil, c.admissionError("cold_start_rejected", ErrColdStartRejected)
+		status, err := c.controllers[binding.Controller].Status(ctx, binding)
+		if err != nil || !status.Prepared {
+			c.recordRejected(binding, request.Features.VirtualModel, "cold_start_rejected")
+			return nil, c.admissionError("cold_start_rejected", ErrColdStartRejected)
+		}
+		// The controller rechecks the prepared receipt under its workload gate.
+		// Losing readiness here must not turn reject into an implicit cold start.
+		request.Features.PreparedOnly = true
 	}
 	if readyErr == nil {
 		return c.acquireControllerLease(ctx, target, request.Features, ready)
@@ -900,7 +906,7 @@ func (c *AdmissionCoordinator) Snapshot(ctx context.Context) (Snapshot, error) {
 			Controller: target.Binding.Controller, BindingRevision: target.Binding.Revision,
 			VirtualModel: target.Binding.VirtualModel, Deployment: target.Deployment,
 			PluginsInUse: append([]string(nil), observed.PluginsInUse...), LifecycleActions: append([]string(nil), observed.LifecycleActions...),
-			Phase: observed.Phase, JobID: observed.JobID, Owned: observed.Owned, ClusterCandidates: append([]string(nil), target.Binding.ClusterCandidates...),
+			Recovery: observed.Recovery, Phase: observed.Phase, JobID: observed.JobID, Owned: observed.Owned, ClusterCandidates: append([]string(nil), target.Binding.ClusterCandidates...),
 			State: state.state, UpdatedAt: state.updatedAt,
 			ActivationStarted:  cloneTime(state.activationStarted),
 			ActivationDeadline: cloneTime(state.activationDeadline),

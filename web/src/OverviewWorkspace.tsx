@@ -197,6 +197,14 @@ function DeploymentDetails({ row, token, hasEvents, hasEndpoints, onClose, onAct
       </dl>
       <p className="overview-policy-note">{row.target?.cold_start === "wait" ? "Requests can start this workload again after it stops." : row.target?.cold_start === "reject" ? "Start this workload manually before sending requests. Cold requests are rejected." : "Stopping keeps this deployment configured. Its activation policy determines whether requests can start it again."}</p>
     </div> : null}
+    {binding?.recovery ? <section aria-label="Automatic recovery"><h4>Automatic recovery</h4><dl className="target-detail-grid">
+      <TargetFact label="Recovery action" value={binding.recovery.action === "restart" ? "Restart immediately" : "Stop until next demand"} />
+      <TargetFact label="Recovery phase" value={humanize(binding.recovery.phase)} />
+      <TargetFact label="Recovery attempts" value={`${binding.recovery.attempts} / ${binding.recovery.max_restarts}`} />
+      <TargetFact label="Failed recovery probes" value={String(binding.recovery.failed_probes)} />
+      <TargetFact label="Next recovery attempt" value={binding.recovery.next_attempt_at ? formatTime(binding.recovery.next_attempt_at) : "—"} />
+      <TargetFact label="Recovery result" value={humanize(binding.recovery.reason || "—")} />
+    </dl>{["failed", "exhausted"].includes(binding.recovery.phase) ? <p className="notice error">Automatic recovery is blocked. Inspect the workload, then use Start to retry explicitly or Stop to shut it down.</p> : null}</section> : null}
     {row.target ? <TargetHealthDetail target={row.target} /> : <p className="overview-policy-note">Routing health is not available for this deployment.</p>}
     {hasEndpoints ? <div className="deployment-endpoints"><h4>Serving endpoints</h4>
       {row.endpoints.length ? <ul>{row.endpoints.map(endpoint => <li key={endpoint.endpoint_id}><code>{endpoint.endpoint_id}</code><span>{endpoint.expired ? "Expired" : humanize(endpoint.state)} · {endpoint.active_requests} requests{endpoint.heartbeat_at ? ` · Last heartbeat ${formatTime(endpoint.heartbeat_at)}` : ""}</span></li>)}</ul> : <p>No serving endpoints are registered.</p>}

@@ -107,6 +107,9 @@ type targetRuntime struct {
 }
 
 type TargetLease struct {
+	// Populated by Complete for the caller releasing the corresponding workload lease.
+	HealthApplied  bool
+	CircuitOpened  bool
 	Deployment     string
 	CircuitState   CircuitState
 	HalfOpenProbe  bool
@@ -303,6 +306,7 @@ func (m *TargetManager) CompleteWithFailureClass(
 		target.state == CircuitHalfOpen &&
 		target.generation == lease.circuitGeneration:
 		target.probeInFlight = false
+		lease.HealthApplied = true
 		switch result {
 		case TargetSuccess:
 			transition = target.close("half_open_success")
@@ -312,8 +316,10 @@ func (m *TargetManager) CompleteWithFailureClass(
 	case !lease.HalfOpenProbe &&
 		target.state == CircuitClosed &&
 		target.generation == lease.circuitGeneration:
+		lease.HealthApplied = !target.policy.Disabled
 		transition = target.recordClosedResult(now, result)
 	}
+	lease.CircuitOpened = transition != nil && transition.To == CircuitOpen
 	target.mu.Unlock()
 	m.observeAdmission(lease.Deployment, -1)
 	m.observeTransition(transition)

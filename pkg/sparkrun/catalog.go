@@ -84,20 +84,21 @@ type Cluster struct {
 }
 
 type RecipeDraft struct {
-	NativeAPIs         []string          `json:"native_apis"`
-	IdleAction         string            `json:"idle_action"`
-	Deployment         string            `json:"deployment,omitempty"`
-	Reference          string            `json:"reference"`
-	RecipeRevision     string            `json:"recipe_revision"`
-	Name               string            `json:"name"`
-	Aliases            []string          `json:"aliases"`
-	Cluster            string            `json:"cluster"`
-	FallbackClusters   []string          `json:"fallback_clusters"`
-	Overrides          map[string]string `json:"overrides"`
-	ActivationTimeout  config.Duration   `json:"activation_timeout"`
-	IdleTTL            config.Duration   `json:"idle_ttl"`
-	MaxQueuedWaiters   int               `json:"max_queued_waiters"`
-	MaxQueuedBodyBytes int64             `json:"max_queued_body_bytes"`
+	Recovery           config.RecoveryPolicy `json:"recovery,omitzero"`
+	NativeAPIs         []string              `json:"native_apis"`
+	IdleAction         string                `json:"idle_action"`
+	Deployment         string                `json:"deployment,omitempty"`
+	Reference          string                `json:"reference"`
+	RecipeRevision     string                `json:"recipe_revision"`
+	Name               string                `json:"name"`
+	Aliases            []string              `json:"aliases"`
+	Cluster            string                `json:"cluster"`
+	FallbackClusters   []string              `json:"fallback_clusters"`
+	Overrides          map[string]string     `json:"overrides"`
+	ActivationTimeout  config.Duration       `json:"activation_timeout"`
+	IdleTTL            config.Duration       `json:"idle_ttl"`
+	MaxQueuedWaiters   int                   `json:"max_queued_waiters"`
+	MaxQueuedBodyBytes int64                 `json:"max_queued_body_bytes"`
 }
 
 func resolveDetails(ctx context.Context, catalog Catalog, reference string, overrides map[string]string) (RecipeDetails, error) {
@@ -197,6 +198,9 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		}
 		seenClusters[candidate] = true
 	}
+	if err := input.Recovery.Validate(); err != nil {
+		return operator, "", false, fmt.Errorf("recovery: %w", err)
+	}
 	if input.ActivationTimeout == 0 {
 		input.ActivationTimeout = config.Duration(30 * time.Minute)
 	}
@@ -216,6 +220,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		source.Recipe, source.RecipeRevision = details.Reference, details.Revision
 		source.ClusterCandidates, source.Overrides = candidates, input.Overrides
 		source.IdleAction = input.IdleAction
+		source.Recovery = input.Recovery
 		source.ActivationTimeout, source.IdleTTL = input.ActivationTimeout, input.IdleTTL
 		source.MaxQueuedWaiters, source.MaxQueuedBodyBytes = input.MaxQueuedWaiters, input.MaxQueuedBodyBytes
 		source.Revision = ""
@@ -271,7 +276,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 
 		source := config.EndpointSource{Type: config.EndpointSourceActivatable, Controller: "sparkrun", Recipe: details.Reference,
 			RecipeRevision: details.Revision, ClusterCandidates: candidates, Overrides: input.Overrides,
-			ActivationTimeout: input.ActivationTimeout, IdleTTL: input.IdleTTL, IdleAction: input.IdleAction, ColdStart: config.ColdStartWait,
+			ActivationTimeout: input.ActivationTimeout, IdleTTL: input.IdleTTL, IdleAction: input.IdleAction, ColdStart: config.ColdStartWait, Recovery: input.Recovery,
 			MaxQueuedWaiters: input.MaxQueuedWaiters, MaxQueuedBodyBytes: input.MaxQueuedBodyBytes}
 		raw, _ := json.Marshal(source)
 		revision := sha256.Sum256(raw)

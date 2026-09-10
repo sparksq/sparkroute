@@ -385,6 +385,7 @@ export interface LifecycleControllerStatus {
 }
 
 export interface LifecycleBindingStatus {
+ recovery?: { action: string; phase: string; reason?: string; failed_probes: number; attempts: number; max_restarts: number; next_attempt_at?: string };
  plugins_in_use?: string[];
  lifecycle_actions?: string[];
  owned?: boolean;

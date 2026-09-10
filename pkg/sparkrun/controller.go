@@ -253,6 +253,9 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 	}
 	seen := make(map[string]struct{})
 	for _, target := range c.targets {
+		if target.Source == lifecycle.EndpointActivatable && c.workloads.recoveryAdmission(target.Binding) != nil {
+			continue
+		}
 		for _, discovered := range result.Endpoints {
 			if !matchesTarget(target, discovered) || !c.workloads.available(discovered.ClusterID) {
 				continue
@@ -288,13 +291,21 @@ func (c *Controller) Reconcile(ctx context.Context) error {
 func (c *Controller) EnsureReady(
 	ctx context.Context,
 	binding lifecycle.Binding,
-	_ lifecycle.RequestFeatures,
+	features lifecycle.RequestFeatures,
 ) (lifecycle.Lease, error) {
 	unlock, err := c.workloads.lock(ctx, binding)
 	if err != nil {
 		return lifecycle.Lease{}, err
 	}
 	defer unlock()
+	if features.ManualStart {
+		if err := c.workloads.prepareManualStart(binding); err != nil {
+			return lifecycle.Lease{}, err
+		}
+	}
+	if err := c.workloads.recoveryAdmission(binding); err != nil {
+		return lifecycle.Lease{}, err
+	}
 	key := lifecycle.ActivationKey(binding)
 	now := c.now().UTC()
 	c.mu.Lock()
@@ -340,7 +351,15 @@ func (c *Controller) EnsureReady(
 	if timeout <= 0 {
 		timeout = 30 * time.Minute
 	}
-	result, err := c.bridge.EnsureReady(ctx, bridgeBinding(binding), timeout)
+	var result EnsureResult
+	if prepared := c.workloads.preparedEndpoint(binding); prepared != nil {
+		result = EnsureResult{State: "ready", Endpoint: prepared}
+	} else if features.PreparedOnly {
+		c.setFailure(key, binding, lifecycle.ErrEndpointNotReady)
+		return lifecycle.Lease{}, lifecycle.ErrEndpointNotReady
+	} else {
+		result, err = c.bridge.EnsureReady(ctx, bridgeBinding(binding), timeout)
+	}
 	if err != nil {
 		c.setFailure(key, binding, err)
 		return lifecycle.Lease{}, err
@@ -398,7 +417,7 @@ func (c *Controller) EnsureReady(
 func (c *Controller) Release(
 	_ context.Context,
 	lease lifecycle.Lease,
-	_ lifecycle.RequestOutcome,
+	outcome lifecycle.RequestOutcome,
 ) error {
 	c.mu.Lock()
 	key, exists := c.leases[lease.ID]
@@ -407,7 +426,7 @@ func (c *Controller) Release(
 		return nil
 	}
 	delete(c.leases, lease.ID)
-	c.workloads.release(lease.Endpoint.ClusterID)
+	c.workloads.release(lease.Endpoint.ClusterID, outcome)
 	state := c.states[key]
 	if state == nil || state.endpoint == nil || state.endpoint.ID != lease.Endpoint.ID {
 		c.mu.Unlock()
@@ -434,9 +453,9 @@ func (c *Controller) Status(
 	defer c.mu.Unlock()
 	state := c.states[key]
 	if state == nil {
-		return lifecycle.Status{State: endpointregistry.StateOffline, UpdatedAt: c.now().UTC()}, nil
+		return c.projectRecoveryStatus(binding, lifecycle.Status{State: endpointregistry.StateOffline, UpdatedAt: c.now().UTC(), Recovery: c.workloads.recoveryStatus(binding)}), nil
 	}
-	status := lifecycle.Status{State: state.state, UpdatedAt: state.updatedAt, Reason: state.reason, Phase: state.phase, JobID: state.jobID}
+	status := lifecycle.Status{State: state.state, UpdatedAt: state.updatedAt, Reason: state.reason, Phase: state.phase, JobID: state.jobID, Recovery: c.workloads.recoveryStatus(binding)}
 	if info, ok := c.workloadInfo[state.jobID]; ok {
 		owned := info.Owned
 		status.Owned = &owned
@@ -470,7 +489,19 @@ func (c *Controller) Status(
 		status.State = endpointregistry.StateOffline
 		status.Endpoint = nil
 	}
-	return status, nil
+	return c.projectRecoveryStatus(binding, status), nil
+}
+
+func applyRecoveryStatus(status lifecycle.Status) lifecycle.Status {
+	if status.Recovery != nil {
+		switch status.Recovery.Phase {
+		case "failed", "exhausted":
+			status.State, status.Phase, status.Reason, status.Endpoint = endpointregistry.StateFailed, "recovery_failed", status.Recovery.Reason, nil
+		case "draining", "stopping", "restarting", "backoff":
+			status.State, status.Phase, status.Endpoint = endpointregistry.StateActivating, "recovering", nil
+		}
+	}
+	return status
 }
 
 func (c *Controller) Stop(
@@ -535,6 +566,9 @@ func failureReason(err error) string {
 	var bridgeErr *BridgeError
 	if errors.As(err, &bridgeErr) {
 		return lifecycle.SanitizeReason(bridgeErr.Code)
+	}
+	if errors.Is(err, lifecycle.ErrEndpointNotReady) {
+		return "endpoint_not_ready"
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "activation_timeout"
@@ -976,3 +1010,18 @@ var (
 	_ lifecycle.Controller         = (*Controller)(nil)
 	_ lifecycle.EndpointAuthorizer = (*Controller)(nil)
 )
+
+func (c *Controller) projectRecoveryStatus(binding lifecycle.Binding, status lifecycle.Status) lifecycle.Status {
+	if prepared := c.workloads.preparedEndpoint(binding); prepared != nil {
+		status.Prepared = true
+		if status.JobID == prepared.JobID {
+			return applyRecoveryStatus(status)
+		}
+		// A prewarmed replacement is running even before the next request
+		// obtains its serving fence. Do not fabricate a registered endpoint.
+		owned := true
+		status.State, status.Phase, status.JobID, status.Owned = endpointregistry.StateReady, "ready", prepared.JobID, &owned
+		status.Endpoint = nil
+	}
+	return applyRecoveryStatus(status)
+}

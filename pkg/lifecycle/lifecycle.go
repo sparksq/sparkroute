@@ -12,10 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sparksq/sparkroute/pkg/config"
 	"github.com/sparksq/sparkroute/pkg/endpointregistry"
 )
 
 type Binding struct {
+	Recovery           config.RecoveryPolicy
 	IdleAction         string
 	Controller         string
 	Revision           string
@@ -43,6 +45,10 @@ const (
 )
 
 type RequestFeatures struct {
+	// PreparedOnly permits registration of a prewarmed job, never a launch.
+	PreparedOnly bool
+	// ManualStart is set only by the authenticated operator Start path.
+	ManualStart  bool
 	VirtualModel string
 	Protocol     string
 	Streaming    bool
@@ -54,11 +60,19 @@ type Lease struct {
 }
 
 type RequestOutcome struct {
-	Success bool
-	Error   string
+	// Only applied circuit observations may influence automatic recovery.
+	HealthObserved bool
+	CircuitOpened  bool
+	HalfOpenProbe  bool
+	BackendFailure bool
+	Success        bool
+	Error          string
 }
 
 type Status struct {
+	// Prepared is a readiness-verified workload awaiting serving registration.
+	Prepared         bool
+	Recovery         *RecoveryStatus
 	PluginsInUse     []string
 	LifecycleActions []string
 	Owned            *bool

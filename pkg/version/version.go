@@ -21,7 +21,7 @@ const Name = "sparkroute"
 // and the linker cannot write to a constant. The literal below is the in-tree
 // default that `go install` and a plain `go build` report, kept in step with
 // versions.yaml by `sync-versions`.
-var Version = "0.0.1"
+var Version = "0.0.2"
 
 // Commit is the public OSS source commit stamped by release builds.
 var Commit = "development"

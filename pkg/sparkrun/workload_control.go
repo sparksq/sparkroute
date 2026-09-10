@@ -178,6 +178,7 @@ func (c *Controller) WorkloadAction(ctx context.Context, deployment, jobID, acti
 			if err := c.stopLocked(ctx, lifecycle.ActivationKey(target.Binding), target.Binding, jobID); err != nil {
 				return WorkloadInfo{}, err
 			}
+			c.workloads.resetRecovery(target.Binding.RecipeRevision, report.Workloads[index].ClusterName)
 			info := report.Workloads[index]
 			info.State, info.LifecycleState, info.LifecycleActions = "offline", "offline", nil
 			c.mu.Lock()

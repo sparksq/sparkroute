@@ -320,15 +320,19 @@ func recordAttempt(
 	recorder.Record(ledger.NewAttemptRecord(record))
 	telemetryAttempt.End(record)
 	targets.CompleteWithFailureClass(lease, targetResult, failureClass)
+	requestOutcome := lifecycle.RequestOutcome{Success: outcome == ledger.OutcomeSuccess, Error: failureClass}
+	if lease != nil {
+		requestOutcome.HealthObserved = lease.HealthApplied
+		requestOutcome.CircuitOpened = lease.CircuitOpened
+		requestOutcome.HalfOpenProbe = lease.HalfOpenProbe
+		requestOutcome.BackendFailure = targetResult == routing.TargetFailure && restartableFailure(status, failureClass)
+	}
 	for _, item := range runtime {
 		if item.coordinator == nil || item.lease == nil {
 			continue
 		}
 		releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_ = item.coordinator.Release(releaseCtx, item.lease, lifecycle.RequestOutcome{
-			Success: outcome == ledger.OutcomeSuccess,
-			Error:   failureClass,
-		})
+		_ = item.coordinator.Release(releaseCtx, item.lease, requestOutcome)
 		cancel()
 	}
 }
@@ -357,4 +361,20 @@ func upstreamRequestID(header http.Header) string {
 		}
 	}
 	return ""
+}
+
+// An open circuit can also represent invalid credentials or overload. Those
+// conditions must not turn an otherwise healthy process into a restart loop.
+func restartableFailure(status int, failureClass string) bool {
+	if status == 429 || status == 503 || status >= 400 && status < 500 {
+		return false
+	}
+	if status >= 500 && status <= 599 {
+		return true
+	}
+	switch failureClass {
+	case "upstream_transport_error", "upstream_transport", "per_try_timeout", "stream_idle_timeout", "stream_read_error", "upstream_read_error", "response_stream_error":
+		return true
+	}
+	return false
 }

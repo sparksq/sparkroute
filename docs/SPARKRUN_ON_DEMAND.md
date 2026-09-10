@@ -90,6 +90,10 @@ gateway process restart and observation. Removing a route disables its idle
 policy without stopping its job. This is one local gateway's coordination, not
 multi-replica distributed ownership.
 
+SparkRoute v0.0.2 adds opt-in [automatic recovery](WORKLOAD_RECOVERY.md) for
+persistently failing owned jobs. Recovery has its own deadline and restart budget,
+independent of idle shutdown and circuit ejection timing.
+
 For v0.0.1, use idle intervals of at least one second (normally minutes).
 Sub-second intervals can expire between the admission coordinator's 100 ms
 readiness polls: an already queued request can miss the ready window and time

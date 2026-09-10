@@ -62,6 +62,7 @@ func TargetsFromDocument(document config.Document) ([]Target, error) {
 				Overrides:          cloneOverrides(source.Overrides),
 				ActivationTimeout:  source.EffectiveActivationTimeout(),
 				IdleAction:         source.IdleAction,
+				Recovery:           source.Recovery.Effective(),
 				IdleTTL:            source.IdleTTL.Value(),
 				MaxQueuedWaiters:   source.EffectiveMaxQueuedWaiters(),
 				MaxQueuedBodyBytes: source.EffectiveMaxQueuedBodyBytes(),

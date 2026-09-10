@@ -385,6 +385,7 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
       <div><dt>Cluster</dt><dd>{sparkrunDeploymentClusters(deployment).join(", ") || "Not yet reported"}</dd></div>
       {source.type === "activatable" && <>
         <div><dt>Cold-start wait</dt><dd>{durationMinutes(source.activation_timeout, 30)} minutes</dd></div>
+        <div><dt>Automatic recovery</dt><dd>{objectValue(source.recovery).action === "restart" ? "Restart when persistently unhealthy" : objectValue(source.recovery).action === "stop" ? "Stop when persistently unhealthy" : "Disabled"}</dd></div>
         <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${source.idle_action === "sleep" ? "Sleep" : "Stop"} after ${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
       </>}
     </dl>
@@ -1215,7 +1216,12 @@ function inspectDocument(document: ConfigurationDocument): {
 			for (const field of ["max_queued_waiters", "max_queued_body_bytes"] as const) {
 				if (!validOptionalNumber(deployment.endpoint_source[field])) return { error: `deployments[${index}].endpoint_source.${field} must be a number.` };
 			}
-			if (!validOptionalStringArray(deployment.endpoint_source.cluster_candidates)) return { error: `deployments[${index}].endpoint_source.cluster_candidates must be a string array.` };
+			if (deployment.endpoint_source.recovery !== undefined && !isObject(deployment.endpoint_source.recovery)) return { error: `deployments[${index}].endpoint_source.recovery must be an object.` };
+            if (isObject(deployment.endpoint_source.recovery)) {
+              for (const field of ["action", "unhealthy_for", "drain_timeout", "backoff", "max_backoff"]) { if (!validOptionalString(deployment.endpoint_source.recovery[field])) return { error: `deployments[${index}].endpoint_source.recovery.${field} must be a string.` }; }
+              for (const field of ["failed_probes", "max_restarts"]) { if (!validOptionalNumber(deployment.endpoint_source.recovery[field])) return { error: `deployments[${index}].endpoint_source.recovery.${field} must be a number.` }; }
+            }
+            if (!validOptionalStringArray(deployment.endpoint_source.cluster_candidates)) return { error: `deployments[${index}].endpoint_source.cluster_candidates must be a string array.` };
 			if (deployment.endpoint_source.overrides !== undefined && !isStringMap(deployment.endpoint_source.overrides)) return { error: `deployments[${index}].endpoint_source.overrides must be a string map.` };
 		}
     if (deployment.circuit !== undefined && !isObject(deployment.circuit)) return { error: `deployments[${index}].circuit must be an object.` };
@@ -1342,7 +1348,7 @@ function setEndpointSourceType(deployment: JSONObject, sourceType: string) {
 			for (const field of [
 				"revision", "recipe", "recipe_revision", "cluster_candidates", "overrides",
 				"activation_timeout", "idle_ttl", "idle_action", "max_queued_waiters",
-				"max_queued_body_bytes", "cold_start",
+				"max_queued_body_bytes", "cold_start", "recovery",
 			]) delete next[field];
 		}
 		return next;

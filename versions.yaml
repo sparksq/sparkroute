@@ -6,10 +6,10 @@
 # Run: sync-versions             to apply
 # Run: sync-versions --check     to verify (CI-friendly)
 
-# First tagged iteration. The Go module, the embedded admin UI and the container
+# The Go module, the embedded admin UI and the container
 # image all ship as one artifact, so they carry one number rather than drifting
 # apart the way three independently-bumped manifests would.
-sparkroute: 0.0.1
+sparkroute: 0.0.2
 
 project_rules:
   sparkroute:

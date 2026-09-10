@@ -41,10 +41,12 @@ it("preserves duplicate file identity and prepares coding on the explicit defaul
  fireEvent.change(screen.getByLabelText("Public model name"), { target: { value: "coding" } });
  fireEvent.change(screen.getByLabelText("Aliases (comma separated)"), { target: { value: "code, assistant" } });
  fireEvent.click(screen.getByLabelText("Manage the model when idle"));
+ fireEvent.change(screen.getByLabelText("When persistently unhealthy"), {target: {value: "restart"}});
+ fireEvent.change(screen.getByLabelText("Minimum unhealthy duration"), {target: {value: "5m"}});
  fireEvent.click(screen.getByRole("button", { name: "Add to draft" }));
  await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
  const prepared = calls.find((call) => call.url.endsWith("recipe-draft"))!.body;
- expect(prepared.recipe).toMatchObject({ name: "coding", aliases: ["code", "assistant"], cluster: "lab", idle_ttl: "30m", activation_timeout: "30m" });
+ expect(prepared.recipe).toMatchObject({ name: "coding", aliases: ["code", "assistant"], cluster: "lab", idle_ttl: "30m", activation_timeout: "30m", recovery: {action: "restart", unhealthy_for: "5m"} });
  expect(calls.some((call) => call.body.operation === "ensure_ready")).toBe(false);
 });
 

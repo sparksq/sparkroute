@@ -139,6 +139,7 @@ func TestEditRecipeDeploymentPreservesRoutingIdentityAndRevisionsPolicy(t *testi
 	document.Deployments[0].Title = "Custom display title"
 	input.Deployment, input.Name, input.Aliases = id, "", nil
 	input.IdleTTL = config.Duration(30 * time.Minute)
+	input.Recovery = config.RecoveryPolicy{Action: "stop", FailedProbes: 4}
 	changed, actual, _, err := PrepareRecipeDraft(context.Background(), f, document, empty, input)
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +149,7 @@ func TestEditRecipeDeploymentPreservesRoutingIdentityAndRevisionsPolicy(t *testi
 		t.Fatal("route identity changed")
 	}
 	target := changed.Deployments[0]
-	if target.Title != "Custom display title" || target.EndpointSource.Revision == revision || target.EndpointSource.IdleTTL != input.IdleTTL {
+	if target.Title != "Custom display title" || target.EndpointSource.Revision == revision || target.EndpointSource.IdleTTL != input.IdleTTL || target.EndpointSource.Recovery != input.Recovery {
 		t.Fatal("policy edit did not preserve identity", target)
 	}
 	input.Deployment = "generated-or-deleted"
