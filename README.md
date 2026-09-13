@@ -35,6 +35,11 @@ Apache-2.0 `github.com/scitrera/go-llm v0.3.0` module.
 
 Optional PII detection and reversible substitution are included, with memory or
 SQLite mapping storage. See [Privacy and guardrails](docs/PRIVACY_AND_GUARDRAILS.md).
+
+Custom distributions can reuse the public gateway/catalog/credential interfaces and
+PostgreSQL backends for usage, runtime, configuration, client credentials and traces.
+See [Custom distributions](docs/CUSTOM_DISTRIBUTIONS.md) for composition and database
+test instructions; standalone CLI storage defaults remain unchanged.
 SparkRoute runs as a single gateway process; managed configuration and local
 storage do not require an external database.
 

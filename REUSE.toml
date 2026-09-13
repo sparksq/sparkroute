@@ -11,7 +11,8 @@ path = ["COPYRIGHT", "NOTICE", "go.mod", "go.sum", "third-party-manifest.json",
         "examples/*.json", "benchmarks/blackbox/requests/*.json",
         "benchmarks/blackbox/sparkroute-config.json",
         "pkg/gateway/testdata/**/*.json", "pkg/gateway/testdata/**/*.sse",
-        "pkg/*/sqlite/migrations/*.sql"]
+        "pkg/*/sqlite/migrations/*.sql", "pkg/*/postgres/migrations/**/*.sql",
+        "pkg/*/postgres/migrations/*.sql"]
 precedence = "closest"
 SPDX-FileCopyrightText = ["2026 Scitrera LLC", "2026 Fox Engine Ltd."]
 SPDX-License-Identifier = "AGPL-3.0-only"
