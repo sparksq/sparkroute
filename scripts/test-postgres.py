@@ -28,7 +28,9 @@ def main():
                     "-e", "POSTGRES_PASSWORD=" + password, args.image], check=True, stdout=subprocess.DEVNULL)
     try:
         deadline = time.monotonic() + 45
-        while subprocess.run(["docker", "exec", name, "pg_isready", "-U", "postgres"],
+        # The image initialization server accepts Unix sockets before final
+        # startup. Wait for TCP so createdb cannot race that server's shutdown.
+        while subprocess.run(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
             if time.monotonic() > deadline:
                 raise RuntimeError("disposable PostgreSQL did not become ready")

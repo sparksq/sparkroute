@@ -21,9 +21,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	savedtracepostgres "github.com/sparksq/sparkroute/pkg/savedtrace/postgres"
 	"github.com/sparksq/sparkroute/pkg/ledger"
 	"github.com/sparksq/sparkroute/pkg/responsesstate"
+	savedtracepostgres "github.com/sparksq/sparkroute/pkg/savedtrace/postgres"
 )
 
 const (
