@@ -33,7 +33,7 @@ func (s *Store) LoadPIIMappings(
 	if err != nil {
 		return nil, fmt.Errorf("begin PostgreSQL PII mapping load: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `
 		UPDATE llm_pii_conversation_mappings
 		SET last_used_at = $1,
@@ -105,7 +105,7 @@ func (s *Store) PutPIIMappingIfAbsent(
 	if err != nil {
 		return privacy.EncryptedMapping{}, fmt.Errorf("begin PostgreSQL PII mapping write: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	// One narrow advisory lock makes the global conversation bound and each
 	// scope's byte/mapping bounds exact across replicas.
 	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", piiMappingWriteLockID); err != nil {

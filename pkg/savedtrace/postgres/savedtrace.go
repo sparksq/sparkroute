@@ -149,9 +149,7 @@ func (s *Store) List(ctx context.Context, query savedtrace.Query) (savedtrace.Pa
 	args := make([]any, 0, 24)
 	appendCondition := func(format string, values ...any) {
 		statement.WriteString(" AND ")
-		statement.WriteString(
-			fmt.Sprintf(format, parameterNumbers(len(args)+1, len(values))...),
-		)
+		_, _ = fmt.Fprintf(&statement, format, parameterNumbers(len(args)+1, len(values))...)
 		args = append(args, values...)
 	}
 	if !query.StartedAtOrAfter.IsZero() {
@@ -196,7 +194,7 @@ func (s *Store) List(ctx context.Context, query savedtrace.Query) (savedtrace.Pa
 		)
 	}
 	statement.WriteString(" ORDER BY started_at DESC, request_id DESC LIMIT ")
-	statement.WriteString(fmt.Sprintf("$%d", len(args)+1))
+	_, _ = fmt.Fprintf(&statement, "$%d", len(args)+1)
 	args = append(args, plan.Limit+1)
 	rows, err := s.pool.Query(ctx, statement.String(), args...)
 	if err != nil {

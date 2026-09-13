@@ -48,14 +48,22 @@ func TestPostgresCredentialLifecycleIsImmediatelyVisibleAcrossStores(t *testing.
 	if err != nil {
 		t.Fatalf("Open(first) error = %v", err)
 	}
-	defer first.Close()
+	defer func() {
+		if err := first.Close(); err != nil {
+			t.Errorf("Close(first) error = %v", err)
+		}
+	}()
 	second, err := Open(ctx, Options{
 		URL: url, ExpectedPostgresMajor: 17, MaxConnections: 2,
 	})
 	if err != nil {
 		t.Fatalf("Open(second) error = %v", err)
 	}
-	defer second.Close()
+	defer func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("Close(second) error = %v", err)
+		}
+	}()
 	firstManager, _ := clientcredentials.NewManager(first)
 	secondManager, _ := clientcredentials.NewManager(second)
 	issued, err := firstManager.Create(ctx, clientcredentials.CreateInput{

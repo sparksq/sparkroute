@@ -95,7 +95,7 @@ func (s *Store) ListRequests(
 	args := make([]any, 0, 10)
 	appendCondition := func(format string, values ...any) {
 		statement.WriteString(" AND ")
-		statement.WriteString(fmt.Sprintf(format, parameterNumbers(len(args)+1, len(values))...))
+		_, _ = fmt.Fprintf(&statement, format, parameterNumbers(len(args)+1, len(values))...)
 		args = append(args, values...)
 	}
 	if !query.StartedAtOrAfter.IsZero() {
@@ -122,7 +122,7 @@ func (s *Store) ListRequests(
 		)
 	}
 	statement.WriteString(" ORDER BY r.started_at DESC, r.request_id DESC LIMIT ")
-	statement.WriteString(fmt.Sprintf("$%d", len(args)+1))
+	_, _ = fmt.Fprintf(&statement, "$%d", len(args)+1)
 	args = append(args, plan.Limit+1)
 
 	rows, err := s.pool.Query(ctx, statement.String(), args...)
@@ -167,7 +167,7 @@ func (s *Store) ListAttempts(
 	args := make([]any, 0, 14)
 	appendCondition := func(format string, values ...any) {
 		statement.WriteString(" AND ")
-		statement.WriteString(fmt.Sprintf(format, parameterNumbers(len(args)+1, len(values))...))
+		_, _ = fmt.Fprintf(&statement, format, parameterNumbers(len(args)+1, len(values))...)
 		args = append(args, values...)
 	}
 	if !query.StartedAtOrAfter.IsZero() {
@@ -218,7 +218,7 @@ func (s *Store) ListAttempts(
 		ORDER BY a.attempt_started_at DESC, a.request_id DESC, a.attempt_no DESC
 		LIMIT
 	`)
-	statement.WriteString(fmt.Sprintf("$%d", len(args)+1))
+	_, _ = fmt.Fprintf(&statement, "$%d", len(args)+1)
 	args = append(args, plan.Limit+1)
 
 	rows, err := s.pool.Query(ctx, statement.String(), args...)
@@ -263,7 +263,7 @@ func (s *Store) ListRuntimeEvents(
 	args := make([]any, 0, 12)
 	appendCondition := func(format string, values ...any) {
 		statement.WriteString(" AND ")
-		statement.WriteString(fmt.Sprintf(format, parameterNumbers(len(args)+1, len(values))...))
+		_, _ = fmt.Fprintf(&statement, format, parameterNumbers(len(args)+1, len(values))...)
 		args = append(args, values...)
 	}
 	if !query.OccurredAtOrAfter.IsZero() {
@@ -293,7 +293,7 @@ func (s *Store) ListRuntimeEvents(
 		)
 	}
 	statement.WriteString(" ORDER BY e.occurred_at DESC, e.event_id DESC LIMIT ")
-	statement.WriteString(fmt.Sprintf("$%d", len(args)+1))
+	_, _ = fmt.Fprintf(&statement, "$%d", len(args)+1)
 	args = append(args, plan.Limit+1)
 
 	rows, err := s.pool.Query(ctx, statement.String(), args...)

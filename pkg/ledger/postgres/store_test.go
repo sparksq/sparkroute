@@ -430,7 +430,11 @@ func TestPostgresStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	}()
 
 	now := normalizePostgresTime(time.Now())
 	requestID := fmt.Sprintf("integration-%d", now.UnixNano())
@@ -616,7 +620,11 @@ func TestPostgresStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() second replica error = %v", err)
 	}
-	defer replica.Close()
+	defer func() {
+		if err := replica.Close(); err != nil {
+			t.Errorf("Close(replica) error = %v", err)
+		}
+	}()
 	promptRoute := promptcache.Route{
 		Provider: "integration", Deployment: "integration",
 		UpstreamModel: "integration", UpstreamProtocol: "openai",

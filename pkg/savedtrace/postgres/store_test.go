@@ -66,7 +66,11 @@ func TestStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	}()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	record := savedtrace.Record{
 		Version:          savedtrace.SchemaVersion,

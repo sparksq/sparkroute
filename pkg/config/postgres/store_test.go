@@ -92,7 +92,11 @@ func TestPostgresConfigurationStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	}()
 
 	seed := fmt.Sprintf("%d", time.Now().UnixNano())
 	firstDocument := testDocument("first-" + seed)
