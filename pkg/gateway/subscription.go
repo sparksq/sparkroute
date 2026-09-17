@@ -81,6 +81,9 @@ func (h *chatCompletionsHandler) buildSubscriptionRequest(downstream *http.Reque
 // the caller, and uses the same attempt deadline and immutable request body.
 func (h *chatCompletionsHandler) sendUpstream(request *http.Request, selection routing.Selection) (*http.Response, error) {
 	response, err := h.client.Do(request)
+	if err == nil && selection.Provider.Type == "openai_compatible" {
+		response, err = h.followModalContinuation(request, response)
+	}
 	if err != nil || selection.Provider.Type != "openai_subscription" || response.StatusCode != http.StatusUnauthorized {
 		return response, err
 	}

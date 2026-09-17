@@ -2059,6 +2059,13 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 			}
 			failureClass := "upstream_transport_error"
 			canRetryAttempt := canRetry
+			if errors.Is(err, errUpstreamContinuation) {
+				canRetryAttempt = false
+				failureClass = "upstream_continuation_error"
+				finalStatus = http.StatusBadGateway
+				finalCode = "upstream_continuation_failed"
+				finalMessage = "could not retrieve the accepted upstream request result"
+			}
 			if overallTimedOut {
 				failureClass = "overall_timeout"
 				canRetryAttempt = false

@@ -254,6 +254,9 @@ schema v4 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).
 
 ## Native provider configuration
 
+Authenticated Modal endpoints support bounded, same-origin result continuations
+without replaying inference; see [Modal proxy inference](docs/MODAL.md).
+
 The console separates the provider's native API from its authentication:
 
 | Provider type | Default native protocol | API capability |
