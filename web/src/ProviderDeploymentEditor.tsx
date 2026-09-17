@@ -580,6 +580,22 @@ function ProviderForm({
           {subscription ? <SubscriptionSignIn key={stringValue(provider.subscription_profile)} profile={stringValue(provider.subscription_profile)} token={subscriptionAuth?.token ?? ""} enabled={!disabled && (subscriptionAuth?.enabled ?? false)} /> : null}
         </details> : <p className="section-help">sparkrun supplies workload endpoints. Configure each deployment’s native APIs in its recipe settings.</p>}
 
+        <details className="model-section policy-section">
+          <summary><span>Inference result continuations</span><small>Long-running requests</small></summary>
+          <div className="policy-fields">
+            <Field label="Result continuations">
+              <select aria-label="Result continuations" value={stringValue(provider.continuations)} onChange={(event) => onChange((value) => setString(value, "continuations", event.target.value))}>
+                <option value="">Default (authenticated Modal compatibility)</option>
+                <option value="none">Disabled</option>
+                <option value="same_origin_303">Follow same-origin HTTPS 303</option>
+                {provider.continuations && !["none", "same_origin_303"].includes(stringValue(provider.continuations)) ? <option value={stringValue(provider.continuations)}>Existing: {stringValue(provider.continuations)}</option> : null}
+              </select>
+              <small>Enable for providers that return a result URL while inference runs. Retrieves the result without resubmitting inference. Applies to inference APIs; Files, Conversations, and response resource operations keep redirects disabled.</small>
+              <small>Default follows only OpenAI-compatible providers with both Modal-Key and Modal-Secret headers. Enabled continuations stay on the original HTTPS host and port, with up to eight hops and the original request deadline.</small>
+            </Field>
+          </div>
+        </details>
+
         <HeaderSection
           heading="Default upstream headers"
           headers={objectValue(provider.default_headers)}
@@ -1182,7 +1198,7 @@ function inspectDocument(document: ConfigurationDocument): {
   const providers: JSONObject[] = [];
   for (const [index, provider] of document.providers.entries()) {
     if (!isObject(provider)) return { error: `providers[${index}] must be an object.` };
-    for (const field of ["name", "type", "base_url", "region"] as const) {
+    for (const field of ["name", "type", "base_url", "region", "continuations"] as const) {
       if (!validOptionalString(provider[field])) return { error: `providers[${index}].${field} must be a string.` };
     }
     if (provider.auth !== undefined && !isObject(provider.auth)) return { error: `providers[${index}].auth must be an object.` };

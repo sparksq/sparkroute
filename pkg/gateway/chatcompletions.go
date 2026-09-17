@@ -3598,43 +3598,7 @@ func (h *chatCompletionsHandler) buildUpstreamRequest(
 	upstreamRequest.Header.Set("User-Agent", version.UserAgent())
 	upstreamRequest.Header.Set("X-Request-Id", requestID)
 	h.telemetry.Inject(upstreamRequest.Context(), upstreamRequest.Header)
-	if selection.Provider.Auth.Type == config.AuthAWSSigV4 {
-		ref := selection.Deployment.Credential
-		if ref == "" {
-			ref = selection.Provider.Auth.Credential
-		}
-		if h.credentials == nil {
-			return nil, fmt.Errorf(
-				"AWS workload credential source is required",
-			)
-		}
-		material, err := h.credentials.Resolve(
-			downstream.Context(),
-			ref,
-		)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"resolve AWS workload credential: %w",
-				err,
-			)
-		}
-		if err := signAWSRequest(
-			upstreamRequest,
-			material.Value,
-			selection.Provider.Region,
-			bedrockAWSService,
-			body,
-			time.Now(),
-		); err != nil {
-			return nil, fmt.Errorf("sign Bedrock request: %w", err)
-		}
-	} else if err := upstreamheaders.ApplyAuthentication(
-		downstream.Context(),
-		upstreamRequest.Header,
-		selection.Provider.Auth,
-		selection.Deployment.Credential,
-		h.credentials,
-	); err != nil {
+	if err := h.applyUpstreamAuthentication(upstreamRequest, selection, body); err != nil {
 		return nil, err
 	}
 	return upstreamRequest, nil

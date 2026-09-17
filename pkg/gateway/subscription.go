@@ -77,33 +77,6 @@ func (h *chatCompletionsHandler) buildSubscriptionRequest(downstream *http.Reque
 	return request, nil
 }
 
-// Authentication recovery is bounded to one replay, before any response reaches
-// the caller, and uses the same attempt deadline and immutable request body.
-func (h *chatCompletionsHandler) sendUpstream(request *http.Request, selection routing.Selection) (*http.Response, error) {
-	response, err := h.client.Do(request)
-	if err == nil && selection.Provider.Type == "openai_compatible" {
-		response, err = h.followModalContinuation(request, response)
-	}
-	if err != nil || selection.Provider.Type != "openai_subscription" || response.StatusCode != http.StatusUnauthorized {
-		return response, err
-	}
-	_ = response.Body.Close()
-	profile := selection.Provider.SubscriptionProfile
-	if err := h.providerAuth.RecoverUnauthorized(request.Context(), profile); err != nil {
-		return nil, err
-	}
-	retry := request.Clone(request.Context())
-	retry.Body, err = request.GetBody()
-	if err != nil {
-		return nil, err
-	}
-	if err := h.providerAuth.Apply(retry.Context(), profile, retry); err != nil {
-		_ = retry.Body.Close()
-		return nil, err
-	}
-	return h.client.Do(retry)
-}
-
 // collectSubscriptionResponse retains the provider's complete terminal object,
 // including tool calls and usage. Missing/failed terminal events never become a
 // successful partial buffered response. Idle and overall deadlines are supplied

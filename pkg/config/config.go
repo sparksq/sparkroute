@@ -61,12 +61,23 @@ type Provider struct {
 	Region              string                 `json:"region,omitempty"`
 	Auth                ProviderAuth           `json:"auth,omitempty"`
 	DefaultHeaders      map[string]HeaderValue `json:"default_headers,omitempty"`
+	// Continuations controls inference result retrieval independently of the API dialect.
+	Continuations ContinuationPolicy `json:"continuations,omitempty"`
 	// ExtraBody supplies bounded top-level inference request defaults. Caller
 	// fields always win, and deployment defaults take precedence over provider
 	// defaults when both define a missing field.
 	ExtraBody          map[string]json.RawMessage `json:"extra_body,omitempty"`
 	CapabilityDefaults CapabilityDefaults         `json:"capability_defaults,omitempty,omitzero"`
 }
+
+type ContinuationPolicy string
+
+const (
+	// The omitted policy retains authenticated openai_compatible Modal behavior.
+	ContinuationsDefault       ContinuationPolicy = ""
+	ContinuationsNone          ContinuationPolicy = "none"
+	ContinuationsSameOrigin303 ContinuationPolicy = "same_origin_303"
+)
 
 type Deployment struct {
 	ModelMetadata *modelrouter.DiscoveredModelMetadata `json:"model_metadata,omitempty"`

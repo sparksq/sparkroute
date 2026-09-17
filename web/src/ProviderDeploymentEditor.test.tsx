@@ -19,6 +19,26 @@ function type(value: string) { fireEvent.change(screen.getByLabelText("Provider 
 function auth(value: string) { fireEvent.change(screen.getByLabelText("Authentication type"), { target: { value } }); }
 
 describe("Native provider configuration", () => {
+  it("edits continuation policy independently of API type and can restore the legacy default", () => {
+    render(<Editor />);
+    const select = () => screen.getByLabelText("Result continuations");
+    expect(select()).toHaveValue("");
+    fireEvent.change(select(), { target: { value: "same_origin_303" } });
+    type("anthropic");
+    expect(draft().providers[0].continuations).toBe("same_origin_303");
+    expect(select()).toHaveValue("same_origin_303");
+    fireEvent.change(select(), { target: { value: "none" } });
+    expect(draft().providers[0].continuations).toBe("none");
+    fireEvent.change(select(), { target: { value: "" } });
+    expect(draft().providers[0]).not.toHaveProperty("continuations");
+  });
+
+  it("preserves a saved continuation policy in a read-only provider", () => {
+    render(<Editor disabled initial={{ providers: [{ ...provider, continuations: "same_origin_303" }], deployments: [], virtual_models: [] }} />);
+    expect(screen.getByLabelText("Result continuations")).toBeDisabled();
+    expect(screen.getByLabelText("Result continuations")).toHaveValue("same_origin_303");
+  });
+
   it("offers native API types and scopes the Bedrock fields to its regional endpoint", () => {
     render(<Editor />);
     for (const name of ["OpenAI (Chat)", "OpenAI (Responses)", "Anthropic", "Amazon Bedrock"]) {

@@ -185,6 +185,11 @@ func (d Document) Validate() error {
 	providers := make(map[string]struct{}, len(d.Providers))
 	for i, provider := range d.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
+		switch provider.Continuations {
+		case ContinuationsDefault, ContinuationsNone, ContinuationsSameOrigin303:
+		default:
+			return fmt.Errorf("%s.continuations: must be omitted, none, or same_origin_303", path)
+		}
 		if err := validateCapabilityDefaults(provider.CapabilityDefaults); err != nil {
 			return fmt.Errorf("%s.capability_defaults: %w", path, err)
 		}

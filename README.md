@@ -254,8 +254,11 @@ schema v4 together. See [the on-demand contract](docs/SPARKRUN_ON_DEMAND.md).
 
 ## Native provider configuration
 
-Authenticated Modal endpoints support bounded, same-origin result continuations
-without replaying inference; see [Modal proxy inference](docs/MODAL.md).
+Providers can opt into bounded, same-origin HTTPS 303 result retrieval with
+`continuations: "same_origin_303"`, independently of the inference API or
+authentication. Existing authenticated Modal configurations retain their behavior.
+See [upstream result continuations](docs/UPSTREAM_CONTINUATIONS.md) and
+[Modal proxy inference](docs/MODAL.md).
 
 The console separates the provider's native API from its authentication:
 

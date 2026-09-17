@@ -133,7 +133,7 @@ func TestModalContinuationFailuresAreTerminalAndDoNotLeakCredentials(t *testing.
 			request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"public","messages":[]}`))
 			request.Header.Set("Content-Type", "application/json")
 			modalTestHandler(t, upstream).ServeHTTP(out, request)
-			if out.Code != http.StatusBadGateway || posts.Load() != 1 || foreignCalls.Load() != 0 || gets.Load() > maxModalContinuations {
+			if out.Code != http.StatusBadGateway || posts.Load() != 1 || foreignCalls.Load() != 0 || gets.Load() > maxUpstreamContinuations {
 				t.Fatalf("status=%d posts=%d gets=%d foreign=%d", out.Code, posts.Load(), gets.Load(), foreignCalls.Load())
 			}
 			if out.Header().Get("Location") != "" || strings.Contains(out.Body.String(), "private-signed-token") {

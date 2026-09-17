@@ -69,7 +69,7 @@ func signAWSRequest(
 			material.SessionToken,
 		)
 	}
-	if request.Header.Get("Content-Type") == "" {
+	if request.Header.Get("Content-Type") == "" && request.Method != http.MethodGet && request.Method != http.MethodHead {
 		request.Header.Set("Content-Type", "application/json")
 	}
 
@@ -86,12 +86,12 @@ func signAWSRequest(
 		host = request.Host
 	}
 	headers := map[string]string{
-		"content-type": canonicalAWSHeaderValue(
-			request.Header.Get("Content-Type"),
-		),
 		"host":                 canonicalAWSHeaderValue(host),
 		"x-amz-content-sha256": payloadHash,
 		"x-amz-date":           amzDate,
+	}
+	if contentType := request.Header.Get("Content-Type"); contentType != "" {
+		headers["content-type"] = canonicalAWSHeaderValue(contentType)
 	}
 	if material.SessionToken != "" {
 		headers["x-amz-security-token"] = canonicalAWSHeaderValue(
