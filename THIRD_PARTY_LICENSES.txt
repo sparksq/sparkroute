@@ -3856,14 +3856,14 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa —
 
 
 ========================================================================
-google.golang.org/grpc v1.82.1 — AUTHORS
+google.golang.org/grpc v1.83.1 — AUTHORS
 ========================================================================
 
 Google Inc.
 
 
 ========================================================================
-google.golang.org/grpc v1.82.1 — LICENSE
+google.golang.org/grpc v1.83.1 — LICENSE
 ========================================================================
 
 
@@ -4071,7 +4071,7 @@ google.golang.org/grpc v1.82.1 — LICENSE
 
 
 ========================================================================
-google.golang.org/grpc v1.82.1 — NOTICE.txt
+google.golang.org/grpc v1.83.1 — NOTICE.txt
 ========================================================================
 
 Copyright 2014 gRPC authors.

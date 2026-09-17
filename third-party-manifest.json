@@ -310,7 +310,7 @@
           "sha256": "693ff28ec216d5112ac1bbfe64ef539005867d1c7bd427b57d579683293b947f"
         }
       ],
-      "version": "v1.82.1"
+      "version": "v1.83.1"
     },
     {
       "name": "google.golang.org/protobuf",
