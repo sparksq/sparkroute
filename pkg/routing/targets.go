@@ -228,6 +228,22 @@ func (m *TargetManager) Eligible(deployment string) bool {
 	return true
 }
 
+// Outstanding reports the deployment's replica-local admitted requests that
+// have not completed. Like Eligible it is a non-reserving planning hint; an
+// unknown deployment reports zero.
+func (m *TargetManager) Outstanding(deployment string) int {
+	if m == nil {
+		return 0
+	}
+	target, exists := m.targets[deployment]
+	if !exists {
+		return 0
+	}
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	return target.active
+}
+
 func (m *TargetManager) Acquire(
 	deployment string,
 ) (*TargetLease, AdmissionReason) {

@@ -330,6 +330,16 @@ func TestDocumentValidateWeightedHashAndPromptCacheAffinity(t *testing.T) {
 	}
 }
 
+func TestDocumentValidateLeastOutstandingSelection(t *testing.T) {
+	t.Parallel()
+
+	document := validDocument()
+	document.VirtualModels[0].Selection = SelectionPolicy{Mode: SelectionLeastOutstanding}
+	if err := document.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 func TestPromptCacheAffinityDefaultsDisabled(t *testing.T) {
 	t.Parallel()
 
@@ -363,6 +373,18 @@ func TestDocumentValidateRoutingPolicyRejectsInvalidSelection(t *testing.T) {
 			name:      "weighted hash without key",
 			selection: SelectionPolicy{Mode: SelectionWeightedHash},
 			contains:  "hash_key is required",
+		},
+		{
+			name: "hash key with least outstanding",
+			selection: SelectionPolicy{
+				Mode: SelectionLeastOutstanding, HashKey: SelectionHashThreadID,
+			},
+			contains: "hash_key requires",
+		},
+		{
+			name:      "unknown mode",
+			selection: SelectionPolicy{Mode: "least_busy"},
+			contains:  "least_outstanding",
 		},
 		{
 			name: "invalid affinity scope",

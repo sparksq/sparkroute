@@ -258,6 +258,7 @@ func (h *filesHandler) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 		ProtocolResolver:     nativeProtocolResolver(config.ProtocolOpenAI),
 		SingleAttempt:        true,
 		Eligibility:          h.core.targets,
+		Load:                 h.core.targets,
 		Picker:               h.core.picker,
 	}
 	var affinity responsesstate.ResourceAffinity

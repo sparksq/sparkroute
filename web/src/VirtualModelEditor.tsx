@@ -267,6 +267,7 @@ export function VirtualModelEditor({
                   >
                     <option value="weighted_random">Weighted random</option>
                     <option value="weighted_hash">Weighted hash</option>
+                    <option value="least_outstanding">Least outstanding</option>
                   </select>
                 </Field>
                 {selectionMode === "weighted_hash" ? (

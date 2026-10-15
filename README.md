@@ -201,6 +201,16 @@ passive circuit health settings are grouped under **Concurrency and circuit poli
 Prompt-cache route affinity controls are hidden; existing settings are preserved
 and remain configurable in JSON.
 
+A virtual model's `selection.mode` decides how targets within one routing pool
+are ordered: `weighted_random` (the default), `weighted_hash` (stable per trusted
+caller attribute), or `least_outstanding`, which tries first the target with the
+fewest requests in flight on this replica per unit of weight, breaking ties by a
+weighted random draw. `least_outstanding` suits pools of interchangeable
+deployments whose request durations vary widely, where a random draw can stack
+long requests on one target while others sit idle. In-flight counts are
+replica-local, like circuit state, and are read once when the request's plan is
+built. It is listed as **Least outstanding** in the **Selection** field.
+
 Under **Virtual Models / Aliases**, **Request profiles** follows the general model
 fields and precedes routing pools. The table shows each named selector (such as
 `low` or `xhigh`), a compact JSON preview, and pencil/X actions. **Add profile**

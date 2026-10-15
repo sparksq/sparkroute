@@ -710,6 +710,12 @@ type SelectionMode string
 const (
 	SelectionWeightedRandom SelectionMode = "weighted_random"
 	SelectionWeightedHash   SelectionMode = "weighted_hash"
+	// SelectionLeastOutstanding orders each pool by the replica-local number
+	// of requests in flight per unit of weight, breaking ties with a weighted
+	// random draw. It suits pools of interchangeable deployments whose
+	// request durations vary widely, where a random draw can stack long
+	// requests on one target while others sit idle.
+	SelectionLeastOutstanding SelectionMode = "least_outstanding"
 )
 
 type SelectionPolicy struct {

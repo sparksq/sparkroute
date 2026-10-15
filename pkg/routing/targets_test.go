@@ -482,3 +482,39 @@ func newTestTargetManager(
 	}
 	return manager
 }
+
+func TestTargetManagerOutstandingTracksAdmissions(t *testing.T) {
+	t.Parallel()
+
+	manager, err := NewTargetManager(
+		[]config.Deployment{{Name: "a", Provider: "provider", Model: "m"}},
+		TargetManagerOptions{},
+	)
+	if err != nil {
+		t.Fatalf("NewTargetManager() error = %v", err)
+	}
+	first, reason := manager.Acquire("a")
+	if reason != "" {
+		t.Fatalf("Acquire() rejected: %s", reason)
+	}
+	second, _ := manager.Acquire("a")
+	if got := manager.Outstanding("a"); got != 2 {
+		t.Fatalf("Outstanding = %d, want 2", got)
+	}
+	manager.Complete(first, TargetSuccess)
+	manager.Complete(first, TargetSuccess) // a second Complete of one lease is a no-op
+	if got := manager.Outstanding("a"); got != 1 {
+		t.Fatalf("Outstanding after one completion = %d, want 1", got)
+	}
+	manager.Complete(second, TargetFailure)
+	if got := manager.Outstanding("a"); got != 0 {
+		t.Fatalf("Outstanding after all completions = %d, want 0", got)
+	}
+	if got := manager.Outstanding("unknown"); got != 0 {
+		t.Fatalf("Outstanding(unknown) = %d, want 0", got)
+	}
+	var none *TargetManager
+	if got := none.Outstanding("a"); got != 0 {
+		t.Fatalf("nil manager Outstanding = %d, want 0", got)
+	}
+}

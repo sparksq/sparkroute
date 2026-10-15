@@ -166,6 +166,13 @@ type Eligibility interface {
 	Eligible(deployment string) bool
 }
 
+// LoadView reports replica-local requests in flight per deployment for
+// least_outstanding selection. It is read once per plan as a hint; admission
+// is still decided when an attempt acquires its target.
+type LoadView interface {
+	Outstanding(deployment string) int
+}
+
 type PlanOptions struct {
 	RequiredCapabilities []config.Capability
 	AllowedProviderTypes []string
@@ -175,8 +182,11 @@ type PlanOptions struct {
 	PinnedProvider       string
 	SingleAttempt        bool
 	Eligibility          Eligibility
-	Picker               WeightedPicker
-	SelectionKey         string
+	// Load is consulted only for least_outstanding selection. Without it the
+	// mode falls back to a weighted random order.
+	Load         LoadView
+	Picker       WeightedPicker
+	SelectionKey string
 	// ProviderPriority is a bounded, case-insensitive list of configured
 	// provider names to move ahead of the otherwise canonical attempt order.
 	// Unknown names are harmless and unlisted candidates remain stable.
@@ -432,10 +442,27 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 				}
 				remaining = ordered
 			}
+			leastOutstanding := model.Selection.Mode == config.SelectionLeastOutstanding &&
+				options.Load != nil && len(remaining) > 1
+			var loads []int
+			if leastOutstanding {
+				loads = make([]int, len(remaining))
+				for index := range remaining {
+					loads[index] = options.Load.Outstanding(remaining[index].target.Deployment)
+				}
+			}
 			for len(remaining) > 0 {
+				// draw holds the indexes into remaining this pick chooses
+				// among: every candidate, or under least_outstanding only
+				// those with the fewest requests in flight per unit weight.
+				weights := make([]int, len(remaining))
+				for index := range remaining {
+					weights[index] = remaining[index].target.Weight
+				}
+				draw := lowestLoadIndexes(weights, loads, leastOutstanding)
 				var totalWeight int64
-				for _, eligible := range remaining {
-					weight := int64(eligible.target.Weight)
+				for _, candidateIndex := range draw {
+					weight := int64(remaining[candidateIndex].target.Weight)
 					if weight > int64(^uint64(0)>>1)-totalWeight {
 						return Plan{}, fmt.Errorf("routing pool %d weight overflow", pool.Priority)
 					}
@@ -457,10 +484,10 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 						)
 					}
 				}
-				index := 0
+				index := draw[0]
 				var boundary int64
-				for candidateIndex, candidate := range remaining {
-					boundary += int64(candidate.target.Weight)
+				for _, candidateIndex := range draw {
+					boundary += int64(remaining[candidateIndex].target.Weight)
 					if value < boundary {
 						index = candidateIndex
 						break
@@ -468,6 +495,9 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 				}
 				eligible := remaining[index]
 				remaining = append(remaining[:index], remaining[index+1:]...)
+				if loads != nil {
+					loads = append(loads[:index], loads[index+1:]...)
+				}
 				target := eligible.target
 
 				deployment, exists := s.deployments[target.Deployment]
@@ -528,6 +558,39 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 		ProviderPriority:     providerPriority,
 		Candidates:           candidates,
 	}, nil
+}
+
+// lowestLoadIndexes returns the indexes of the remaining candidates (given by
+// their weights) that a draw chooses among. Without least_outstanding that is
+// every candidate, in order. With it, only the candidates whose in-flight count
+// per unit of weight is lowest; the comparison is cross-multiplied so integer
+// weights need no division.
+func lowestLoadIndexes(weights []int, loads []int, leastOutstanding bool) []int {
+	indexes := make([]int, 0, len(weights))
+	if !leastOutstanding || len(loads) != len(weights) {
+		for index := range weights {
+			indexes = append(indexes, index)
+		}
+		return indexes
+	}
+	best := -1
+	for index := range weights {
+		if best < 0 {
+			best = index
+			indexes = append(indexes, index)
+			continue
+		}
+		left := int64(loads[index]) * int64(weights[best])
+		right := int64(loads[best]) * int64(weights[index])
+		switch {
+		case left < right:
+			best = index
+			indexes = append(indexes[:0], index)
+		case left == right:
+			indexes = append(indexes, index)
+		}
+	}
+	return indexes
 }
 
 const (

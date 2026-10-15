@@ -965,6 +965,59 @@ describe("AdminApp", () => {
     expect(validationCall?.[1]?.body).toContain('"preserve me"');
   });
 
+  it("offers least_outstanding selection and drops a stale hash key", async () => {
+    const activeRevision = "d".repeat(64);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === "/v1/ui/bootstrap") {
+        return jsonResponse({
+          ...bootstrap,
+          edition: "cluster",
+          config_revision: activeRevision,
+          features: { status: false, config_read: true, config_validate: true },
+          principal: { id: "config-reader", roles: ["config_read"] },
+        });
+      }
+      if (path === "/v1/config") {
+        return jsonResponse({
+          revision: activeRevision,
+          document: {
+            providers: [],
+            deployments: [
+              { name: "replica-a", provider: "provider", model: "same" },
+              { name: "replica-b", provider: "provider", model: "same" },
+            ],
+            virtual_models: [{
+              name: "chat",
+              selection: { mode: "weighted_hash", hash_key: "thread_id" },
+              pools: [{
+                priority: 0,
+                targets: [
+                  { deployment: "replica-a", weight: 1 },
+                  { deployment: "replica-b", weight: 1 },
+                ],
+              }],
+            }],
+          },
+        });
+      }
+      return jsonResponse({ error: { message: `Unexpected request ${path}` } }, 500);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/admin/configuration");
+
+    render(<AdminApp productName="SparkRoute" />);
+    await screen.findByLabelText("Canonical name");
+    fireEvent.change(screen.getByLabelText("Selection"), { target: { value: "least_outstanding" } });
+    expect(screen.queryByLabelText(/^Stable hash key/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
+
+    const document = JSON.parse(
+      (screen.getByLabelText("Gateway configuration JSON") as HTMLTextAreaElement).value,
+    );
+    expect(document.virtual_models[0].selection).toEqual({ mode: "least_outstanding" });
+  });
+
   it("edits provider and deployment policy while redacting configured header literals", async () => {
     const activeRevision = "f".repeat(64);
     const configuredHeader = "configured-literal-must-not-render";

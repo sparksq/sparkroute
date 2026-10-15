@@ -1475,6 +1475,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		SingleAttempt: responseState.singleAttempt() ||
 			h.operation.requiresSingleAttempt(requiredCapabilities),
 		Eligibility:      eligibility,
+		Load:             h.targets,
 		Picker:           h.picker,
 		SelectionKey:     selectionKey,
 		ProviderPriority: providerPriority,

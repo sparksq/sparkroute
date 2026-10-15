@@ -142,6 +142,7 @@ func (h *responsesResourceHandler) ServeHTTP(
 			PinnedProvider:       affinity.Provider,
 			SingleAttempt:        true,
 			Eligibility:          h.core.targets,
+			Load:                 h.core.targets,
 			Picker:               h.core.picker,
 		},
 	)

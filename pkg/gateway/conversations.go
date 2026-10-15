@@ -314,6 +314,7 @@ func (h *conversationsHandler) ServeHTTP(
 		ProtocolResolver:     nativeProtocolResolver(config.ProtocolOpenAI),
 		SingleAttempt:        true,
 		Eligibility:          h.core.targets,
+		Load:                 h.core.targets,
 		Picker:               h.core.picker,
 	}
 	if route.conversationID != "" {

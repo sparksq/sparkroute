@@ -850,8 +850,12 @@ func (p SelectionPolicy) Validate() error {
 		if p.HashKey == "" {
 			return fmt.Errorf("hash_key is required for mode weighted_hash")
 		}
+	case SelectionLeastOutstanding:
+		if p.HashKey != "" {
+			return fmt.Errorf("hash_key requires mode weighted_hash")
+		}
 	default:
-		return fmt.Errorf("mode must be weighted_random, weighted_hash, or empty")
+		return fmt.Errorf("mode must be weighted_random, weighted_hash, least_outstanding, or empty")
 	}
 	switch p.HashKey {
 	case "", SelectionHashTenant, SelectionHashPrincipal, SelectionHashUser,
