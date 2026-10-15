@@ -51,6 +51,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
   const [previewOverrides, setPreviewOverrides] = useState("{}");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [needsRecipeReview, setNeedsRecipeReview] = useState(false);
   const [refresh, setRefresh] = useState<SparkrunOperation>();
   const [refreshMessage, setRefreshMessage] = useState("");
   const serial = useRef(0);
@@ -70,7 +71,6 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       if (initialDeployment) {
         const result = await sparkRunCatalog<SparkrunRecipeDetails>(token, "catalog_resolve", {reference: initialSource.recipe, overrides: initialSource.overrides ?? {}}, abort.signal);
         acceptPreview(result); setPreviewOverrides(overrides);
-        if (result.recipe_revision !== initialSource.recipe_revision) setError("This recipe has changed since it was saved. Review this preview before applying the updated recipe.");
       }
     }).catch((e) => { if (!abort.signal.aborted) setError(message(e)); })
       .finally(() => { if (!abort.signal.aborted) setBusy(""); });
@@ -95,8 +95,10 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
 
   async function action(label: string, work: () => Promise<void>) {
     const current = ++serial.current;
-    setBusy(label); setError("");
-    try { await work(); } catch (e) { if (current === serial.current) setError(message(e)); }
+    setBusy(label); setError(""); setNeedsRecipeReview(false);
+    try { await work(); } catch (e) { if (current === serial.current) {
+      setError(message(e)); setNeedsRecipeReview(e instanceof AdminAPIError && e.code === "recipe_revision_changed");
+    } }
     finally { if (current === serial.current) setBusy(""); }
   }
   async function search(next = 0) {
@@ -132,6 +134,7 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       acceptPreview(result); setPreviewOverrides(overrides);
     });
   }
+  const recipeChanged = Boolean(initialDeployment && preview && (preview.reference !== initialSource.recipe || preview.recipe_revision !== initialSource.recipe_revision));
   const invalidPreview = !preview || previewOverrides !== overrides || preview.issues.some((issue) => issue.severity === "error");
 
   return <section className={embedded ? "recipe-wizard recipe-embedded" : "recipe-wizard"} aria-label="sparkrun recipe settings">
@@ -139,8 +142,15 @@ export function SparkrunRecipeWizard({ token, document, revision, onChange, onCl
       <button type="button" className="text-button" onClick={onClose}>Cancel</button></div>}
     <p className="section-help">{initialDeployment ? "Update the recipe or lifecycle settings. All names targeting this deployment keep their routing reference. Applying settings does not restart a running workload." : "Choose a recipe and a cluster. Saving makes the public model name available; its first request can start the workload."}</p>
     <div className="recipe-steps" aria-label="Setup steps"><strong>{step === "recipe" ? "1. Choose recipe" : "2. Configure model"}</strong></div>
-    {error && <div className="notice error" role="alert">{error}</div>}
+    {error && <div className="notice error" role="alert">{error}{needsRecipeReview && preview && <button type="button" disabled={Boolean(busy)} onClick={() => void select(preview.reference)}>Review latest recipe</button>}</div>}
     {busy && <p role="status">{busy}…</p>}
+    {recipeChanged && preview && <div className="notice info" role="status">
+      <strong>Review recipe update for {String(initialDeployment?.title || initialDeployment?.model || initialDeployment?.name)}.</strong>
+      <p>Saved revision <code>{String(initialSource.recipe_revision)}</code> → current revision <code>{preview.recipe_revision}</code>.</p>
+      {preview.model !== initialDeployment?.model && <p>Served model changes from {String(initialDeployment?.model)} to {preview.model}.</p>}
+      <p>Applying adopts the recipe shown below for future starts. Public names, aliases and routing pools stay in your draft. It does not restart a running workload.</p>
+      <p>The previous recipe contents were not retained, so a full comparison is unavailable. Review the current recipe details and settings before applying.</p>
+    </div>}
     {step === "recipe" ? <>
       <fieldset disabled={Boolean(busy)} className="recipe-fieldset">
         <label>Recipe source<select aria-label="Recipe source" value={source} onChange={(e) => { setSource(e.target.value); setRegistry(""); setFilters({}); setPage(emptyPage); setOffset(0); }}>

@@ -110,6 +110,7 @@ func (c *Client) adaptDaemonWorkloads(ctx context.Context, operation string, raw
 	case "workloads":
 		var value struct {
 			Workloads []daemonWorkload `json:"workloads"`
+			Complete  bool             `json:"complete"`
 			Providers []struct {
 				Name    string `json:"name"`
 				Version int    `json:"version"`
@@ -124,7 +125,7 @@ func (c *Client) adaptDaemonWorkloads(ctx context.Context, operation string, raw
 		if err := c.invokeDaemon(ctx, bridgeRequest{Operation: "catalog_plugins"}, &plugins); err != nil {
 			return nil, err
 		}
-		result := WorkloadReport{Plugins: plugins.Plugins, Workloads: []WorkloadInfo{}}
+		result := WorkloadReport{Complete: value.Complete, Plugins: plugins.Plugins, Workloads: []WorkloadInfo{}}
 		for _, row := range value.Workloads {
 			result.Workloads = append(result.Workloads, row.project())
 		}

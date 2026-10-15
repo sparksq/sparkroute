@@ -75,3 +75,20 @@ it("disambiguates equal titles and supports older generated deployments", () => 
   expect(titles["sparkrun:two"]).toBe("sparkrun:spark-a:model (sparkrun:two)");
   expect(titles["sparkrun:old"]).toBe("sparkrun:spark-b:old-model");
 });
+
+it("defaults to running targets and saves an explicit opt-out across pools while preserving weights and cold-start policy", () => {
+  const initial = {...local, virtual_models:[{name:"coding", selection:{mode:"weighted_hash",hash_key:"tenant"},pools:[{priority:0,targets:[{deployment:"local-target",weight:3}]},{priority:1,targets:[{deployment:"sparkrun:abc123",weight:2}]}]}]};
+  function Editor() {
+    const [document,setDocument] = useState<ConfigurationDocument>(initial);
+    return <><VirtualModelEditor document={document} readOnlyDocument={generated} disabled={false} onChange={setDocument}/><output aria-label="Submitted draft">{JSON.stringify(document)}</output></>;
+  }
+  render(<Editor/>);
+  const toggle = screen.getByLabelText("Prefer running targets with capacity");
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  expect(draft().virtual_models[0].selection).toEqual({mode:"weighted_hash",hash_key:"tenant",prefer_running:false});
+  expect(draft().virtual_models[0].pools).toEqual(initial.virtual_models[0]!.pools);
+  expect(draft().deployments).toEqual(local.deployments);
+  fireEvent.click(toggle);
+  expect(draft().virtual_models[0].selection.prefer_running).toBe(true);
+});

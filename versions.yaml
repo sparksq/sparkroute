@@ -9,7 +9,7 @@
 # The Go module, the embedded admin UI and the container
 # image all ship as one artifact, so they carry one number rather than drifting
 # apart the way three independently-bumped manifests would.
-sparkroute: 0.0.6
+sparkroute: 0.0.7
 
 project_rules:
   sparkroute:

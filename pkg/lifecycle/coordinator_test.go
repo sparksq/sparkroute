@@ -411,3 +411,82 @@ func waitForQueuedWaiters(t *testing.T, coordinator *AdmissionCoordinator, want 
 	}
 	t.Fatalf("queued waiters did not reach %d", want)
 }
+
+func TestReadyHintChecksEndpointCapacityExpiryAndAuthorizationWithoutLaunching(t *testing.T) {
+	ctx := context.Background()
+	registry := endpointregistry.NewMemory()
+	target := Target{Deployment: "deployment", Controller: "controller", Source: EndpointDiscovered, Protocol: "openai", UpstreamModel: "upstream"}
+	denied := false
+	coordinator, err := NewAdmissionCoordinator([]Target{target}, AdmissionOptions{Registry: registry, Authorizer: EndpointAuthorizerFunc(func(context.Context, endpointregistry.Endpoint) error {
+		if denied {
+			return errors.New("denied")
+		}
+		return nil
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint := endpointregistry.Endpoint{ID: "endpoint", Target: "deployment", Controller: "controller", BaseURL: "http://127.0.0.1:9000/v1", Protocol: "openai", ServedModels: []string{"upstream"}, State: endpointregistry.StateReady, MaxConcurrency: 1}
+	put := func() {
+		t.Helper()
+		if err := registry.Register(ctx, endpoint); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("missing endpoint ready")
+	}
+	put()
+	if !coordinator.Ready(ctx, "deployment") {
+		t.Fatal("ready endpoint missed")
+	}
+	lease, err := coordinator.Acquire(ctx, AdmissionRequest{Deployment: "deployment"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("local active lease ignored")
+	}
+	if err := coordinator.Release(ctx, lease, RequestOutcome{}); err != nil {
+		t.Fatal(err)
+	}
+	endpoint.ActiveRequests = 1
+	put()
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("reported capacity ignored")
+	}
+	endpoint.ActiveRequests = 0
+	endpoint.ExpiresAt = time.Now().Add(-time.Minute)
+	put()
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("expired endpoint ready")
+	}
+	endpoint.ExpiresAt = time.Time{}
+	put()
+	denied = true
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("unauthorized endpoint ready")
+	}
+	denied = false
+	endpoint.State = endpointregistry.StateDraining
+	put()
+	if coordinator.Ready(ctx, "deployment") {
+		t.Fatal("draining endpoint ready")
+	}
+}
+
+func TestPreferredReadyTargetDoesNotColdStartAfterReadinessRace(t *testing.T) {
+	registry := endpointregistry.NewMemory()
+	controller := &fakeController{registry: registry, started: make(chan struct{}), ready: make(chan struct{})}
+	coordinator, err := NewAdmissionCoordinator([]Target{activationTarget(1, 32)}, AdmissionOptions{Registry: registry, Controllers: map[string]Controller{"controller": controller}, Authorizer: EndpointAuthorizerFunc(func(context.Context, endpointregistry.Endpoint) error { return nil })})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coordinator.Ready(context.Background(), "deployment") {
+		t.Fatal("cold target ready")
+	}
+	_, err = coordinator.Acquire(context.Background(), AdmissionRequest{Deployment: "deployment", Features: RequestFeatures{PreparedOnly: true}})
+	if !errors.Is(err, ErrEndpointNotReady) || controller.ensureCalls != 0 {
+		t.Fatal(err, controller.ensureCalls)
+	}
+}

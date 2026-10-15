@@ -33,6 +33,7 @@ type WorkloadInfo struct {
 	State            string   `json:"state,omitempty"`
 }
 type WorkloadReport struct {
+	Complete  bool                 `json:"complete,omitempty"`
 	Plugins   []PluginAvailability `json:"plugins"`
 	Workloads []WorkloadInfo       `json:"workloads"`
 }

@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { MMProjectionSettingsEditor } from "./MMProjectionSettingsEditor";
 import { TraceSettingsEditor } from "./TraceSettingsEditor";
+import { SparkrunRecipeWizard } from "./SparkrunRecipeWizard";
 import { ProviderDeploymentEditor } from "./ProviderDeploymentEditor";
 import { PolicyProfilesEditor } from "./PolicyProfilesEditor";
 import { VirtualModelEditor } from "./VirtualModelEditor";
@@ -41,6 +42,7 @@ const emptyDocument = `{
 interface Notice {
   kind: "success" | "error" | "info";
   text: string;
+  deployment?: string;
 }
 
 export function ManagedConfigurationWorkspace({
@@ -82,7 +84,9 @@ export function ManagedConfigurationWorkspace({
   const editorRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<Notice>();
   const [busy, setBusy] = useState("");
-  const [recipeWizard, setRecipeWizard] = useState(false);
+  const [editorRecipeWizard, setRecipeWizard] = useState(false);
+  const [reviewDeployment, setReviewDeployment] = useState<Record<string, unknown>>();
+  const recipeWizard = editorRecipeWizard || Boolean(reviewDeployment);
   const [editorMode, setEditorMode] = useState<"structured" | "json">("structured");
   const infrastructureSection = useRef<"providers" | "deployments">("providers");
   if (section === "providers" || section === "deployments") infrastructureSection.current = section;
@@ -262,6 +266,8 @@ export function ManagedConfigurationWorkspace({
     setNotice({ kind: "info", text: "Draft changed. Validate before saving." });
   };
 
+  const recipeErrorDeployment = Array.isArray(operatorParsed.document?.deployments)
+    ? operatorParsed.document.deployments.find((deployment: Record<string, unknown>) => deployment.name === notice?.deployment) as Record<string, unknown> | undefined : undefined;
   return (
     <div className="config-workspace" ref={editorRef} onChangeCapture={() => setValidatedCandidate(undefined)}>
       <section className="managed-config-overview" aria-label="Managed configuration ownership">
@@ -328,8 +334,17 @@ export function ManagedConfigurationWorkspace({
             </button>
           ) : null}
         </div>
-        {notice ? <div className={`notice ${notice.kind}`} role="status">{notice.text}</div> : null}
-        <div hidden={editorMode !== "structured"}>
+        {notice ? <div className={`notice ${notice.kind}`} role="status">{notice.text}
+          {recipeErrorDeployment && canEdit && bootstrap.features.sparkrun_catalog && <button type="button" className="secondary-button" disabled={Boolean(busy) || recipeWizard} onClick={() => {
+            setReviewDeployment(recipeErrorDeployment);
+          }}>Review recipe update</button>}
+        </div> : null}
+        {reviewDeployment && operatorParsed.document && <div>
+          <div className="panel-heading"><h3>Review recipe update</h3><button type="button" className="text-button" onClick={() => setReviewDeployment(undefined)}>Cancel</button></div>
+          <SparkrunRecipeWizard embedded token={token} document={operatorParsed.document} revision={storedRevision} initialDeployment={reviewDeployment}
+            onClose={() => setReviewDeployment(undefined)} onChange={(document) => { structuredChange(document); setReviewDeployment(undefined); }} />
+        </div>}
+        <div hidden={editorMode !== "structured" || Boolean(reviewDeployment)}>
           {operatorParsed.document ? (
             <>
               <div hidden={section !== "advanced"}>
@@ -373,7 +388,7 @@ export function ManagedConfigurationWorkspace({
                 />
               </div>
               <div hidden={section !== "providers" && section !== "deployments"}>
-                <ProviderDeploymentEditor allowGeneratedRemoval={Boolean(bootstrap.features.sparkrun_catalog)} sparkrun={{enabled: Boolean(bootstrap.features.sparkrun_catalog), token, revision: storedRevision, onEditingChange: setRecipeWizard, onPrepared: (document, message) => { structuredChange(document); setNotice({kind: "info", text: message + " Validate, then Save to make it available. Saving does not launch it."}); }}} section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={{...generatedDocument, request_profile_sources: storedDocuments.recipe_profiles?.request_profile_sources}} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
+                <ProviderDeploymentEditor allowGeneratedRemoval={Boolean(bootstrap.features.sparkrun_catalog)} sparkrun={{enabled: Boolean(bootstrap.features.sparkrun_catalog), autoUpdateRecipes: Boolean(bootstrap.features.sparkrun_auto_update_recipes), token, revision: storedRevision, onEditingChange: setRecipeWizard, onPrepared: (document, message) => { structuredChange(document); setNotice({kind: "info", text: message + " Validate, then Save to make it available. Saving does not launch it."}); }}} section={infrastructureSection.current} simplifiedCapabilities disabled={!canEdit || Boolean(busy)} document={operatorParsed.document} readOnlyDocument={{...generatedDocument, request_profile_sources: storedDocuments.recipe_profiles?.request_profile_sources}} onChange={structuredChange} subscriptionAuth={{ token, enabled: Boolean(bootstrap.features.provider_auth) }} />
               </div>
               <div hidden={section !== "deployments"}>
                 <ExcludedSparkrunDeployments document={operatorParsed.document} generated={storedDocuments.sparkrun}
@@ -387,7 +402,7 @@ export function ManagedConfigurationWorkspace({
             </div>
           )}
         </div>
-        {editorMode === "json" ? (
+        {editorMode === "json" && !reviewDeployment ? (
           <>
           <p className="section-help configuration-context">Edit your configuration here. Generated entries are included when validating and saving.</p>
           <textarea
@@ -444,5 +459,6 @@ function errorNotice(error: unknown): Notice {
   return {
     kind: "error",
     text: error instanceof Error ? error.message : "Configuration request failed.",
+    deployment: error instanceof AdminAPIError && error.code === "recipe_revision_changed" ? error.deployment : undefined,
   };
 }

@@ -1474,6 +1474,9 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 		PinnedProvider:       pinnedProvider,
 		SingleAttempt: responseState.singleAttempt() ||
 			h.operation.requiresSingleAttempt(requiredCapabilities),
+		Ready: func(deployment string) bool {
+			return h.lifecycle == nil || !h.lifecycle.IsDynamic(deployment) || h.lifecycle.Ready(request.Context(), deployment)
+		},
 		Eligibility:      eligibility,
 		Picker:           h.picker,
 		SelectionKey:     selectionKey,
@@ -1765,6 +1768,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 					Deployment: selection.Deployment.Name,
 					BodyBytes:  candidateBytes,
 					Features: lifecycle.RequestFeatures{
+						PreparedOnly: selection.Running,
 						VirtualModel: plan.VirtualModel,
 						Protocol:     string(selectionUpstreamProtocol(selection)),
 						Streaming:    streaming,
@@ -1790,7 +1794,7 @@ func (h *chatCompletionsHandler) ServeHTTP(w http.ResponseWriter, request *http.
 					return
 				}
 				canRetryActivation := canRetry
-				if h.lifecycle.IsActivatable(selection.Deployment.Name) &&
+				if !selection.Running && h.lifecycle.IsActivatable(selection.Deployment.Name) &&
 					index+1 < len(plan.Candidates) &&
 					h.lifecycle.IsActivatable(plan.Candidates[index+1].Deployment.Name) {
 					canRetryActivation = false

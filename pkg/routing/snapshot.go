@@ -102,7 +102,9 @@ type Selection struct {
 	UpstreamProtocol config.Protocol
 	NativeProtocol   bool
 	PoolPriority     int
-	PreferenceClass  int
+	// Running marks a preferred ready candidate; admission must not cold-start it.
+	Running         bool
+	PreferenceClass int
 	// ProviderPreference is the selector-supplied provider rank applied after
 	// eligibility filtering. Unlisted providers share the final rank.
 	ProviderPreference int
@@ -134,7 +136,7 @@ type Plan struct {
 }
 
 // PreferDeployment moves a soft-affinity match to the front only when it is in
-// the same operator priority, protocol/capability class, and explicit provider
+// the same readiness preference, operator priority, protocol/capability class, and explicit provider
 // preference rank as the plan's existing first candidate. Hard pins are
 // resolved before this point.
 func (p *Plan) PreferDeployment(deployment string) bool {
@@ -152,6 +154,7 @@ func (p *Plan) PreferDeployment(deployment string) bool {
 		}
 		if candidate.PoolPriority != first.PoolPriority ||
 			candidate.PreferenceClass != first.PreferenceClass ||
+			candidate.Running != first.Running ||
 			candidate.ProviderPreference != first.ProviderPreference {
 			return false
 		}
@@ -175,8 +178,11 @@ type PlanOptions struct {
 	PinnedProvider       string
 	SingleAttempt        bool
 	Eligibility          Eligibility
-	Picker               WeightedPicker
-	SelectionKey         string
+	// Ready is a non-reserving readiness/capacity hint used only when the model
+	// prefers running targets. Eligibility and request compatibility still gate it.
+	Ready        func(deployment string) bool
+	Picker       WeightedPicker
+	SelectionKey string
 	// ProviderPriority is a bounded, case-insensitive list of configured
 	// provider names to move ahead of the otherwise canonical attempt order.
 	// Unknown names are harmless and unlisted candidates remain stable.
@@ -504,6 +510,21 @@ func (s *Snapshot) BuildPlanFor(requested string, options PlanOptions) (Plan, er
 		}
 		return Plan{}, fmt.Errorf("%w: %s", ErrNoTargets, canonical)
 	}
+	if model.Selection.PrefersRunning() && options.Ready != nil {
+		// Stable partition preserves weights and all existing preference classes
+		// within ready and remaining candidates, including weighted-hash order.
+		ready := make([]Selection, 0, len(candidates))
+		remaining := make([]Selection, 0, len(candidates))
+		for _, candidate := range candidates {
+			candidate.Running = options.Ready(candidate.Deployment.Name)
+			if candidate.Running {
+				ready = append(ready, candidate)
+			} else {
+				remaining = append(remaining, candidate)
+			}
+		}
+		candidates = append(ready, remaining...)
+	}
 	providerPriority := applyProviderPriority(candidates, options.ProviderPriority)
 	if options.PinnedDeployment != "" && len(candidates) > 1 {
 		candidates = candidates[:1]
@@ -659,6 +680,10 @@ func cloneRawMessages(input map[string]json.RawMessage) map[string]json.RawMessa
 }
 
 func cloneVirtualModel(model config.VirtualModel) config.VirtualModel {
+	if model.Selection.PreferRunning != nil {
+		preferRunning := *model.Selection.PreferRunning
+		model.Selection.PreferRunning = &preferRunning
+	}
 	model.Profile = config.CloneProfileValue(model.Profile)
 	if model.RequestOverrides != nil {
 		overrides := make(map[string]map[string]json.RawMessage, len(model.RequestOverrides))

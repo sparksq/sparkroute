@@ -931,3 +931,111 @@ func TestSnapshotAppliesSharedProfilesAndKeepsPreviousGenerationIsolated(t *test
 		t.Fatal("compile materialized policies in source")
 	}
 }
+
+func TestPreferRunningDefaultsOnAndKeepsExplicitOptOut(t *testing.T) {
+	enabled, disabled := true, false
+	for _, test := range []struct {
+		name     string
+		enabled  *bool
+		ready    map[string]bool
+		eligible eligibilityMap
+		want     []string
+	}{
+		{"disabled", &disabled, map[string]bool{"fallback": true}, nil, []string{"primary", "fallback"}},
+		{"default warm fallback", nil, map[string]bool{"fallback": true}, nil, []string{"fallback", "primary"}},
+		{"warm fallback", &enabled, map[string]bool{"fallback": true}, nil, []string{"fallback", "primary"}},
+		{"all cold", nil, nil, nil, []string{"primary", "fallback"}},
+		{"both running", nil, map[string]bool{"primary": true, "fallback": true}, nil, []string{"primary", "fallback"}},
+		{"busy fallback", nil, map[string]bool{"fallback": true}, eligibilityMap{"primary": true}, []string{"primary"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			document := routingDocument()
+			document.VirtualModels[0].Selection.PreferRunning = test.enabled
+			snapshot, err := Compile(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			options := PlanOptions{Picker: &sequencePicker{values: []int64{0, 0}}, Ready: func(name string) bool {
+				if test.enabled != nil && !*test.enabled {
+					t.Fatal("readiness queried despite explicit opt-out")
+				}
+				return test.ready[name]
+			}}
+			if test.eligible != nil {
+				options.Eligibility = test.eligible
+			}
+			plan, err := snapshot.BuildPlanFor("default", options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Candidates) != len(test.want) {
+				t.Fatal(plan.Candidates)
+			}
+			for i, name := range test.want {
+				if plan.Candidates[i].Deployment.Name != name {
+					t.Fatal(plan.Candidates)
+				}
+			}
+			if (test.enabled == nil || *test.enabled) && test.ready["fallback"] && len(plan.Candidates) > 1 && !test.ready["primary"] && plan.PreferDeployment("primary") {
+				t.Fatal("affinity crossed readiness preference")
+			}
+		})
+	}
+}
+
+func TestPreferRunningPreservesPinsWeightedOrderAndCompatibility(t *testing.T) {
+	document := routingDocument()
+	preferRunning := true
+	document.VirtualModels[0].Selection.PreferRunning = &preferRunning
+	document.VirtualModels[0].Pools = []config.RoutingPool{{Targets: []config.WeightedTarget{{Deployment: "primary", Weight: 1}, {Deployment: "fallback", Weight: 3}}}}
+	snapshot, err := Compile(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ready := func(string) bool { return true }
+	plan, err := snapshot.BuildPlanFor("public", PlanOptions{Ready: ready, Picker: &sequencePicker{values: []int64{2, 0}}})
+	if err != nil || plan.Candidates[0].Deployment.Name != "fallback" {
+		t.Fatal(plan, err)
+	}
+	for _, pinned := range []string{"primary", "fallback"} {
+		plan, err = snapshot.BuildPlanFor("public", PlanOptions{PinnedDeployment: pinned, Ready: func(name string) bool { return name != "primary" }})
+		if err != nil || len(plan.Candidates) != 1 || plan.Candidates[0].Deployment.Name != pinned {
+			t.Fatal(plan, err)
+		}
+	}
+	_, err = snapshot.BuildPlanFor("public", PlanOptions{Ready: ready, Compatibility: func(string) bool { return false }})
+	if !errors.Is(err, ErrUnsupportedSemantics) {
+		t.Fatal(err)
+	}
+}
+
+func TestPreferRunningOptOutSurvivesSerializationAndSnapshotCloning(t *testing.T) {
+	document := routingDocument()
+	disabled := false
+	document.VirtualModels[0].Selection.PreferRunning = &disabled
+	raw, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"prefer_running":false`) {
+		t.Fatal("explicit opt-out was omitted")
+	}
+	var decoded config.Document
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := Compile(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	*decoded.VirtualModels[0].Selection.PreferRunning = true
+	model, err := snapshot.ResolveModel("public", false)
+	if err != nil || model.Selection.PrefersRunning() {
+		t.Fatal("source changed snapshot", err)
+	}
+	*model.Selection.PreferRunning = true
+	model, err = snapshot.ResolveModel("public", false)
+	if err != nil || model.Selection.PrefersRunning() {
+		t.Fatal("resolved model changed snapshot", err)
+	}
+}

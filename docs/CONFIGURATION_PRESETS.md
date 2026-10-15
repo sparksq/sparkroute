@@ -12,8 +12,10 @@ and select the new preset. Subsequent configuration saves update that preset.
 Save any unsaved draft before creating or managing presets.
 
 Choose a preset to load its operator configuration. Loading checks the merged
-configuration against the current generated inventory and revalidates sparkrun
-recipe bindings. A failed check leaves the current configuration and selection
+configuration against the current generated inventory and revalidates new or
+changed sparkrun recipe bindings. Unchanged bindings retain their saved pins during validation and activation
+(background automatic recipe updates run independently),
+including when the upstream recipe has changed. A failed check leaves the current configuration and selection
 intact. An unsaved draft requires confirmation before it is discarded.
 
 **Manage presets…** provides rename and delete actions. Default cannot be renamed

@@ -328,6 +328,24 @@ func (c *AdmissionCoordinator) Eligible(deployment string) bool {
 	}
 }
 
+// Ready reports whether a target has an authorized, unexpired ready endpoint
+// with capacity. It never reserves capacity or invokes lifecycle operations.
+// Static targets rely on the caller's circuit/concurrency eligibility checks.
+func (c *AdmissionCoordinator) Ready(ctx context.Context, deployment string) bool {
+	target, exists := c.targets[deployment]
+	if !exists || !c.Eligible(deployment) {
+		return false
+	}
+	if target.Source == EndpointStatic {
+		return true
+	}
+	if c.authorizer == nil {
+		return false
+	}
+	_, err := c.readyEndpoint(ctx, target)
+	return err == nil
+}
+
 // Start explicitly activates a configured binding without an inference request.
 // It uses the same bounded queue, fencing and leases as request admission, but
 // permits an operator to prewarm a binding whose requests reject cold starts.
@@ -390,6 +408,9 @@ func (c *AdmissionCoordinator) acquireActivatable(
 ) (*AdmissionLease, error) {
 	binding := target.Binding
 	ready, readyErr := c.readyEndpoint(ctx, target)
+	if request.Features.PreparedOnly && readyErr != nil {
+		return nil, c.admissionError("endpoint_not_ready", ErrEndpointNotReady)
+	}
 	if readyErr == nil && binding.ColdStart == ColdStartReject {
 		return c.acquireControllerLease(ctx, target, request.Features, ready)
 	}

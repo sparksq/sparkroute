@@ -75,10 +75,11 @@ type RecipeDetails struct {
 }
 
 type Cluster struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	HostCount   int    `json:"host_count"`
-	Default     bool   `json:"default"`
+	Hosts       []string `json:"hosts,omitempty"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	HostCount   int      `json:"host_count"`
+	Default     bool     `json:"default"`
 }
 
 type RecipeDraft struct {
@@ -164,7 +165,7 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 		}
 	}
 	if input.RecipeRevision == "" || input.RecipeRevision != details.Revision {
-		return operator, "", false, fmt.Errorf("recipe changed; refresh its preview before adding it")
+		return operator, "", false, &RecipeRevisionError{Deployment: input.Deployment, Recipe: details.Name, Clusters: append([]string{input.Cluster}, input.FallbackClusters...), SavedRevision: input.RecipeRevision, CurrentRevision: details.Revision}
 	}
 	var clusters struct {
 		Clusters []Cluster `json:"clusters"`
@@ -311,6 +312,52 @@ func PrepareRecipeDraft(ctx context.Context, catalog Catalog, operator, generate
 	return operator, deploymentName, reused, nil
 }
 
+// ChangedRecipeBindings selects new or changed launch/lifecycle bindings by
+// deployment identity. Display metadata and routing edits do not adopt a new
+// recipe. Compare against the merged document at the caller's expected revision.
+func ChangedRecipeBindings(baseline, candidate config.Document) config.Document {
+	previous := make(map[string]config.Deployment, len(baseline.Deployments))
+	for _, deployment := range baseline.Deployments {
+		previous[deployment.Name] = deployment
+	}
+	changed := config.Document{}
+	for _, deployment := range candidate.Deployments {
+		source := deployment.EndpointSource
+		if source.Type != config.EndpointSourceActivatable || source.Controller != "sparkrun" {
+			continue
+		}
+		old, exists := previous[deployment.Name]
+		// JSON normalizes omitted maps/slices and is deterministic for overrides.
+		before, _ := json.Marshal(old.EndpointSource)
+		after, _ := json.Marshal(source)
+		if !exists || old.Model != deployment.Model || old.Provider != deployment.Provider || string(before) != string(after) {
+			changed.Deployments = append(changed.Deployments, deployment)
+		}
+	}
+	return changed
+}
+
+// RecipeRevisionError identifies an explicit recipe edit that needs review.
+// It is distinct from an unavailable catalog and never advances a saved pin.
+type RecipeRevisionError struct {
+	Deployment      string
+	Recipe          string
+	Clusters        []string
+	SavedRevision   string
+	CurrentRevision string
+}
+
+func (e *RecipeRevisionError) Error() string {
+	name := e.Recipe
+	if name == "" {
+		name = e.Deployment
+	}
+	if len(e.Clusters) > 0 {
+		name += " on " + strings.Join(e.Clusters, ", ")
+	}
+	return fmt.Sprintf("Recipe %s changed since it was reviewed. Review the recipe update in Model Deployments before applying this binding change.", name)
+}
+
 // ValidateRecipeBindings re-resolves exact selections on both Validate and Save.
 // Revision pins include launch overrides, so editing an override requires a new preview.
 func ValidateRecipeBindings(ctx context.Context, catalog Catalog, document config.Document) error {
@@ -348,7 +395,7 @@ func ValidateRecipeBindings(ctx context.Context, catalog Catalog, document confi
 			}
 		}
 		if details.Revision != source.RecipeRevision || details.Model != deployment.Model {
-			return fmt.Errorf("recipe for %s changed; refresh the recipe preview", deployment.Name)
+			return &RecipeRevisionError{Deployment: deployment.Name, Recipe: details.Name, Clusters: source.ClusterCandidates, SavedRevision: source.RecipeRevision, CurrentRevision: details.Revision}
 		}
 		if !loadedClusters {
 			if err := catalog.Catalog(ctx, "catalog_clusters", nil, &clusters); err != nil {

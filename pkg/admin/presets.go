@@ -5,14 +5,11 @@
 package admin
 
 import (
-	"context"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/sparksq/sparkroute/pkg/config"
 	"github.com/sparksq/sparkroute/pkg/config/managed"
-	"github.com/sparksq/sparkroute/pkg/sparkrun"
 )
 
 func (h *handler) configurationPresets(writer http.ResponseWriter, request *http.Request) {
@@ -80,22 +77,12 @@ func (h *handler) configurationPresets(writer http.ResponseWriter, request *http
 	case "activate":
 		var preset managed.Preset
 		preset, err = store.GetPreset(request.Context(), input.ID)
-		if err == nil {
-			var candidate config.Document
-			candidate, _, err = h.options.ManagedConfig.BuildCandidate(request.Context(), managed.OwnerOperator, preset.Document, input.ExpectedActive)
-			if err == nil {
-				ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
-				err = sparkrun.ValidateRecipeBindings(ctx, h.options.SparkrunCatalog, candidate)
-				if err == nil {
-					err = sparkrun.RetainRecipeImports(ctx, h.options.SparkrunCatalog, preset.Document)
-				}
-				cancel()
-				if err != nil {
-					writeCatalogError(writer, err)
-					return
-				}
-			}
+		if err == nil && !h.validateSparkrunCandidate(writer, request, managed.OwnerOperator, managedSetMutation{
+			Document: preset.Document, ExpectedActiveRevision: &input.ExpectedActive,
+		}, true) {
+			return
 		}
+
 		if err == nil {
 			result, err = store.ActivatePreset(request.Context(), input.ID, options)
 		}

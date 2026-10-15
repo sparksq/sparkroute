@@ -229,6 +229,19 @@ readiness checks, and routes to the assigned port. Aliases share one workload.
 The cluster's actual name is saved even when it was selected as the default.
 Unrecognized API model names never cause automatic recipe selection.
 
+Routing edits preserve existing recipe pins. Background reconciliation follows
+trusted recipe updates automatically once the previous workload is removed,
+without restarting running or sleeping jobs. Set
+`gateways.sparkroute.auto_update_recipes: false` in the plugin's `proxy.yaml` and
+restart the proxy to require manual **Review recipe update** instead. Standalone
+SparkRoute accepts `-sparkrun-auto-update-recipes=false`. See the
+[automatic update policy](docs/SPARKRUN_ON_DEMAND.md#automatic-recipe-updates).
+
+In **Virtual Models / Aliases → Routing pools**, **Prefer running targets with
+capacity** tries ready targets across pools before the usual priority and
+cold-start rules. It is on by default and can be explicitly disabled. See the
+[readiness and capacity policy](docs/SPARKRUN_ON_DEMAND.md#prefer-running-targets).
+
 Cold-start wait defaults to 30 minutes. Client timeouts must allow the model to
 load. Optional idle shutdown suggests 30 minutes and begins after the last
 request completes; streaming requests hold their lease until they finish.
@@ -241,7 +254,8 @@ Search is cache-only. **Refresh registries** explicitly updates caches and keeps
 usable results when a registry fails. Browser uploads are limited to one YAML
 file (256 KiB), do not grant trust, and do not include auxiliary build assets.
 Use a configured registry or a control-node recipe directory for those assets.
-Changed recipes require a fresh preview before saving or activation.
+Explicit recipe edits require a current preview before saving. Automatic updates
+perform the same revision and configuration checks.
 
 Start SparkRoute with **`-sparkrun`** to enable the integration. The sparkrun
 plugin supplies this flag automatically. `-sparkrun-command` only selects the

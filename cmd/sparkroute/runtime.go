@@ -39,38 +39,39 @@ import (
 )
 
 type runtimeBuildOptions struct {
-	Privacy                  *privacyRuntime
-	TraceStores              *traceStores
-	TraceReader              savedtrace.Reader
-	SparkrunWorkloads        *sparkrunruntime.Workloads
-	Context                  context.Context
-	Logger                   *slog.Logger
-	CredentialOptions        credentialbuiltin.Options
-	Ledger                   ledger.Recorder
-	ResponsesState           responsesstate.Store
-	SavedTraces              *savedtrace.AsyncRecorder
-	MaxSavedTraceBytes       int64
-	PromptCache              *promptcache.Directory
-	PromptFingerprinter      *promptcache.Fingerprinter
-	Telemetry                *otlpexport.Runtime
-	IncludeAliases           bool
-	ModelRouter              modelrouter.Router
-	MMProjection             *mmprojection.Client
-	MMProjectionCredentials  credentials.StatusSource
-	CallerAuthentication     identity.Authenticator
-	AdminEnabled             bool
-	AdminAuthentication      identity.Authenticator
-	AllowInsecureAdmin       bool
-	ClientCredentials        *clientcredentials.Manager
-	ProviderAuth             *providerauth.Service
-	ManagedConfig            managed.Store
-	SparkrunEnabled          bool
-	SparkrunDaemonConnection string
-	SparkrunCommand          string
-	SparkrunEndpointTTL      time.Duration
-	SparkrunReconcile        time.Duration
-	SparkrunProfileRefresh   time.Duration
-	SparkrunStopTimeout      time.Duration
+	Privacy                   *privacyRuntime
+	TraceStores               *traceStores
+	TraceReader               savedtrace.Reader
+	SparkrunWorkloads         *sparkrunruntime.Workloads
+	Context                   context.Context
+	Logger                    *slog.Logger
+	CredentialOptions         credentialbuiltin.Options
+	Ledger                    ledger.Recorder
+	ResponsesState            responsesstate.Store
+	SavedTraces               *savedtrace.AsyncRecorder
+	MaxSavedTraceBytes        int64
+	PromptCache               *promptcache.Directory
+	PromptFingerprinter       *promptcache.Fingerprinter
+	Telemetry                 *otlpexport.Runtime
+	IncludeAliases            bool
+	ModelRouter               modelrouter.Router
+	MMProjection              *mmprojection.Client
+	MMProjectionCredentials   credentials.StatusSource
+	CallerAuthentication      identity.Authenticator
+	AdminEnabled              bool
+	AdminAuthentication       identity.Authenticator
+	AllowInsecureAdmin        bool
+	ClientCredentials         *clientcredentials.Manager
+	ProviderAuth              *providerauth.Service
+	ManagedConfig             managed.Store
+	SparkrunEnabled           bool
+	SparkrunAutoUpdateRecipes bool
+	SparkrunDaemonConnection  string
+	SparkrunCommand           string
+	SparkrunEndpointTTL       time.Duration
+	SparkrunReconcile         time.Duration
+	SparkrunProfileRefresh    time.Duration
+	SparkrunStopTimeout       time.Duration
 }
 
 type runtimeGeneration struct {
@@ -284,6 +285,7 @@ func buildRuntimeGeneration(
 				return nil, err
 			}
 			adminOptions.SparkrunCatalog = catalog
+			adminOptions.SparkrunAutoUpdateRecipes = options.SparkrunAutoUpdateRecipes && options.ManagedConfig != nil
 		}
 		adminOptions.ModelMetadata, _ = requestModelRouter.(modelrouter.DiscoveredMetadataInspector)
 		if options.MMProjection != nil {
@@ -466,7 +468,7 @@ func reconcileManagedConfiguration(
 		logger.Error("watch managed configuration", slog.Any("err", err))
 		return
 	}
-	var profileCatalog sparkrunruntime.Catalog
+	var profileCatalog *sparkrunruntime.Client
 	if options.SparkrunEnabled {
 		var err error
 		profileCatalog, err = newSparkrunClient(options)
@@ -485,6 +487,11 @@ func reconcileManagedConfiguration(
 		}
 		refreshCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
+		if options.SparkrunAutoUpdateRecipes && options.SparkrunWorkloads != nil {
+			if err := sparkrunruntime.RefreshRecipeBindings(refreshCtx, store, profileCatalog, options.SparkrunWorkloads, profileCatalog.InspectWorkloads); err != nil {
+				logger.Warn("refresh recipe bindings", slog.Any("err", err))
+			}
+		}
 		if err := sparkrunruntime.RefreshRecipeProfiles(refreshCtx, store, profileCatalog); err != nil {
 			logger.Warn("refresh recipe profiles", slog.Any("err", err))
 		} else {

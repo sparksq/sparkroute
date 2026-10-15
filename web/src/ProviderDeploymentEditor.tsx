@@ -69,7 +69,7 @@ export function ProviderDeploymentEditor({
   simplifiedCapabilities?: boolean;
   readOnlyDocument?: ConfigurationDocument;
   allowGeneratedRemoval?: boolean;
-  sparkrun?: { enabled: boolean; token: string; revision: string;
+  sparkrun?: { enabled: boolean; autoUpdateRecipes?: boolean; token: string; revision: string;
     onEditingChange: (editing: boolean) => void;
     onPrepared: (document: ConfigurationDocument, message: string) => void };
 
@@ -322,7 +322,7 @@ export function ProviderDeploymentEditor({
               deployments={[stringValue(selectedDeployment.name)]} disabled={disabled} onChange={onChange}
               heading={<div><p className="eyebrow">sparkrun workload</p><h3>{deploymentTitle(selectedDeployment)}</h3></div>} />
               : <FormHeading eyebrow="sparkrun workload" title={deploymentTitle(selectedDeployment)} disabled={formDisabled || removeBlocked} confirmRemove={confirmRemove} removeTitle={removeBlocked ? "Used by virtual models" : "Remove deployment"} onRemove={removeSelected} onBlur={() => setConfirmRemove(false)} />}
-            <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} />
+            <div className="sparkrun-deployment-content"><SparkrunDeploymentSummary deployment={selectedDeployment} catalog={sparkrun} disabled={disabled} onReview={!readOnlySelected ? () => setEditingRecipe(true) : undefined} />
             {readOnlySelected && objectValue(selectedDeployment.endpoint_source).type === "activatable" ? <p className="notice info">
               This deployment is retained by a recipe binding in sparkrun’s proxy.yaml, even while its workload is stopped.
               {allowGeneratedRemoval ? " Use Remove from sparkroute above to exclude it and its generated names. No manual configuration-file edit is needed." : " Its generated names are managed with this deployment."}
@@ -362,19 +362,19 @@ export function ProviderDeploymentEditor({
   );
 }
 
-function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObject; catalog: {enabled: boolean; token: string}}) {
+function SparkrunDeploymentSummary({deployment, catalog, disabled, onReview}: {deployment: JSONObject; catalog: {enabled: boolean; autoUpdateRecipes?: boolean; token: string}; disabled: boolean; onReview?: () => void}) {
   const source = objectValue(deployment.endpoint_source);
-  const [preview, setPreview] = useState<{name: string; source_path: string}>();
+  const [preview, setPreview] = useState<{name: string; source_path: string; recipe_revision: string}>();
   const [error, setError] = useState("");
   const recipe = stringValue(source.recipe), overrides = JSON.stringify(source.overrides ?? {});
   useEffect(() => {
     setPreview(undefined); setError("");
     if (!catalog.enabled || !recipe) return;
     const abort = new AbortController();
-    void sparkRunCatalog<{name: string; source_path: string}>(catalog.token, "catalog_resolve", {reference: recipe, overrides: JSON.parse(overrides)}, abort.signal)
-      .then(setPreview).catch(() => { if (!abort.signal.aborted) setError("Recipe details are unavailable. Edit recipe settings to check the selection on the control node."); });
+    void sparkRunCatalog<{name: string; source_path: string; recipe_revision: string}>(catalog.token, "catalog_resolve", {reference: recipe, overrides: JSON.parse(overrides)}, abort.signal)
+      .then((result) => { if (!abort.signal.aborted) setPreview(result); }).catch(() => { if (!abort.signal.aborted) setError("Recipe details are unavailable. Existing bindings are kept when you save unrelated routing changes. Recipe edits and future starts may require attention."); });
     return () => abort.abort();
-  }, [catalog.enabled, catalog.token, recipe, overrides]);
+  }, [catalog.enabled, catalog.token, recipe, overrides, source.recipe_revision]);
   return <>
     <dl className="sparkrun-deployment-summary">
       <div><dt>Model</dt><dd>{stringValue(deployment.model)}</dd></div>
@@ -389,6 +389,12 @@ function SparkrunDeploymentSummary({deployment, catalog}: {deployment: JSONObjec
         <div><dt>Idle shutdown</dt><dd>{durationMinutes(source.idle_ttl, 0) > 0 ? `${source.idle_action === "sleep" ? "Sleep" : "Stop"} after ${durationMinutes(source.idle_ttl, 0)} minutes` : "Disabled"}</dd></div>
       </>}
     </dl>
+    {source.type === "activatable" && preview?.recipe_revision && preview.recipe_revision !== source.recipe_revision && <div className="notice info" role="status">
+      <strong>{catalog.autoUpdateRecipes ? "Automatic recipe update pending" : "Recipe update available"}: {preview.name}{sparkrunDeploymentClusters(deployment).length ? ` on ${sparkrunDeploymentClusters(deployment).join(", ")}` : ""}.</strong>
+      <p>{catalog.autoUpdateRecipes ? "This update will be applied automatically after the current workload is stopped and removed. Running and sleeping workloads stay unchanged. Updates are checked every minute and must pass trust and configuration checks." : "Your saved recipe binding is unchanged. You can save routing edits without adopting this update. Review it before the next cold start."}</p>
+      {!catalog.autoUpdateRecipes && (onReview ? <button type="button" className="secondary-button" disabled={disabled} onClick={onReview}>Review recipe update</button>
+        : <p>This binding is managed by sparkrun. Update it there when you are ready to adopt the new recipe.</p>)}
+    </div>}
     {error && <p className="notice info">{error}</p>}
   </>;
 }

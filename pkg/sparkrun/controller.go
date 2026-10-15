@@ -304,6 +304,9 @@ func (c *Controller) EnsureReady(
 		return lifecycle.Lease{}, err
 	}
 	defer unlock()
+	if c.workloads.bindingRetired(binding) {
+		return lifecycle.Lease{}, lifecycle.ErrEndpointNotReady
+	}
 	if features.ManualStart {
 		if err := c.workloads.prepareManualStart(binding); err != nil {
 			return lifecycle.Lease{}, err

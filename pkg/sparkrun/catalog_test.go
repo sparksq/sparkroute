@@ -7,6 +7,7 @@ package sparkrun
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -306,5 +307,58 @@ func TestRecipeDraftRejectsInheritedProfileAliasCollision(t *testing.T) {
 	_, _, _, err := PrepareRecipeDraft(context.Background(), fixture, operator, managed.EmptyDocument(), RecipeDraft{Reference: "catalog:123", RecipeRevision: "same", Name: "coding", Aliases: []string{"code"}, Cluster: "lab"})
 	if err == nil || !strings.Contains(err.Error(), "code:low") {
 		t.Fatalf("inherited alias collision accepted: %v", err)
+	}
+}
+
+func TestRecipeBindingChangesIgnoreRoutingAndMetadataButValidateBindingEdits(t *testing.T) {
+	f := &catalogFixture{revision: "saved"}
+	baseline, _, _, err := PrepareRecipeDraft(context.Background(), f, managed.EmptyDocument(), managed.EmptyDocument(), RecipeDraft{Reference: "catalog:123", RecipeRevision: "saved", Name: "coding", Cluster: "lab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.revision = "upstream-changed"
+	for _, test := range []struct {
+		name    string
+		change  func(*config.Document)
+		changed bool
+	}{
+		{"unchanged", func(*config.Document) {}, false},
+		{"aliases and weights", func(d *config.Document) {
+			d.VirtualModels[0].Aliases = []string{"new-alias"}
+			d.VirtualModels[0].Pools[0].Targets[0].Weight = 9
+		}, false},
+		{"title", func(d *config.Document) { d.Deployments[0].Title = "Renamed" }, false},
+		{"nil and empty overrides", func(d *config.Document) { d.Deployments[0].EndpointSource.Overrides = map[string]string{} }, false},
+		{"recipe reference", func(d *config.Document) { d.Deployments[0].EndpointSource.Recipe = "catalog:other" }, true},
+		{"recipe pin", func(d *config.Document) { d.Deployments[0].EndpointSource.RecipeRevision = "another-pin" }, true},
+		{"model", func(d *config.Document) { d.Deployments[0].Model = "another/model" }, true},
+		{"provider", func(d *config.Document) { d.Deployments[0].Provider = "another-provider" }, true},
+		{"overrides", func(d *config.Document) { d.Deployments[0].EndpointSource.Overrides = map[string]string{"tp": "2"} }, true},
+		{"cluster", func(d *config.Document) {
+			d.Deployments[0].EndpointSource.ClusterCandidates = []string{"another-cluster"}
+		}, true},
+		{"lifecycle", func(d *config.Document) { d.Deployments[0].EndpointSource.IdleTTL = config.Duration(time.Minute) }, true},
+		{"new deployment", func(d *config.Document) { d.Deployments[0].Name = "another-deployment" }, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, _ := json.Marshal(baseline)
+			var candidate config.Document
+			_ = json.Unmarshal(raw, &candidate)
+			test.change(&candidate)
+			changes := ChangedRecipeBindings(baseline, candidate)
+			if (len(changes.Deployments) > 0) != test.changed {
+				t.Fatalf("changes = %#v", changes)
+			}
+			f.calls = nil
+			err := ValidateRecipeBindings(context.Background(), f, changes)
+			if test.changed {
+				var mismatch *RecipeRevisionError
+				if !errors.As(err, &mismatch) || mismatch.Deployment != candidate.Deployments[0].Name {
+					t.Fatalf("want actionable revision error, got %v", err)
+				}
+			} else if err != nil || len(f.calls) != 0 {
+				t.Fatalf("unrelated edit consulted catalog: %v %v", err, f.calls)
+			}
+		})
 	}
 }

@@ -90,6 +90,13 @@ func TestRecipeUIFlowValidatesAndSavesWithoutLaunching(t *testing.T) {
 	catalog.revision = "changed"
 	if response := call("PUT", "/v1/config/managed-sets/operator", mutation); response.Code != 422 {
 		t.Fatal(response.Code, response.Body.String())
+	} else {
+		var body struct {
+			Error struct{ Code, Deployment string }
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || body.Error.Code != "recipe_revision_changed" || body.Error.Deployment != prepared.Document.Deployments[0].Name {
+			t.Fatal(response.Body.String(), err)
+		}
 	}
 	_, still, _ := store.Load(context.Background())
 	if still != revision {
@@ -192,5 +199,132 @@ func TestWorkloadStartStopAPIRequiresConfigWrite(t *testing.T) {
 				t.Fatal(action, response.Code, response.Body.String(), control)
 			}
 		}
+	}
+}
+
+func TestRoutingEditsAndPresetsDoNotResolveUnchangedRecipes(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := configsqlite.Open(ctx, configsqlite.Options{Path: filepath.Join(directory, "config.sqlite")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	catalog := &adminCatalog{revision: "saved"}
+	document, _, _, err := sparkrun.PrepareRecipeDraft(ctx, catalog, managed.EmptyDocument(), managed.EmptyDocument(), sparkrun.RecipeDraft{Reference: "catalog:selection", RecipeRevision: "saved", Name: "coding", Cluster: "lab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Initialize(ctx, document, "test", ""); err != nil {
+		t.Fatal(err)
+	}
+	_, revision, _ := store.Load(ctx)
+	// Retain a preset with identical bindings but different routing.
+	presets, _ := store.ListPresets(ctx)
+	work, err := store.SavePreset(ctx, "Work", managed.ReplaceOptions{ExpectedActive: revision, ExpectedPresetsRevision: &presets.PresetsRevision, Actor: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The bridge could be unavailable or its recipe removed. Neither should be
+	// consulted by Validate, Save (including retention), or a routing-only preset.
+	handler := NewHandler(document, revision, Options{ManagedConfig: store, AllowInsecureAdmin: true})
+	call := func(method, path string, body any) *httptest.ResponseRecorder {
+		raw, _ := json.Marshal(body)
+		request := httptest.NewRequest(method, path, bytes.NewReader(raw))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		return response
+	}
+	mutation := func() map[string]any {
+		return map[string]any{"document": document, "expected_active_revision": revision}
+	}
+	if response := call("POST", "/v1/config/managed-sets/operator/validate", mutation()); response.Code != 200 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	// Add an independently discovered target without changing the saved pin.
+	document.Deployments = append(document.Deployments, config.Deployment{Name: "discovered", Provider: "sparkrun", Model: "test/model", EndpointSource: config.EndpointSource{Type: config.EndpointSourceDiscovered, Controller: "sparkrun"}})
+	document.VirtualModels[0].Aliases = []string{"code"}
+	document.VirtualModels[0].Pools = append(document.VirtualModels[0].Pools, config.RoutingPool{Priority: 1, Targets: []config.WeightedTarget{{Deployment: "discovered", Weight: 1}}})
+	preferRunning := true
+	document.VirtualModels[0].Selection.PreferRunning = &preferRunning
+	for _, method := range []string{"POST", "PUT"} {
+		path := "/v1/config/managed-sets/operator"
+		if method == "POST" {
+			path += "/validate"
+		}
+		if response := call(method, path, mutation()); response.Code != 200 {
+			t.Fatal(method, response.Code, response.Body.String())
+		}
+	}
+	saved, current, _ := store.Load(ctx)
+	if saved.Deployments[0].EndpointSource.RecipeRevision != "saved" {
+		t.Fatal("routing save advanced pin")
+	}
+	if response := call("PUT", "/v1/config/managed-sets/operator", mutation()); response.Code != 409 {
+		t.Fatal("stale revision accepted", response.Code)
+	}
+	revision = current
+	for _, id := range []string{"default", work.ID} {
+		presets, _ = store.ListPresets(ctx)
+		response := call("POST", "/v1/config/presets/activate", map[string]any{"id": id, "expected_active_revision": presets.ActiveRevision, "expected_presets_revision": presets.PresetsRevision})
+		if response.Code != 200 {
+			t.Fatal(response.Code, response.Body.String())
+		}
+	}
+}
+
+// Simulate a generated inventory update between the baseline read and candidate
+// construction. The request must not use an unversioned baseline to skip checks.
+type changingBaselineStore struct {
+	managed.Store
+	change func()
+}
+
+func (s *changingBaselineStore) Load(ctx context.Context) (config.Document, config.Version, error) {
+	document, revision, err := s.Store.Load(ctx)
+	if s.change != nil {
+		change := s.change
+		s.change = nil
+		change()
+	}
+	return document, revision, err
+}
+func TestRecipeBaselineUsesExpectedRevisionAcrossConcurrentUpdate(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := configsqlite.Open(ctx, configsqlite.Options{Path: filepath.Join(directory, "config.sqlite")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	empty := managed.EmptyDocument()
+	_, _ = store.Initialize(ctx, empty, "test", "")
+	_, revision, _ := store.Load(ctx)
+	changing := &changingBaselineStore{Store: store, change: func() {
+		replacement := managed.EmptyDocument()
+		replacement.Providers = []config.Provider{{Name: "other", Type: "openai", BaseURL: "https://api.example.test/v1"}}
+		if _, err := store.ReplaceSet(ctx, managed.OwnerOperator, replacement, managed.ReplaceOptions{ExpectedActive: revision, Actor: "concurrent"}); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	h := NewHandler(empty, revision, Options{ManagedConfig: changing, AllowInsecureAdmin: true})
+	raw, _ := json.Marshal(map[string]any{"document": empty, "expected_active_revision": revision})
+	request := httptest.NewRequest("POST", "/v1/config/managed-sets/operator/validate", bytes.NewReader(raw))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	h.ServeHTTP(response, request)
+	if response.Code != 409 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	saved, _, _ := store.Load(ctx)
+	if len(saved.Providers) != 1 || saved.Providers[0].Name != "other" {
+		t.Fatal("concurrent update lost")
 	}
 }

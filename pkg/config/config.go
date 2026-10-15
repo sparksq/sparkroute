@@ -713,9 +713,18 @@ const (
 )
 
 type SelectionPolicy struct {
+	// PreferRunning tries ready targets with request capacity across priority pools
+	// before falling back to the usual priority and cold-start behavior.
+	// Omitted means enabled; an explicit false preserves strict priority ordering.
+	PreferRunning       *bool                     `json:"prefer_running,omitempty"`
 	Mode                SelectionMode             `json:"mode,omitempty"`
 	HashKey             SelectionHashKey          `json:"hash_key,omitempty"`
 	PromptCacheAffinity PromptCacheAffinityPolicy `json:"prompt_cache_affinity,omitempty,omitzero"`
+}
+
+// PrefersRunning defaults to ready targets while retaining an explicit opt-out.
+func (p SelectionPolicy) PrefersRunning() bool {
+	return p.PreferRunning == nil || *p.PreferRunning
 }
 
 // SelectionHashKey names trusted identity or attribution used for stable

@@ -66,10 +66,74 @@ recipe resolution, uploads, and explicit refresh progress. The handler only
 allows catalog operations, never arbitrary subprocess or lifecycle commands.
 `POST /v1/sparkrun/recipe-draft` resolves and pins the selection and derives the
 provider, deployment, binding revision, and virtual-model entries. Validate and
-Save recheck the recipe revision and named cluster. None of those paths launch
-models. Existing configuration-read and operator-write roles apply; uploads and
-registry refresh require write permission. Catalog failures do not block cloud
-configurations without sparkrun bindings.
+Save recheck the recipe revision and named cluster for new or changed bindings.
+The comparison uses the saved merged configuration at the expected active
+revision. Full structural validation still applies to the entire candidate;
+unchanged bindings do not require catalog resolution or import retention. This
+also applies when activating a preset. Routing pools, weights, aliases and display
+metadata can be edited even if an unchanged recipe has changed or is unavailable.
+None of those paths launch models. Existing configuration-read and operator-write
+roles apply; uploads and registry refresh require write permission.
+
+## Automatic recipe updates
+
+Recipe bindings follow trusted catalog changes automatically by default in managed
+configuration mode (`-sparkrun-auto-update-recipes=false` opts out). The SparkRoute
+plugin exposes this as `gateways.sparkroute.auto_update_recipes` in `proxy.yaml`.
+Reconciliation checks every minute and waits until the previous workload receipt
+is removed, including sleeping and unready workloads. It preserves deployment
+IDs, routes, aliases, launch overrides and lifecycle policy; the next successful
+cold start uses the updated pin. A request immediately after shutdown may need to
+wait for the next reconciliation. Unavailable catalogs/inventory, untrusted
+recipes, changed model/API contracts and invalid configurations leave the saved
+binding unchanged and emit a gateway log warning. Automatic updates neither
+refresh registries nor restart jobs. With the option disabled, Model Deployments
+continues to offer explicit recipe review. Generated YAML bindings use the same
+update policy, retaining their stable deployment IDs across discovery sweeps.
+
+Model Deployments shows **Automatic recipe update pending** while a changed
+recipe waits for the previous workload to be removed. With auto-updates disabled,
+it shows **Recipe update available** and **Review recipe update** instead.
+**Apply to draft → Validate → Save** explicitly adopts an update while preserving
+the routing draft. A recipe changed again during an explicit binding edit returns
+`recipe_revision_changed`, with deployment and saved/current revisions, and the
+UI offers a direct review action. Unrelated saves never advance pins themselves;
+automatic updates are separate audited configuration changes and use revision
+checks to preserve concurrent edits.
+
+A saved fingerprint detects drift but does not retain old recipe contents, so a
+full historical diff is unavailable. Existing workloads are adopted, observed,
+woken and stopped using their recorded identity. New launches still require an
+exact match to the current recipe and enforce trust. Incomplete/truncated
+inventory, controller operations in progress and unfinished launch receipts
+prevent automatic updates from assuming the old workload is absent. The paired
+core/plugin inventory exposes this completeness information; older inventories
+without it leave automatic updates deferred.
+
+## Prefer running targets
+
+In **Virtual Models / Aliases → Routing pools**, **Prefer running targets
+with capacity** is enabled by default for the whole virtual model, including
+existing configurations that omit the setting. Uncheck it to save an explicit
+`selection.prefer_running: false` opt-out. Linked request profiles inherit it. SparkRoute first
+tries ready targets across all priority pools, preserving priorities, protocol
+and capability preferences, and relative weights within that group. If no ready
+target can serve, remaining targets retain the existing priority and cold-start
+rules. Usual retry limits and budgets still apply; an explicit provider selector
+preference and hard state-affinity pins retain their precedence.
+
+Capacity means deployment concurrency/circuit admission and, for dynamic
+endpoints, reported active requests plus this gateway's active leases against
+endpoint concurrency limits. Expired, unauthorized and non-ready registrations
+are not preferred. A zero concurrency limit means no declared limit; SparkRoute
+does not estimate spare GPU memory or token throughput. Eligible static/hosted
+endpoints are considered running without an additional probe.
+
+Readiness is a non-reserving hint and admission rechecks it. A preferred running
+target that loses readiness will not cold-start as part of that preferred attempt;
+normal fallback and retry rules apply to remaining targets. This option does not
+create routes, start jobs while editing, or change any deployment's cold-start
+policy.
 
 Selections are exact controller-local `catalog:<id>` references. sparkrun owns
 registry resolution, normalized overrides, fingerprints, recipe/plugin checks,

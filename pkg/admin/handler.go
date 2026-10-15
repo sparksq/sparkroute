@@ -52,22 +52,23 @@ type Options struct {
 	SparkrunControl interface {
 		WorkloadAction(context.Context, string, string, string) (sparkrun.WorkloadInfo, error)
 	}
-	Lifecycle         lifecycle.StatusSource
-	SparkrunCatalog   sparkrun.Catalog
-	Endpoints         ReadyEndpoints
-	EndpointInventory endpointregistry.Inspector
-	Targets           routing.TargetStatusSource
-	Credentials       credentials.StatusSource
-	GatewayVersion    string
-	BuildInfo         map[string]string
-	ValidateConfig    func(config.Document) error
-	Authenticator     identity.Authenticator
-	ClientCredentials *clientcredentials.Manager
-	ManagedConfig     managed.Store
-	MMProjection      mmprojection.StatusProber
-	ModelMetadata     modelrouter.DiscoveredMetadataInspector
-	Privacy           privacy.StatusSource
-	ProviderAuth      *providerauth.Service
+	Lifecycle                 lifecycle.StatusSource
+	SparkrunCatalog           sparkrun.Catalog
+	SparkrunAutoUpdateRecipes bool
+	Endpoints                 ReadyEndpoints
+	EndpointInventory         endpointregistry.Inspector
+	Targets                   routing.TargetStatusSource
+	Credentials               credentials.StatusSource
+	GatewayVersion            string
+	BuildInfo                 map[string]string
+	ValidateConfig            func(config.Document) error
+	Authenticator             identity.Authenticator
+	ClientCredentials         *clientcredentials.Manager
+	ManagedConfig             managed.Store
+	MMProjection              mmprojection.StatusProber
+	ModelMetadata             modelrouter.DiscoveredMetadataInspector
+	Privacy                   privacy.StatusSource
+	ProviderAuth              *providerauth.Service
 	// AllowInsecureAdmin grants the local operator full standalone admin
 	// privileges without authentication. Callers must constrain the listener
 	// to loopback; the executable rejects unsafe bind combinations.
@@ -446,6 +447,7 @@ func (h *handler) serveBootstrap(
 		bootstrap.Features["sparkrun_controls"] = h.options.SparkrunControl != nil && hasRole(principal, RoleConfigWrite)
 		bootstrap.Features["sparkrun"] = h.options.SparkrunCatalog != nil
 		bootstrap.Features["sparkrun_catalog"] = h.options.SparkrunCatalog != nil && hasRole(principal, RoleConfigRead)
+		bootstrap.Features["sparkrun_auto_update_recipes"] = h.options.SparkrunAutoUpdateRecipes && bootstrap.Features["sparkrun_catalog"]
 		bootstrap.Features[adminapi.FeatureLifecycleStatus] = h.options.Lifecycle != nil && hasRole(principal, RoleStatusRead)
 		bootstrap.Features[adminapi.FeatureEndpointInventory] = h.options.EndpointInventory != nil && hasRole(principal, RoleStatusRead)
 		bootstrap.Features[adminapi.FeatureLifecycle] = bootstrap.Features[adminapi.FeatureLifecycleStatus] || bootstrap.Features[adminapi.FeatureEndpointInventory]

@@ -15,7 +15,7 @@ const deployment = {name: "stable-target", title: "sparkrun:lab:test/model", pro
 const integrated: ConfigurationDocument = {providers: [{name: "local-provider", type: "openai"}], deployments: [deployment], virtual_models: [{name: "coding", aliases: ["code"], pools: [{targets: [{deployment: "stable-target", weight: 1}]}]}]};
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-function mockCatalog() {
+function mockCatalog(currentRevision = detail.recipe_revision) {
   const calls: any[] = [];
   vi.stubGlobal("fetch", vi.fn(async (_url: string, request: RequestInit) => {
     const body = JSON.parse(String(request.body)); calls.push(body);
@@ -25,18 +25,18 @@ function mockCatalog() {
       case "catalog_clusters": response = {clusters: [{name: "lab", host_count: 2, default: true}]}; break;
       case "catalog_registries": response = {registries: []}; break;
       case "catalog_search": response = {recipes: [detail], total: 1, next_offset: null, unavailable_registries: []}; break;
-      case "catalog_resolve": response = detail; break;
+      case "catalog_resolve": response = {...detail, recipe_revision: currentRevision}; break;
       default: throw new Error("unexpected operation: " + body.operation);
     }
     return new Response(JSON.stringify(response), {headers: {"Content-Type": "application/json"}});
   }));
   return calls;
 }
-function Editor({enabled = true, initial = empty, generated}: {enabled?: boolean; initial?: ConfigurationDocument; generated?: ConfigurationDocument}) {
+function Editor({enabled = true, autoUpdateRecipes = false, initial = empty, generated}: {enabled?: boolean; autoUpdateRecipes?: boolean; initial?: ConfigurationDocument; generated?: ConfigurationDocument}) {
   const [document, setDocument] = useState(initial);
   const [editing, setEditing] = useState(false);
   return <><ProviderDeploymentEditor section="deployments" document={document} readOnlyDocument={generated} disabled={false} onChange={setDocument}
-    sparkrun={{enabled, token: "fixture", revision: "active", onEditingChange: setEditing, onPrepared: setDocument}} />
+    sparkrun={{enabled, autoUpdateRecipes, token: "fixture", revision: "active", onEditingChange: setEditing, onPrepared: setDocument}} />
     <output aria-label="Draft">{JSON.stringify(document)}</output><output aria-label="Editing">{String(editing)}</output></>;
 }
 const draft = () => JSON.parse(screen.getByLabelText("Draft").textContent!);
@@ -107,4 +107,35 @@ it("shows the recipe path once in small text and uses the reported cluster rathe
   expect(screen.getByText("Cluster").nextElementSibling).toHaveTextContent("actual-cluster");
   expect(screen.queryByText("Reported by sparkrun")).not.toBeInTheDocument();
   expect(draft()).toEqual(empty);
+});
+
+it("warns about recipe drift without modifying the draft and opens an explicit review", async () => {
+  const calls = mockCatalog("updated-revision"); render(<Editor initial={integrated} />);
+  expect(await screen.findByText(/Recipe update available: @registry\/coder on lab/)).toBeVisible();
+  expect(draft()).toEqual(integrated);
+  fireEvent.click(screen.getByRole("button", {name: "Review recipe update"}));
+  expect(await screen.findByText(/Review recipe update for sparkrun:lab:test\/model/)).toBeVisible();
+  expect(screen.getByText("updated-revision", {selector: "code"})).toBeVisible();
+  expect(screen.getByText(/previous recipe contents were not retained/)).toBeVisible();
+  expect(draft()).toEqual(integrated);
+  expect(calls.some(call => call.recipe)).toBe(false);
+  fireEvent.click(screen.getByRole("button", {name: "Cancel"}));
+  expect(draft()).toEqual(integrated);
+});
+
+it("keeps an unavailable recipe informational and leaves routing editable", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({error:{message:"Recipe removed"}}), {status:422})));
+  render(<Editor initial={integrated} />);
+  expect(await screen.findByText(/Existing bindings are kept when you save unrelated routing changes/)).toBeVisible();
+  expect(screen.getByRole("button", {name: "Edit recipe settings"})).toBeEnabled();
+  expect(draft()).toEqual(integrated);
+});
+
+it("shows an automatic update pending without requiring recipe review", async () => {
+  mockCatalog("updated-revision"); render(<Editor initial={integrated} autoUpdateRecipes />);
+  expect(await screen.findByText(/Automatic recipe update pending: @registry\/coder on lab/)).toBeVisible();
+  expect(screen.getByText(/Running and sleeping workloads stay unchanged/)).toBeVisible();
+  expect(screen.queryByRole("button", {name: "Review recipe update"})).not.toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Edit recipe settings"})).toBeEnabled();
+  expect(draft()).toEqual(integrated);
 });

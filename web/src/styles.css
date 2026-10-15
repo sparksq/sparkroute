@@ -1735,6 +1735,10 @@ details.model-section > summary small {
   font-weight: 600;
 }
 
+.routing-preference {
+  margin: 14px 22px 8px;
+}
+
 .routing-pools {
   display: grid;
   gap: 12px;

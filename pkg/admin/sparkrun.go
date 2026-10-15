@@ -118,9 +118,19 @@ func (h *handler) sparkrunRecipeDraft(writer http.ResponseWriter, request *http.
 	writeJSON(writer, 200, map[string]any{"document": document, "deployment": deployment, "reused": reused})
 }
 
-func (h *handler) validateSparkrunCandidate(writer http.ResponseWriter, request *http.Request, owner managed.Owner, input managedSetMutation) bool {
+func (h *handler) validateSparkrunCandidate(writer http.ResponseWriter, request *http.Request, owner managed.Owner, input managedSetMutation, retain bool) bool {
 	if owner != managed.OwnerOperator {
 		return true
+	}
+	// Load and candidate construction both check the same content revision.
+	// A concurrent update either fails here or at the final Validate/Replace CAS.
+	baseline, active, err := h.options.ManagedConfig.Load(request.Context())
+	if err == nil && active != *input.ExpectedActiveRevision {
+		err = managed.ErrRevisionConflict
+	}
+	if err != nil {
+		writeManagedConfigError(writer, err)
+		return false
 	}
 	candidate, _, err := h.options.ManagedConfig.BuildCandidate(request.Context(), owner, input.Document, *input.ExpectedActiveRevision)
 	if err != nil {
@@ -129,12 +139,17 @@ func (h *handler) validateSparkrunCandidate(writer http.ResponseWriter, request 
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
 	defer cancel()
-	if err := sparkrun.ValidateRecipeBindings(ctx, h.options.SparkrunCatalog, candidate); err != nil {
+	if err := sparkrun.ValidateWorkloadSharing(candidate); err != nil {
 		writeCatalogError(writer, err)
 		return false
 	}
-	if request.Method == http.MethodPut {
-		if err := sparkrun.RetainRecipeImports(ctx, h.options.SparkrunCatalog, input.Document); err != nil {
+	changed := sparkrun.ChangedRecipeBindings(baseline, candidate)
+	if err := sparkrun.ValidateRecipeBindings(ctx, h.options.SparkrunCatalog, changed); err != nil {
+		writeCatalogError(writer, err)
+		return false
+	}
+	if retain {
+		if err := sparkrun.RetainRecipeImports(ctx, h.options.SparkrunCatalog, changed); err != nil {
 			writeCatalogError(writer, err)
 			return false
 		}
@@ -143,6 +158,14 @@ func (h *handler) validateSparkrunCandidate(writer http.ResponseWriter, request 
 }
 
 func writeCatalogError(writer http.ResponseWriter, err error) {
+	var revisionError *sparkrun.RecipeRevisionError
+	if errors.As(err, &revisionError) {
+		writeJSON(writer, http.StatusUnprocessableEntity, map[string]any{"error": map[string]any{
+			"code": "recipe_revision_changed", "message": revisionError.Error(),
+			"deployment": revisionError.Deployment, "saved_revision": revisionError.SavedRevision, "current_revision": revisionError.CurrentRevision,
+		}})
+		return
+	}
 	var bridgeError *sparkrun.BridgeError
 	if errors.As(err, &bridgeError) {
 		writeError(writer, http.StatusUnprocessableEntity, bridgeError.Code, bridgeError.Message)

@@ -41,7 +41,7 @@ import type {
 export class AdminAPIError extends Error {
   readonly status: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, readonly code?: string, readonly deployment?: string) {
     super(message);
     this.name = "AdminAPIError";
     this.status = status;
@@ -72,15 +72,17 @@ async function requestJSON<T>(
 
 async function responseError(response: Response) {
   let message = `Admin request failed with status ${response.status}`;
+  let code: string | undefined, deployment: string | undefined;
   try {
     const body = (await response.json()) as {
-      error?: { message?: string };
+      error?: { message?: string; code?: string; deployment?: string };
     };
     if (body.error?.message) message = body.error.message;
+    code = body.error?.code; deployment = body.error?.deployment;
   } catch {
     // Keep the bounded status-only fallback; do not reflect arbitrary HTML.
   }
-  return new AdminAPIError(response.status, message);
+  return new AdminAPIError(response.status, message, code, deployment);
 }
 
 function queryPath<T extends object>(path: string, values: T) {

@@ -18,13 +18,14 @@ import (
 // Leases count physical jobs, so a draining generation cannot idle-stop a job
 // while the replacement generation is serving it.
 type Workloads struct {
-	recoveries map[string]*recoveryState
-	wait       sync.WaitGroup
-	mu         sync.Mutex
-	gates      map[string]chan struct{}
-	jobs       map[string]*workload
-	policies   map[string]lifecycle.Binding
-	closed     bool
+	recoveries      map[string]*recoveryState
+	wait            sync.WaitGroup
+	mu              sync.Mutex
+	gates           map[string]chan struct{}
+	jobs            map[string]*workload
+	policies        map[string]lifecycle.Binding
+	closed          bool
+	retiredBindings map[string]bool
 }
 
 type workload struct {
@@ -72,6 +73,7 @@ func (w *Workloads) Configure(targets []lifecycle.Target) {
 	defer w.mu.Unlock()
 	w.policies = map[string]lifecycle.Binding{}
 	for _, target := range targets {
+		delete(w.retiredBindings, retiredBindingKey(target.Binding))
 		if target.Source != lifecycle.EndpointActivatable {
 			continue
 		}

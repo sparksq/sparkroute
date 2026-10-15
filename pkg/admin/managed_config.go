@@ -150,7 +150,7 @@ func (h *handler) managedSet(writer http.ResponseWriter, request *http.Request) 
 		if !ok {
 			return
 		}
-		if !h.validateSparkrunCandidate(writer, request, owner, input) {
+		if !h.validateSparkrunCandidate(writer, request, owner, input, request.Method == http.MethodPut) {
 			return
 		}
 		principal, _ := principalFromRequest(request)
@@ -235,7 +235,7 @@ func (h *handler) validateManagedSet(
 	if !ok {
 		return
 	}
-	if !h.validateSparkrunCandidate(writer, request, owner, input) {
+	if !h.validateSparkrunCandidate(writer, request, owner, input, request.Method == http.MethodPut) {
 		return
 	}
 	validation, err := h.options.ManagedConfig.ValidateSet(

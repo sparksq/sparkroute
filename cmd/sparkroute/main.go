@@ -289,6 +289,7 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 		"capture-session durability checkpoint interval",
 	)
 	sparkrunEnabled := flags.Bool("sparkrun", false, "enable sparkrun integration, recipe catalog, and on-demand lifecycle")
+	sparkrunAutoUpdateRecipes := flags.Bool("sparkrun-auto-update-recipes", true, "automatically update trusted recipe bindings when their previous workload no longer exists")
 	sparkrunDaemonConnection := flags.String("sparkrun-daemon-connection", env("SPARKROUTE_SPARKRUN_DAEMON_CONNECTION", ""), "Private Sparkrun daemon connection file; selects direct HTTP/SSE instead of the bridge")
 	sparkrunCommand := flags.String(
 		"sparkrun-command",
@@ -744,9 +745,10 @@ func run(ctx context.Context, args []string, stdout io.Writer, logger *slog.Logg
 	runtimeOptions := runtimeBuildOptions{
 		Privacy:     privacyRuntime,
 		TraceStores: newTraceStores(*traceStorage, tracePath, traceStore), TraceReader: traceStore,
-		SparkrunWorkloads: workloads,
-		SparkrunEnabled:   *sparkrunEnabled,
-		Context:           ctx, Logger: logger, CredentialOptions: credentialOptions,
+		SparkrunWorkloads:         workloads,
+		SparkrunEnabled:           *sparkrunEnabled,
+		SparkrunAutoUpdateRecipes: *sparkrunAutoUpdateRecipes,
+		Context:                   ctx, Logger: logger, CredentialOptions: credentialOptions,
 		Ledger: usageWriter, ResponsesState: responsesState,
 		SavedTraces: traceRecorder, MaxSavedTraceBytes: *traceMaxBodyBytes,
 		PromptCache: promptCache, PromptFingerprinter: promptFingerprinter,

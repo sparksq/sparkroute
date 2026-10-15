@@ -351,6 +351,11 @@ export function VirtualModelEditor({
                     Add fallback pool
                   </button>
                 </div>
+                <label className="checkbox-field routing-preference">
+                  <input type="checkbox" checked={selection.prefer_running !== false} onChange={(event) => updateModel((model) => setNested(model, "selection", (selection) => ({...selection, prefer_running: event.target.checked})))} />
+                  <span>Prefer running targets with capacity</span>
+                </label>
+                <p className="section-help">Enabled by default. Try running targets across all pools first, keeping their priority and relative weights. If none can serve, use the normal priority and cold-start rules. Capacity uses configured concurrency limits and reported active requests; it does not estimate GPU capacity.</p>
                 <RoutingPools
                   deployments={deployments}
                   deploymentTitles={titles}
@@ -636,6 +641,9 @@ function inspectDocument(
       if (value[field] !== undefined && !isObject(value[field])) return { error: `virtual_models[${modelIndex}].${field} must be an object.` };
     }
     const selection = objectValue(value.selection);
+    if (selection.prefer_running !== undefined && typeof selection.prefer_running !== "boolean") {
+      return { error: `virtual_models[${modelIndex}].selection.prefer_running must be a boolean.` };
+    }
     if (selection.prompt_cache_affinity !== undefined && !isObject(selection.prompt_cache_affinity)) {
       return { error: `virtual_models[${modelIndex}].selection.prompt_cache_affinity must be an object.` };
     }

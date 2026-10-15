@@ -203,3 +203,90 @@ func dynamicGatewayDocument(capability config.Capability) config.Document {
 		}},
 	}
 }
+
+func TestPreferRunningRoutesToWarmFallbackBeforeColdActivation(t *testing.T) {
+	enabled, disabled := true, false
+	for _, test := range []struct {
+		name                    string
+		prefer                  *bool
+		busy, missing, failWarm bool
+		coldCalls, warmCalls    int
+	}{
+		{name: "explicit opt-out keeps priority", prefer: &disabled, coldCalls: 1},
+		{name: "default prefers running fallback", warmCalls: 1},
+		{name: "running fallback", prefer: &enabled, warmCalls: 1},
+		{name: "busy fallback starts primary", prefer: &enabled, busy: true, coldCalls: 1},
+		{name: "no running targets starts primary", prefer: &enabled, missing: true, coldCalls: 1},
+		{name: "failed warm target falls back to cold priority", prefer: &enabled, failWarm: true, coldCalls: 1, warmCalls: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var mu sync.Mutex
+			coldCalls, warmCalls := 0, 0
+			reply := func(w http.ResponseWriter) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":"reply","object":"chat.completion","model":"upstream","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`))
+			}
+			cold := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { mu.Lock(); coldCalls++; mu.Unlock(); reply(w) }))
+			defer cold.Close()
+			warm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				warmCalls++
+				mu.Unlock()
+				if test.failWarm {
+					w.WriteHeader(503)
+					return
+				}
+				reply(w)
+			}))
+			defer warm.Close()
+			document := dynamicGatewayDocument("")
+			document.Deployments = append(document.Deployments, config.Deployment{Name: "warm", Provider: "provider", Model: "upstream", EndpointSource: config.EndpointSource{Type: config.EndpointSourceDiscovered, Controller: "controller"}})
+			document.VirtualModels[0].Selection.PreferRunning = test.prefer
+			document.VirtualModels[0].Pools = append(document.VirtualModels[0].Pools, config.RoutingPool{Priority: 1, Targets: []config.WeightedTarget{{Deployment: "warm", Weight: 1}}})
+			registry := endpointregistry.NewMemory()
+			endpoint := endpointregistry.Endpoint{ID: "cold-endpoint", Target: "deployment", BaseURL: cold.URL + "/v1", Controller: "controller", Protocol: "openai", ServedModels: []string{"upstream"}, State: endpointregistry.StateReady}
+			controller := &gatewayRuntimeController{registry: registry, endpoint: endpoint}
+			if !test.missing {
+				endpoint.ID = "warm-endpoint"
+				endpoint.Target = "warm"
+				endpoint.BaseURL = warm.URL + "/v1"
+				endpoint.MaxConcurrency = 1
+				if test.busy {
+					endpoint.ActiveRequests = 1
+				}
+				if err := registry.Register(context.Background(), endpoint); err != nil {
+					t.Fatal(err)
+				}
+			}
+			targets, err := lifecycle.TargetsFromDocument(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			coordinator, err := lifecycle.NewAdmissionCoordinator(targets, lifecycle.AdmissionOptions{Registry: registry, Controllers: map[string]lifecycle.Controller{"controller": controller}, Authorizer: lifecycle.EndpointAuthorizerFunc(func(context.Context, endpointregistry.Endpoint) error { return nil })})
+			if err != nil {
+				t.Fatal(err)
+			}
+			handler, err := NewDataHandler(document, DataOptions{Lifecycle: coordinator})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"virtual","messages":[{"role":"user","content":"hello"}]}`))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != 200 {
+				t.Fatal(response.Code, response.Body.String())
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if coldCalls != test.coldCalls || warmCalls != test.warmCalls {
+				t.Fatalf("cold/warm requests = %d/%d; want %d/%d", coldCalls, warmCalls, test.coldCalls, test.warmCalls)
+			}
+			controller.mu.Lock()
+			defer controller.mu.Unlock()
+			if controller.ensures != test.coldCalls {
+				t.Fatalf("cold activation calls = %d, want %d", controller.ensures, test.coldCalls)
+			}
+		})
+	}
+}

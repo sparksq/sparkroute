@@ -21,6 +21,8 @@ import (
 const acceptanceBridgeStateEnvironment = "SPARKROUTE_ACCEPTANCE_BRIDGE_STATE"
 
 type acceptanceBridgeState struct {
+	CatalogRevision         string                                         `json:"catalog_revision,omitempty"`
+	ActiveRecipeRevision    string                                         `json:"active_recipe_revision,omitempty"`
 	LaunchCalls             int                                            `json:"launch_calls"`
 	Profiles                map[string]config.RequestProfileImplementation `json:"profiles,omitempty"`
 	Host                    string                                         `json:"host"`
@@ -89,7 +91,7 @@ func runAcceptanceBridge() int {
 	state, err := updateAcceptanceBridgeState(statePath, func(state *acceptanceBridgeState) error {
 		state.ProcessCalls++
 		switch request.Operation {
-		case "workloads", "catalog_resolve":
+		case "workloads", "catalog_resolve", "catalog_clusters":
 		case "capabilities":
 			state.CapabilitiesCalls++
 		case "discover":
@@ -99,6 +101,9 @@ func runAcceptanceBridge() int {
 			if request.Binding != nil {
 				state.LastRecipe = request.Binding.Recipe
 				state.LastRecipeRevision = request.Binding.RecipeRevision
+				if state.CatalogRevision != "" {
+					state.ActiveRecipeRevision = request.Binding.RecipeRevision
+				}
 			}
 		case "stop":
 			state.StopCalls++
@@ -119,9 +124,19 @@ func runAcceptanceBridge() int {
 	}
 	switch request.Operation {
 	case "catalog_resolve":
-		response.Result = map[string]any{"reference": "cold-recipe", "recipe_revision": acceptanceColdRecipeRevision(state), "model": "cold-upstream", "runtime": "acceptance-runtime", "profile_source_kind": "recipe", "trusted": true, "sparkroute": map[string]any{"request_profiles": state.Profiles}}
+		revision := state.CatalogRevision
+		if revision == "" {
+			revision = acceptanceColdRecipeRevision(state)
+		}
+		response.Result = map[string]any{"reference": "cold-recipe", "recipe_revision": revision, "model": "cold-upstream", "runtime": "acceptance-runtime", "native_protocols": []string{"openai"}, "profile_source_kind": "recipe", "trusted": true, "sparkroute": map[string]any{"request_profiles": state.Profiles}}
+	case "catalog_clusters":
+		response.Result = map[string]any{"clusters": []any{map[string]any{"name": "local-cluster", "host_count": 2, "hosts": []string{"one", "two"}}}}
 	case "workloads":
-		response.Result = map[string]any{"plugins": []any{}, "workloads": []any{}}
+		jobs := []any{}
+		if state.ColdActive {
+			jobs = append(jobs, map[string]any{"job_id": "cold-job", "cluster_name": "local-cluster", "recipe_revision": acceptanceColdRecipeRevision(state), "lifecycle_state": "running"})
+		}
+		response.Result = map[string]any{"plugins": []any{}, "workloads": jobs, "complete": true}
 	case "capabilities":
 		response.Result = map[string]any{
 			"protocol_version": request.SchemaVersion,
@@ -245,6 +260,9 @@ func acceptanceEndpoint(
 func acceptanceColdRecipeRevision(state acceptanceBridgeState) string {
 	if state.BadRecipeRevision {
 		return "badrev000000"
+	}
+	if state.ActiveRecipeRevision != "" {
+		return state.ActiveRecipeRevision
 	}
 	return "coldrev00001"
 }
